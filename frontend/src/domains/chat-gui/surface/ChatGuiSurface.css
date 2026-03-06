@@ -17,13 +17,23 @@
   min-width: 0;
   min-height: 0;
   overflow: hidden;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
 }
 
-.chat-gui-surface.empty {
-  padding: 0;
+.chat-gui-header {
+  display: flex;
+  justify-content: flex-end;
+  padding: 12px 18px 8px;
 }
 
-.chat-gui-surface.history {
+.chat-gui-empty-body {
+  min-height: 0;
+  overflow: auto;
+}
+
+.chat-gui-history-layout {
+  min-height: 0;
   display: grid;
   grid-template-rows: minmax(0, 1fr) auto;
 }

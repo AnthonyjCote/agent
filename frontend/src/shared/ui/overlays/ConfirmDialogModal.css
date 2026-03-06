@@ -1,0 +1,18 @@
+/*
+ * Purpose: Style shared confirm dialog modal body copy.
+ * Responsibilities:
+ * - Keep destructive confirmation content clear and compact.
+ * - Match shared modal typography treatment.
+ */
+/* @tags: shared-ui,overlays,confirm,styles */
+/* @status: active */
+/* @owner: founder */
+/* @domain: shared */
+/* @adr: none */
+
+.confirm-dialog-message {
+  margin: 0;
+  color: color-mix(in srgb, var(--text-primary) 94%, #fff);
+  font-size: 13px;
+  line-height: 1.45;
+}

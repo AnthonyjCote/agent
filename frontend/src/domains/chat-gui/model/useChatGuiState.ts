@@ -11,20 +11,12 @@
 // @domain: chat-gui
 // @adr: none
 
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { buildAssistantResponse, type ActiveAgent, type ChatMessage } from '../lib';
 
-export function useChatGuiState() {
+export function useChatGuiState(activeAgent: ActiveAgent) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState('');
-
-  const activeAgent = useMemo<ActiveAgent>(
-    () => ({
-      id: 'agent-1',
-      name: 'Coordinator'
-    }),
-    []
-  );
 
   const submitDraft = () => {
     const content = draft.trim();
@@ -47,7 +39,6 @@ export function useChatGuiState() {
   };
 
   return {
-    activeAgent,
     messages,
     draft,
     setDraft,

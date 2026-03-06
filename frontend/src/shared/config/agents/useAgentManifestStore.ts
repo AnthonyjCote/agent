@@ -41,9 +41,14 @@ export function useAgentManifestStore() {
     );
   };
 
+  const deleteAgent = (agentId: string) => {
+    setAgents((current) => current.filter((agent) => agent.agentId !== agentId));
+  };
+
   return {
     agents: sortedAgents,
     createAgent,
-    updateAgent
+    updateAgent,
+    deleteAgent
   };
 }

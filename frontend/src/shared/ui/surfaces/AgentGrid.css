@@ -1,0 +1,96 @@
+/*
+ * Purpose: Style reusable agent grid surface and actions.
+ * Responsibilities:
+ * - Present agent cards in responsive full-bleed modal layouts.
+ * - Keep select/edit actions compact and visually consistent.
+ */
+/* @tags: shared-ui,surfaces,agents,grid,styles */
+/* @status: active */
+/* @owner: founder */
+/* @domain: shared */
+/* @adr: none */
+
+.agent-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 12px;
+}
+
+.agent-grid-card {
+  border: 1px solid color-mix(in srgb, var(--border-strong) 78%, transparent);
+  background: linear-gradient(180deg, #1f2632 0%, #181e29 100%);
+  border-radius: 14px;
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+}
+
+.agent-grid-card.is-active {
+  border-color: color-mix(in srgb, var(--accent) 78%, #9db0cc);
+  box-shadow: 0 0 0 1px rgba(123, 141, 168, 0.32);
+}
+
+.agent-grid-media {
+  display: flex;
+  justify-content: center;
+}
+
+.agent-grid-meta h3 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.agent-grid-meta p {
+  margin: 4px 0 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.agent-grid-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.agent-grid-icon-button {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  border: 1px solid color-mix(in srgb, var(--border-subtle) 85%, #b6c4dc 9%);
+  background: #222b39;
+  color: color-mix(in srgb, var(--text-primary) 88%, #fff);
+  display: inline-grid;
+  place-items: center;
+  cursor: pointer;
+  transition:
+    border-color 0.16s ease,
+    background 0.16s ease,
+    color 0.16s ease;
+}
+
+.agent-grid-icon-button svg {
+  width: 14px;
+  height: 14px;
+}
+
+.agent-grid-icon-button:hover {
+  border-color: color-mix(in srgb, var(--accent) 60%, #a7bad5);
+  background: #2a3546;
+}
+
+.agent-grid-icon-button.is-active {
+  border-color: color-mix(in srgb, var(--accent) 82%, #a9bdd8);
+  background: #34435a;
+}
+
+.agent-grid-empty {
+  border: 1px dashed color-mix(in srgb, var(--border-strong) 78%, transparent);
+  border-radius: 14px;
+  padding: 22px;
+  text-align: center;
+  color: var(--text-muted);
+}

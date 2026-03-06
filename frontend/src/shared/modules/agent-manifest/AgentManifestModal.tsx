@@ -18,7 +18,7 @@ import {
   type AgentStylePreset,
   type AuthorityScope
 } from '../../config/agents';
-import { AgentAvatar, DropdownSelector, InfoTooltip, TextAreaField, TextButton, TextField, ModalShell } from '../../ui';
+import { AgentAvatar, ConfirmDialogModal, DropdownSelector, InfoTooltip, TextAreaField, TextButton, TextField, ModalShell } from '../../ui';
 import { AgentAvatarCropModal } from './AgentAvatarCropModal';
 import './AgentManifestModal.css';
 
@@ -28,6 +28,7 @@ type AgentManifestModalProps = {
   mode: 'create' | 'edit';
   initialAgent?: AgentManifest;
   onSubmit: (input: AgentManifestInput) => void;
+  onDelete?: () => void;
 };
 
 type RequiredFieldKey = 'name' | 'role' | 'primaryObjective' | 'systemDirectiveShort';
@@ -96,10 +97,11 @@ function FieldLabel({ label, info, invalid = false }: { label: string; info: str
   );
 }
 
-export function AgentManifestModal({ open, onClose, mode, initialAgent, onSubmit }: AgentManifestModalProps) {
+export function AgentManifestModal({ open, onClose, mode, initialAgent, onSubmit, onDelete }: AgentManifestModalProps) {
   const [form, setForm] = useState<AgentManifestInput>(() => deriveInitialInput(initialAgent));
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [cropOpen, setCropOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [pendingAvatarSource, setPendingAvatarSource] = useState<string | null>(null);
   const [submitAttempted, setSubmitAttempted] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -119,6 +121,7 @@ export function AgentManifestModal({ open, onClose, mode, initialAgent, onSubmit
     setForm(deriveInitialInput(initialAgent));
     setShowAdvanced(false);
     setCropOpen(false);
+    setDeleteConfirmOpen(false);
     setPendingAvatarSource(null);
     setSubmitAttempted(false);
   };
@@ -196,6 +199,9 @@ export function AgentManifestModal({ open, onClose, mode, initialAgent, onSubmit
             Fill required fields.
           </p>
           <div className="agent-manifest-footer-actions">
+            {mode === 'edit' && onDelete ? (
+              <TextButton label="Delete Agent" variant="danger" onClick={() => setDeleteConfirmOpen(true)} />
+            ) : null}
             <TextButton label="Cancel" variant="ghost" onClick={closeModal} />
             <TextButton label={mode === 'create' ? 'Create Agent' : 'Save Changes'} variant="primary" onClick={handleSubmit} />
           </div>
@@ -224,6 +230,19 @@ export function AgentManifestModal({ open, onClose, mode, initialAgent, onSubmit
           }));
           setCropOpen(false);
           setPendingAvatarSource(null);
+        }}
+      />
+      <ConfirmDialogModal
+        open={deleteConfirmOpen}
+        onCancel={() => setDeleteConfirmOpen(false)}
+        title="Delete Agent"
+        message="This will permanently delete this agent from your workspace."
+        confirmLabel="Delete Agent"
+        confirmVariant="danger"
+        onConfirm={() => {
+          setDeleteConfirmOpen(false);
+          onDelete?.();
+          closeModal();
         }}
       />
 

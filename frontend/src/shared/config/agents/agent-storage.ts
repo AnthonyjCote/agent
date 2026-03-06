@@ -35,5 +35,38 @@ export function saveAgentManifests(manifests: AgentManifest[]) {
   if (typeof window === 'undefined') {
     return;
   }
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(manifests));
+
+  const tryWrite = (next: AgentManifest[]): boolean => {
+    try {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  if (tryWrite(manifests)) {
+    return;
+  }
+
+  // Fallback 1: keep cropped avatar, drop original source image payload.
+  const withoutSource = manifests.map((agent) => ({
+    ...agent,
+    avatarSourceDataUrl: ''
+  }));
+
+  if (tryWrite(withoutSource)) {
+    return;
+  }
+
+  // Fallback 2: drop avatars as last resort to preserve non-media manifest data.
+  const withoutAvatars = manifests.map((agent) => ({
+    ...agent,
+    avatarSourceDataUrl: '',
+    avatarDataUrl: ''
+  }));
+
+  if (!tryWrite(withoutAvatars)) {
+    console.warn('Unable to persist agent manifests: local storage quota exceeded.');
+  }
 }
