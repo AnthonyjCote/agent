@@ -1,0 +1,61 @@
+/*
+ * Purpose: Style avatar crop modal preview and controls.
+ * Responsibilities:
+ * - Provide drag-based crop preview with circular mask guide.
+ * - Style zoom and action controls for image adjustment flow.
+ */
+/* @tags: shared-modules,agents,avatar,crop,styles */
+/* @status: active */
+/* @owner: founder */
+/* @domain: shared */
+/* @adr: none */
+
+.avatar-crop-modal-body {
+  display: grid;
+  gap: 16px;
+  justify-items: center;
+}
+
+.avatar-crop-preview {
+  width: 320px;
+  height: 320px;
+  border-radius: 18px;
+  border: 1px solid color-mix(in srgb, var(--border-strong) 82%, transparent);
+  background: #0f141c;
+  overflow: hidden;
+  position: relative;
+  cursor: grab;
+  touch-action: none;
+}
+
+.avatar-crop-preview:active {
+  cursor: grabbing;
+}
+
+.avatar-crop-preview img {
+  position: absolute;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.avatar-crop-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  box-shadow:
+    0 0 0 9999px rgba(2, 4, 7, 0.45),
+    inset 0 0 0 2px rgba(255, 255, 255, 0.72);
+  pointer-events: none;
+}
+
+.avatar-crop-zoom {
+  width: min(320px, 100%);
+  display: grid;
+  gap: 8px;
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.avatar-crop-zoom input[type='range'] {
+  width: 100%;
+}

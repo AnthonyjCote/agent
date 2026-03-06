@@ -1,0 +1,8 @@
+[package]
+name = "adapter"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+agent_core = { path = "../agent_core" }
+serde = { version = "1", features = ["derive"] }

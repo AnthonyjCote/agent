@@ -1,0 +1,129 @@
+/*
+ * Purpose: Style reusable agent manifest create/edit modal content.
+ * Responsibilities:
+ * - Provide grid layout for core and additional fields.
+ * - Keep controls readable for large-form modal workflows.
+ */
+/* @tags: shared-modules,agents,modal,styles */
+/* @status: active */
+/* @owner: founder */
+/* @domain: shared */
+/* @adr: none */
+
+.agent-manifest-modal-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.agent-manifest-avatar-picker {
+  display: grid;
+  justify-items: center;
+  margin-bottom: 14px;
+}
+
+.agent-manifest-avatar-button {
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  cursor: pointer;
+  padding: 0;
+}
+
+.agent-manifest-avatar-button:hover {
+  color: var(--text-primary);
+}
+
+.agent-manifest-avatar-button .agent-avatar {
+  border-width: 2px;
+}
+
+.agent-manifest-avatar-input {
+  display: none;
+}
+
+.agent-manifest-field {
+  display: grid;
+  gap: 8px;
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.agent-manifest-field span {
+  color: color-mix(in srgb, var(--text-primary) 92%, #fff);
+}
+
+.agent-manifest-label-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.agent-manifest-label-text {
+  color: color-mix(in srgb, var(--text-primary) 92%, #fff);
+}
+
+.agent-manifest-label-row.is-invalid .agent-manifest-label-text {
+  color: #d8929c;
+}
+
+.agent-manifest-field.span-2,
+.agent-manifest-accordion-button.span-2,
+.agent-manifest-advanced.span-2 {
+  grid-column: 1 / -1;
+}
+
+.agent-manifest-accordion-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 36px;
+  border: 1px solid color-mix(in srgb, var(--border-subtle) 88%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--bg-elev-1) 88%, #11151d);
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.agent-manifest-advanced {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.agent-manifest-optional-notice {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.agent-manifest-footer {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.agent-manifest-footer-validation {
+  margin: 0;
+  min-height: 16px;
+  color: #d8929c;
+  font-size: 12px;
+  line-height: 1.2;
+  opacity: 0;
+}
+
+.agent-manifest-footer-validation.is-visible {
+  opacity: 1;
+}
+
+.agent-manifest-footer-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}

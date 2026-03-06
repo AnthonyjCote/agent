@@ -1,0 +1,21 @@
+{
+  "name": "agent-deck",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "frontend",
+    "backend/targets/tauri-desktop",
+    "packages/runtime-client",
+    "packages/schemas"
+  ],
+  "scripts": {
+    "dev:desktop": "npm --prefix backend/targets/tauri-desktop run dev",
+    "dev:server": "concurrently -k \"cargo run --manifest-path backend/Cargo.toml -p server_target\" \"npm --prefix frontend run dev\"",
+    "build:frontend": "npm --prefix frontend run build",
+    "build:desktop": "npm --prefix backend/targets/tauri-desktop run build",
+    "build:server": "cargo build --manifest-path backend/Cargo.toml -p server_target"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}

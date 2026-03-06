@@ -1,0 +1,18 @@
+/*
+ * Purpose: Style reusable chat thread shell layout.
+ * Responsibilities:
+ * - Define thread width and scroll behavior.
+ * - Provide neutral container styling for message history.
+ */
+/* @tags: shared-ui,chat,thread,styles */
+/* @status: active */
+/* @owner: founder */
+/* @domain: shared */
+/* @adr: none */
+
+.message-thread-shell {
+  width: min(920px, calc(100% - 96px));
+  margin: 0 auto;
+  min-height: 100%;
+  padding: 28px 0 20px;
+}

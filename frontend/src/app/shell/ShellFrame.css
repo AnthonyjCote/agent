@@ -1,0 +1,40 @@
+/**
+ * Purpose: Co-locate shell layout mechanics with ShellFrame composition.
+ * Responsibilities:
+ * - Define root shell frame and global rail offset behavior.
+ * - Keep the main working area full-bleed with no padding/margins.
+ */
+/* @tags: app,shell,layout,styles */
+/* @status: active */
+/* @owner: founder */
+/* @domain: app */
+/* @adr: none */
+
+.shell-root {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.shell-main {
+  margin-left: 56px;
+  width: calc(100% - 56px);
+  height: 100%;
+  overflow: hidden;
+  min-width: 0;
+  background:
+    radial-gradient(circle at 12% -10%, rgba(255, 255, 255, 0.06) 0%, transparent 42%),
+    radial-gradient(circle at 120% 110%, rgba(255, 255, 255, 0.04) 0%, transparent 35%),
+    linear-gradient(180deg, #12151b 0%, #0c0d10 100%);
+}
+
+.view-region {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  padding: 0;
+  margin: 0;
+}

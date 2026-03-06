@@ -1,0 +1,36 @@
+/*
+ * Purpose: Style reusable two-pane left-column shell layout.
+ * Responsibilities:
+ * - Define full-height split with fixed left rail and fluid right region.
+ * - Keep spacing tokens neutral and reusable across domains.
+ */
+/* @tags: shared-ui,layout,styles */
+/* @status: active */
+/* @owner: founder */
+/* @domain: shared */
+/* @adr: none */
+
+.left-column-shell {
+  height: 100%;
+  width: 100%;
+  display: grid;
+  grid-template-columns: 272px minmax(0, 1fr);
+  min-height: 0;
+  min-width: 0;
+}
+
+.left-column-shell-left {
+  border-right: 1px solid color-mix(in srgb, var(--border-subtle) 90%, transparent);
+  background: linear-gradient(180deg, #11141b 0%, #0e1118 100%);
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.left-column-shell-right {
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 26px 28px 34px;
+}

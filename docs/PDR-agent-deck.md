@@ -66,15 +66,17 @@ A “run” is a unit of execution:
 
 ---
 
-## 7. Architecture Overview (Designed for V1 Desktop + V2 Web)
+## 7. Architecture Overview (Dual-Target: Desktop + Web)
 
 ### 7.1 Guiding constraint
 **UI must not depend on “desktop-only” APIs.**  
 The UI only talks to a single interface: `AgentRuntimeClient`.
+There is exactly one maintained frontend UI codebase for both desktop and web targets.
 
 ### 7.2 Three layers (portable)
 1) **UI (shared)**  
-   React/TS app: Agent Deck, Canvas, Chat, Editor, Run Console
+   Single React/TS app (one codebase) used by both desktop and web targets:
+   Agent Deck, Canvas, Chat, Editor, Run Console
 
 2) **Runtime Client (shared)**  
    A thin TS library that exposes functions like:
@@ -87,14 +89,35 @@ The UI only talks to a single interface: `AgentRuntimeClient`.
    - `getRunTrace(runId)`
 
 3) **Runtime Implementation (swapable)**
-   - **V1 Desktop**: Tauri IPC → Rust runtime
-   - **V2 Web/SaaS**: HTTP + WS/SSE → Rust server runtime
+   - **Desktop target**: Tauri IPC → Rust runtime
+   - **Web target**: HTTP + WS/SSE → Rust server runtime
 
 **Result:** same UI, same client interface, different transport.
 
+### 7.4 Capability-driven target behavior
+Target differences are handled through runtime capabilities, not separate UIs.
+
+- Example capability flags:
+  - `supportsFileSystemAccess`
+  - `supportsHostedWebhooks`
+  - `supportsLocalListener`
+- UI behavior branches on capability flags from runtime, while keeping the same UI surface/components.
+
+### 7.3 Provider-agnostic agent runtime (required)
+The agentic layer must be internal and universal.  
+The GUI must never couple to a specific model/provider implementation.
+
+- Define a stable internal provider contract (send/receive, streaming, cancellation, capabilities, errors, usage).
+- Implement provider adapters behind that contract:
+  - `CliProviderAdapter`
+  - `ApiProviderAdapter`
+  - `LocalProviderAdapter`
+- Provider-specific parsing, command invocation, and request mapping stay inside adapters only.
+- UI and domain logic consume only `AgentRuntimeClient` + normalized runtime events.
+
 ---
 
-## 8. V1 Desktop Stack (Recommended)
+## 8. Desktop Runtime Target (Built in Tandem with Web)
 
 ### 8.1 Frontend
 - React + TypeScript
@@ -118,8 +141,12 @@ The UI only talks to a single interface: `AgentRuntimeClient`.
 ### 8.4 Model & ML Gates
 - Routing/classification via lightweight models:
   - simple rules + small ONNX models where helpful
-- LLM provider “bring-your-own”:
-  - local models (optional) + cloud providers (user keys)
+- LLM provider “bring-your-own” via adapter architecture:
+  - CLI agents
+  - API agents
+  - locally hosted agents
+- V1 starts with **Gemini CLI** adapter due to generous free-tier access.
+- Gemini is the first adapter, not a hard dependency of UI or runtime contracts.
 
 ---
 
@@ -166,7 +193,7 @@ The UI only talks to a single interface: `AgentRuntimeClient`.
 
 ---
 
-## 10. V2 Web/SaaS Constraints & Requirements (Design Now, Build Later)
+## 10. Web/SaaS Runtime Target (Built in Tandem with Desktop)
 
 ### 10.1 Multi-tenancy
 - Tenant isolation for:
@@ -237,6 +264,13 @@ Create `agent_core` crate with **no Tauri dependencies**:
 
 Tauri app and Server app both depend on `agent_core`.
 
+### 11.4 Hard boundaries (non-negotiable)
+- `agent_core` must remain portable Rust with no Tauri/Axum/web framework dependencies.
+- `agent_desktop` and `agent_server` are adapter layers around `agent_core`, not duplicate business logic.
+- Provider integrations stay behind provider adapter contracts; no provider-specific UI paths.
+- Shared schemas/events stay canonical across desktop and web targets.
+- Rust implementation must follow `docs/RUST-ARCHITECTURE-RULES.md` (module boundaries, file-size limits, trait-first seams, CI checks).
+
 ---
 
 ## 12. Security Model (V1 → V2 consistent)
@@ -260,17 +294,35 @@ Tauri app and Server app both depend on `agent_core`.
 
 ## 13. Repo / Monorepo Layout (Suggested)
 
-- apps/
-  - desktop/            (Tauri wrapper + Rust commands + bundling)
-  - web/                (future: hosted UI build; same UI package)
+- frontend/
+  - src/
+    - app/              (shell, routing, providers, app-level concerns)
+    - shared/           (domain-neutral UI/config/modules)
+      - config/
+      - modules/
+      - ui/
+    - domains/          (route/view ownership; one folder per top-level view)
+      - `<domain>/`
+        - api/
+        - lib/
+        - model/
+        - modules/
+        - surface/
+        - view.tsx
+        - index.ts
+    - assets/
+- backend/
+  - crates/
+    - agent_core/       (portable engine + policies + traces)
+    - adapter/          (provider/runtime adapter contracts + shared adapter utilities)
+    - agent_desktop/    (desktop adapter bindings + local runtime integrations)
+    - agent_server/     (server adapter bindings + hosted runtime integrations)
+  - targets/
+    - tauri-desktop/    (desktop packaging/wrapper target)
+    - server/           (server binary target)
 - packages/
-  - ui/                 (deck, canvas, panels, shared components)
   - runtime-client/     (AgentRuntimeClient + transports)
   - schemas/            (JSON schema + versioning utilities)
-- crates/
-  - agent_core/         (portable engine + policies + traces)
-  - agent_desktop/      (Tauri bindings + local storage + local webhook listener)
-  - agent_server/       (future: Axum server + queues + hosted webhooks)
 
 ---
 
@@ -282,6 +334,18 @@ Tauri app and Server app both depend on `agent_core`.
 - Tool system can execute at least:
   - one REST connector (user-provided API key)
   - one webhook trigger (local listener)
+- Agent runtime can complete chat/run flows via at least one provider adapter:
+  - **Gemini CLI adapter** implemented first
+  - runtime contract remains provider-agnostic for additional CLI/API/local adapters
+- Both runtime targets compile from the same monorepo boundaries:
+  - desktop target (`agent_desktop` + `TauriTransport`)
+  - web target (`agent_server` + `HttpTransport`)
+- A single frontend UI codebase (`frontend/src`) is used by both targets.
+- Target-specific behavior is capability-driven; no separate desktop/web UI variants.
+- Rust crates satisfy architecture guardrails:
+  - `agent_core` contains no Tauri/Axum dependencies
+  - no monolith Rust files beyond defined thresholds without explicit allowlist
+  - core/adapter responsibilities remain separated
 - Run console shows:
   - step timeline
   - tool call details (redacted)
@@ -297,13 +361,13 @@ Tauri app and Server app both depend on `agent_core`.
 
 ---
 
-## 16. V1 → V2 Migration Plan (High Level)
-1) V1 ships with stable schemas and runtime-client abstraction.
-2) Build `agent_server` using the same `agent_core`.
-3) Implement `HttpTransport` in runtime-client.
-4) UI gains “Connect to Cloud Workspace” option.
-5) Add multi-tenancy, hosted webhooks, and metering.
-6) Gradually parity features; desktop remains local-first option.
+## 16. Dual-Target Delivery Plan (High Level)
+1) Establish stable schemas and runtime-client abstraction first.
+2) Build and maintain `agent_desktop` and `agent_server` in tandem on top of `agent_core`.
+3) Implement and maintain both `TauriTransport` and `HttpTransport` in parallel.
+4) Keep UI provider/runtime interactions transport-agnostic.
+5) Add web-specific concerns (multi-tenancy, hosted webhooks, metering) without changing core contracts.
+6) Ship desktop as local-first and web as hosted, with shared behavior parity targets.
 
 ---
 
@@ -312,3 +376,4 @@ Tauri app and Server app both depend on `agent_core`.
 - Choose canvas library path (React Flow only vs hybrid with tldraw)
 - Decide minimum tool set for V1 (REST + webhook + filesystem? or postpone filesystem tool)
 - Decide first “golden path” relationship templates (recommended: Manager/Workers + Review Gate)
+- Define the next adapters after Gemini CLI (API provider and first local-hosted provider)

@@ -1,0 +1,24 @@
+/*
+ * Purpose: Define shared visual tokens for text/dropdown control surfaces.
+ * Responsibilities:
+ * - Keep field controls consistent across reusable UI primitives.
+ * - Centralize contrast and interaction tokens for control shells.
+ */
+/* @tags: shared-ui,controls,tokens */
+/* @status: active */
+/* @owner: founder */
+/* @domain: shared */
+/* @adr: none */
+
+:root {
+  --control-field-height: 36px;
+  --control-field-radius: 10px;
+  --control-field-border: color-mix(in srgb, var(--border-strong) 82%, transparent);
+  --control-field-border-hover: color-mix(in srgb, var(--accent) 58%, var(--border-strong));
+  --control-field-border-focus: color-mix(in srgb, var(--accent) 76%, transparent);
+  --control-field-bg: linear-gradient(180deg, #242c39 0%, #1b2330 100%);
+  --control-field-bg-hover: linear-gradient(180deg, #293243 0%, #1e2736 100%);
+  --control-field-text: var(--text-primary);
+  --control-field-placeholder: color-mix(in srgb, var(--text-muted) 86%, #fff);
+  --control-field-ring: 0 0 0 2px rgba(173, 182, 198, 0.24);
+}

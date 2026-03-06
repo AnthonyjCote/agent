@@ -1,0 +1,72 @@
+/*
+ * Purpose: Provide reusable avatar sizing/shape styling for agent identity surfaces.
+ * Responsibilities:
+ * - Define stable size and shape variants.
+ * - Keep premium neutral visual treatment across contexts.
+ */
+/* @tags: shared-ui,avatar,styles */
+/* @status: active */
+/* @owner: founder */
+/* @domain: shared */
+/* @adr: none */
+
+.agent-avatar {
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--border-strong) 85%, transparent);
+  background: linear-gradient(180deg, #20252d 0%, #181c23 100%);
+  color: var(--text-primary);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 10px 24px rgba(0, 0, 0, 0.28);
+  user-select: none;
+}
+
+img.agent-avatar {
+  object-fit: cover;
+}
+
+.agent-avatar.shape-circle {
+  border-radius: 999px;
+}
+
+.agent-avatar.shape-rounded-square {
+  border-radius: 14px;
+}
+
+.agent-avatar.shape-square {
+  border-radius: 0;
+}
+
+.agent-avatar.size-xs {
+  width: 24px;
+  height: 24px;
+  font-size: 10px;
+}
+
+.agent-avatar.size-sm {
+  width: 32px;
+  height: 32px;
+  font-size: 12px;
+}
+
+.agent-avatar.size-md {
+  width: 40px;
+  height: 40px;
+  font-size: 13px;
+}
+
+.agent-avatar.size-lg {
+  width: 56px;
+  height: 56px;
+  font-size: 16px;
+}
+
+.agent-avatar.size-xl {
+  width: 72px;
+  height: 72px;
+  font-size: 20px;
+}

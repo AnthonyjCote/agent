@@ -1,0 +1,110 @@
+/**
+ * Purpose: Style the app-level global left rail navigation shell.
+ * Responsibilities:
+ * - Own global rail layout, icons, active/hover states, and tooltips.
+ * - Keep global navigation styling co-located with GlobalRail composition.
+ */
+/* @tags: app,shell,global-rail,styles */
+/* @status: active */
+/* @owner: founder */
+/* @domain: app */
+/* @adr: none */
+
+.global-rail {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 56px;
+  z-index: 20;
+  background: linear-gradient(180deg, #0f1116 0%, #0d1014 100%);
+  color: var(--text-primary);
+  border-right: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 6px;
+  user-select: none;
+}
+
+.global-rail-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.rail-item {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+  transition:
+    background 0.16s ease,
+    border-color 0.16s ease,
+    transform 0.16s ease;
+}
+
+.rail-item svg {
+  width: 18px;
+  height: 18px;
+  opacity: 0.92;
+}
+
+.rail-item:hover {
+  background: var(--bg-elev-2);
+  border-color: var(--border-subtle);
+  transform: translateY(-1px);
+}
+
+.rail-item.active {
+  background: #252a33;
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+}
+
+.rail-tooltip {
+  position: absolute;
+  left: calc(100% + 10px);
+  top: 50%;
+  transform: translateY(-50%) translateX(-4px);
+  background: #232830;
+  color: var(--text-primary);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  padding: 5px 8px;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition:
+    opacity 0.14s ease,
+    transform 0.14s ease;
+  z-index: 50;
+}
+
+.rail-tooltip::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: -5px;
+  width: 8px;
+  height: 8px;
+  background: #232830;
+  border-left: 1px solid var(--border-strong);
+  border-bottom: 1px solid var(--border-strong);
+  transform: translateY(-50%) rotate(45deg);
+}
+
+.rail-item:hover .rail-tooltip,
+.rail-item:focus-visible .rail-tooltip {
+  opacity: 1;
+  transform: translateY(-50%) translateX(0);
+}

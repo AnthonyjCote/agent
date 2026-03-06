@@ -1,0 +1,89 @@
+/*
+ * Purpose: Style reusable inline info tooltip popover control.
+ * Responsibilities:
+ * - Keep icon lightweight and non-intrusive near labels.
+ * - Provide readable hover/focus explanation popover.
+ */
+/* @tags: shared-ui,tooltip,styles */
+/* @status: active */
+/* @owner: founder */
+/* @domain: shared */
+/* @adr: none */
+
+.info-tooltip-root {
+  position: relative;
+  display: inline-flex;
+  width: 16px;
+  height: 16px;
+  align-items: center;
+  justify-content: center;
+}
+
+.info-tooltip-trigger {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: help;
+  display: inline-grid;
+  place-items: center;
+  transition: color 0.14s ease;
+}
+
+.info-tooltip-trigger svg {
+  width: 13px;
+  height: 13px;
+}
+
+.info-tooltip-trigger:focus-visible {
+  outline: 0;
+}
+
+.info-tooltip-popover {
+  position: absolute;
+  left: calc(100% + 8px);
+  top: 50%;
+  transform: translateY(-50%) translateX(-4px);
+  min-width: 220px;
+  max-width: 300px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--border-strong) 90%, transparent);
+  background: linear-gradient(180deg, #202631 0%, #171d27 100%);
+  color: var(--text-primary);
+  font-size: 12px;
+  line-height: 1.35;
+  z-index: 240;
+  pointer-events: none;
+  opacity: 0;
+  transition:
+    opacity 0.14s ease,
+    transform 0.14s ease;
+  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.28);
+}
+
+.info-tooltip-popover::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: -5px;
+  width: 8px;
+  height: 8px;
+  transform: translateY(-50%) rotate(45deg);
+  background: #202631;
+  border-left: 1px solid color-mix(in srgb, var(--border-strong) 90%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--border-strong) 90%, transparent);
+}
+
+.info-tooltip-root:hover .info-tooltip-trigger,
+.info-tooltip-root:focus-within .info-tooltip-trigger {
+  color: var(--text-primary);
+}
+
+.info-tooltip-root:hover .info-tooltip-popover,
+.info-tooltip-root:focus-within .info-tooltip-popover {
+  opacity: 1;
+  transform: translateY(-50%) translateX(0);
+}

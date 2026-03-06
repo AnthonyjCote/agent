@@ -1,0 +1,10 @@
+[workspace]
+resolver = "2"
+members = [
+  "crates/agent_core",
+  "crates/adapter",
+  "crates/agent_desktop",
+  "crates/agent_server",
+  "targets/server",
+  "targets/tauri-desktop/src-tauri"
+]

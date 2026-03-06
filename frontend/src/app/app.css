@@ -1,0 +1,43 @@
+/*
+ * Purpose: Define app-level shell theme variables and root sizing for the shared UI.
+ * Responsibilities:
+ * - Provide global CSS variables used by shell and navigation.
+ * - Ensure root nodes are full-height/full-width for desktop/web targets.
+ * Constraints: Keep global styles minimal and domain-agnostic.
+ */
+/* @tags: app,styles,shell */
+/* @status: active */
+/* @owner: founder */
+/* @domain: app */
+/* @adr: none */
+
+:root {
+  font-family: "Manrope", "IBM Plex Sans", "Avenir Next", "Segoe UI", sans-serif;
+  --bg-base: #0c0d10;
+  --bg-shell: #101216;
+  --bg-elev-1: #14171d;
+  --bg-elev-2: #1a1e25;
+  --bg-elev-3: #20252d;
+  --border-subtle: #2b313b;
+  --border-strong: #3a424f;
+  --text-primary: #e7e9ee;
+  --text-muted: #98a1b0;
+  --accent: #8f98a8;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  color: var(--text-primary);
+  background: var(--bg-base);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}

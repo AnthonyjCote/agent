@@ -1,0 +1,11 @@
+{
+  "name": "@agent-deck/runtime-client",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "main": "src/index.ts",
+  "dependencies": {
+    "@agent-deck/schemas": "0.1.0",
+    "@tauri-apps/api": "^2.8.0"
+  }
+}

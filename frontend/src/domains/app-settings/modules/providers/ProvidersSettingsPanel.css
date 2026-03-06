@@ -1,0 +1,23 @@
+/*
+ * Purpose: Style provider settings panel composition and field controls.
+ * Responsibilities:
+ * - Arrange provider cards in a vertical stack.
+ * - Provide neutral form control styling for provider configuration inputs.
+ */
+/* @tags: domain,app-settings,providers,styles */
+/* @status: active */
+/* @owner: founder */
+/* @domain: app-settings */
+/* @adr: none */
+
+.providers-settings-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.provider-field {
+  display: grid;
+  gap: 7px;
+  color: var(--text-primary);
+  font-size: 13px;
+}

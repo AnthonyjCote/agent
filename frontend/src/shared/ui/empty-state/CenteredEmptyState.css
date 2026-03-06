@@ -1,0 +1,40 @@
+/*
+ * Purpose: Style centered empty-state composition for full-bleed pages.
+ * Responsibilities:
+ * - Center lead/prompt/action with restrained premium spacing.
+ * - Keep visual treatment reusable and domain-neutral.
+ */
+/* @tags: shared-ui,empty-state,styles */
+/* @status: active */
+/* @owner: founder */
+/* @domain: shared */
+/* @adr: none */
+
+.centered-empty-state {
+  width: min(720px, calc(100% - 64px));
+  margin: 0 auto;
+  min-height: 100%;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 18px;
+  padding-bottom: 8vh;
+}
+
+.centered-empty-lead {
+  display: grid;
+  place-items: center;
+}
+
+.centered-empty-prompt {
+  margin: 0;
+  color: color-mix(in srgb, var(--text-primary) 92%, #fff);
+  font-size: clamp(18px, 2.2vw, 26px);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  text-align: center;
+}
+
+.centered-empty-action {
+  width: 100%;
+}

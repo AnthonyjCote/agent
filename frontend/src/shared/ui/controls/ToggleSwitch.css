@@ -1,0 +1,58 @@
+/*
+ * Purpose: Style reusable premium toggle switch control.
+ * Responsibilities:
+ * - Provide high-contrast active/inactive states.
+ * - Render smooth thumb movement suitable for settings panels.
+ */
+/* @tags: shared-ui,controls,toggle,styles */
+/* @status: active */
+/* @owner: founder */
+/* @domain: shared */
+/* @adr: none */
+
+.toggle-switch {
+  width: 52px;
+  height: 30px;
+  border: 1px solid color-mix(in srgb, var(--border-strong) 78%, transparent);
+  border-radius: 999px;
+  background: linear-gradient(180deg, #242a35 0%, #1a202b 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 4px 12px rgba(0, 0, 0, 0.24);
+  display: inline-flex;
+  align-items: center;
+  padding: 3px;
+  cursor: pointer;
+  transition: border-color 0.18s ease, background 0.18s ease;
+}
+
+.toggle-switch-thumb {
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #ffffff 0%, #e4e8ef 100%);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.26);
+  transform: translateX(0);
+  transition: transform 0.2s ease;
+}
+
+.toggle-switch.checked {
+  border-color: color-mix(in srgb, var(--accent) 85%, transparent);
+  background: linear-gradient(180deg, #46516a 0%, #313b50 100%);
+}
+
+.toggle-switch.checked .toggle-switch-thumb {
+  transform: translateX(22px);
+}
+
+.toggle-switch:focus-visible {
+  outline: 0;
+  box-shadow:
+    0 0 0 2px rgba(173, 182, 198, 0.36),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.toggle-switch:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}

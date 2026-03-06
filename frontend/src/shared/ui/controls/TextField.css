@@ -1,0 +1,53 @@
+/*
+ * Purpose: Style reusable premium text field control.
+ * Responsibilities:
+ * - Apply shared field tokens for contrast and consistency.
+ * - Provide focus/hover states aligned with dropdown controls.
+ */
+/* @tags: shared-ui,controls,text-field,styles */
+/* @status: active */
+/* @owner: founder */
+/* @domain: shared */
+/* @adr: none */
+
+@import './ControlField.tokens.css';
+
+.text-field-control {
+  width: 100%;
+  height: var(--control-field-height);
+  border-radius: var(--control-field-radius);
+  border: 1px solid var(--control-field-border);
+  background: var(--control-field-bg);
+  color: var(--control-field-text);
+  padding: 0 10px;
+  font: inherit;
+  transition:
+    border-color 0.16s ease,
+    background 0.16s ease,
+    box-shadow 0.16s ease;
+}
+
+.text-field-control::placeholder {
+  color: var(--control-field-placeholder);
+}
+
+.text-field-control:hover {
+  border-color: var(--control-field-border-hover);
+  background: var(--control-field-bg-hover);
+}
+
+.text-field-control:focus-visible {
+  outline: 0;
+  border-color: var(--control-field-border-focus);
+  box-shadow: var(--control-field-ring);
+}
+
+.text-field-control.is-invalid {
+  border-color: #b66a73;
+  box-shadow: 0 0 0 2px rgba(182, 106, 115, 0.18);
+}
+
+.text-field-control:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}

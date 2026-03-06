@@ -1,0 +1,122 @@
+/*
+ * Purpose: Style reusable premium text action button variants.
+ * Responsibilities:
+ * - Provide cohesive visual language for shared button intents.
+ * - Keep interaction and focus states accessible and consistent.
+ */
+/* @tags: shared-ui,controls,button,styles */
+/* @status: active */
+/* @owner: founder */
+/* @domain: shared */
+/* @adr: none */
+
+.text-button {
+  --button-height: 34px;
+  --button-radius: 10px;
+  --button-padding-x: 14px;
+  --button-border: #3a4352;
+  --button-border-hover: #4a5668;
+  --button-border-active: #55647a;
+  --button-bg: #1f2733;
+  --button-bg-hover: #242e3c;
+  --button-text: var(--text-primary);
+  --button-shadow: none;
+  --button-top-sheen: none;
+  --button-bottom-depth: none;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  appearance: none;
+  -webkit-appearance: none;
+  height: var(--button-height);
+  border-radius: var(--button-radius);
+  border: 1px solid var(--button-border);
+  background: var(--button-bg);
+  color: var(--button-text);
+  margin: 0;
+  padding: 1px var(--button-padding-x) 0;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1;
+  font-weight: 500;
+  letter-spacing: 0.002em;
+  cursor: pointer;
+  box-shadow:
+    var(--button-top-sheen),
+    var(--button-bottom-depth),
+    var(--button-shadow);
+  transition:
+    border-color 0.16s ease,
+    background 0.16s ease,
+    box-shadow 0.16s ease,
+    color 0.16s ease;
+}
+
+.text-button:hover:not(:disabled) {
+  border-color: var(--button-border-hover);
+  background: var(--button-bg-hover);
+}
+
+.text-button:active:not(:disabled) {
+  border-color: var(--button-border-active);
+  filter: brightness(0.98);
+}
+
+.text-button:focus-visible {
+  outline: 0;
+  box-shadow:
+    0 0 0 2px rgba(141, 165, 199, 0.22),
+    0 0 0 4px rgba(70, 91, 124, 0.16);
+}
+
+.text-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.text-button-sm {
+  --button-height: 30px;
+  --button-padding-x: 12px;
+  font-size: 12px;
+}
+
+.text-button-md {
+  --button-height: 34px;
+}
+
+.text-button-primary {
+  --button-border: #5b6f8f;
+  --button-border-hover: #6f85aa;
+  --button-border-active: #7b93bc;
+  --button-bg: #2a3547;
+  --button-bg-hover: #37465f;
+  --button-text: #e8eef9;
+}
+
+.text-button-secondary {
+  --button-border: #404c5f;
+  --button-border-hover: #4f5f76;
+  --button-border-active: #5c6f89;
+  --button-bg: #232d3b;
+  --button-bg-hover: #2a3545;
+}
+
+.text-button-ghost {
+  --button-border: #374151;
+  --button-border-hover: #47556a;
+  --button-border-active: #556883;
+  --button-bg: transparent;
+  --button-bg-hover: rgba(66, 78, 97, 0.22);
+  --button-text: #c6cfdb;
+}
+
+.text-button-danger {
+  --button-border: #a85f69;
+  --button-border-hover: #bc6f7a;
+  --button-border-active: #cb808b;
+  --button-bg: #4d2830;
+  --button-bg-hover: #593038;
+  --button-text: #f6dfe3;
+}

@@ -1,0 +1,6 @@
+node_modules/
+frontend/dist/
+backend/target/
+backend/targets/tauri-desktop/src-tauri/target/
+.DS_Store
+*.log
