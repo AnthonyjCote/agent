@@ -75,12 +75,58 @@ Implementation-relevant facts:
   - final response,
   - run status/errors.
 
+## 6.1 Locked Foundation Decisions (Non-Optional)
+These are fixed for V1 implementation.
+
+### A) Governance model for side effects
+- Use model-led planning with deterministic side-effect lifecycle:
+  - `proposed -> approved -> dispatched -> acknowledged -> completed|failed`
+- This lifecycle applies to:
+  - tool write actions
+  - delegation side effects
+  - channel sends (chat/email/sms/internal).
+
+### B) Identity and tenancy
+- All runtime/sync entities are workspace-scoped.
+- `workspace_id` is mandatory on agents, threads, messages, runs, inbox/outbox, delegation records.
+- Cross-workspace execution is not allowed in V1.
+
+### C) Conflict and reconciliation policy
+- V1 default is last-write-wins.
+- Conflict strategy hook is required per entity from day 1 for future custom merge policies.
+
+### D) Thread and concurrency model
+- Support many threads per agent.
+- Enforce per-thread run lock semantics (one active writer run per thread).
+
+### E) Artifact and typed tool outputs
+- All tools must emit typed output envelope:
+  - `summary`, `structured_data`, `artifacts`, `errors`.
+- Add artifact repository boundary from day 1.
+
+### F) Reliability baseline
+- V1 must ship with explicit reliability baselines:
+  - retry limits
+  - dead-letter policy
+  - run latency target metrics
+  - human fallback trigger path.
+
+### G) Audit and explainability baseline
+- Use immutable append-only event log.
+- Every side-effect decision event includes:
+  - policy snapshot version
+  - context hash
+  - evidence/artifact references.
+
 ## 7. Granular Implementation Checklist
 
 ### Phase 0 — Contracts Freeze (Day 0, first commit set)
 - [ ] Define canonical Rust structs/enums:
   - `RunRequest`, `RunEvent`, `ToolCallRequest`, `ToolCallResult`, `RunUsage`, `RunError`.
 - [ ] Define stable JSON wire schema mirrored in TS `packages/schemas`.
+- [ ] Define mandatory `workspace_id` and tenancy scope fields on all sync/runtime entities.
+- [ ] Define deterministic side-effect lifecycle schema:
+  - `proposed|approved|dispatched|acknowledged|completed|failed`.
 - [ ] Define channel-agnostic message envelope contract:
   - `channel`: `chat_ui | internal_agent | email | sms`
   - `sender`, `recipient`, `thread_id`, `task_id`, `correlation_id`
@@ -94,6 +140,12 @@ Implementation-relevant facts:
   - `table` (reserved)
   - `chart_spec` (reserved)
   - `file_artifact` (reserved)
+- [ ] Define typed tool output envelope schema:
+  - `summary`
+  - `structured_data`
+  - `artifacts`
+  - `errors`
+- [ ] Define conflict-policy hook metadata per entity (V1 default LWW, strategy pluggable).
 - [ ] Add crate-level README codemap for each new folder.
 - [ ] Add compile-time module boundaries (`mod.rs`) before logic.
 
@@ -101,12 +153,14 @@ Implementation-relevant facts:
 - [ ] Implement `ModelInferencePort` trait (sync/stream/cancel/health).
 - [ ] Implement `ToolExecutionPort` trait.
 - [ ] Implement `TraceStorePort` trait.
+- [ ] Implement `ArtifactRepositoryPort` trait boundary (storage backend pluggable).
 - [ ] Implement `ChannelPort` trait family:
   - inbound intake (`poll/receive`)
   - outbound dispatch (`send`)
   - delivery status updates.
 - [ ] Implement `RunLoop` state machine:
   - states: `Init -> ModelStep -> ToolStep -> ModelStep -> Completed|Failed|Cancelled`.
+- [ ] Implement per-thread run lock semantics with many-threads-per-agent model.
 - [ ] Add inter-agent orchestration events and states:
   - `DelegationRequested`
   - `DelegationAccepted|Rejected`
@@ -117,6 +171,10 @@ Implementation-relevant facts:
   - max tool calls,
   - max wall-clock duration.
 - [ ] Emit structured `RunEvent` at every transition.
+- [ ] Include immutable decision provenance fields in run events:
+  - policy snapshot version
+  - context hash
+  - action evidence refs
 
 ### Phase 2 — Gemini CLI Adapter (Headless)
 - [ ] Add binary detection (`which gemini` / spawn probe).
@@ -159,6 +217,7 @@ Implementation-relevant facts:
   - retries (limited),
   - structured error mapping.
 - [ ] Emit `tool_use` and `tool_result` events to run trace.
+- [ ] Enforce typed tool output envelope for all tools (no text-only freeform results).
 
 ### Phase 5 — First Tool: Open-Meteo Weather
 - [ ] Add `tools/weather_open_meteo/` with:
@@ -210,6 +269,7 @@ Implementation-relevant facts:
 ### Phase 8 — Multi-Action Execution Semantics
 - [ ] Implement model-led loop control with deterministic stop guards only.
 - [ ] Enable multiple tool calls per user turn.
+- [ ] Enforce deterministic side-effect lifecycle for tool/channel/delegation actions.
 - [ ] Add continuation criteria:
   - stop when model returns final response event,
   - stop on guardrail breach,
@@ -223,6 +283,7 @@ Implementation-relevant facts:
 - [ ] Persist agent/thread/message/run entities in repository layer.
 - [ ] Persist `MessageBlock[]` with each assistant/system message (no lossy text-only collapse).
 - [ ] Persist tool call records with args/result summaries.
+- [ ] Persist artifact metadata in dedicated repository and link via message/run ids.
 - [ ] Persist per-agent inbox/outbox stores (day-1 schema, even before email/sms go live):
   - `agent_inbox`
   - `agent_outbox`
@@ -232,11 +293,17 @@ Implementation-relevant facts:
   - `delegation_result`
   - status lifecycle and linked run IDs.
 - [ ] Add run replay endpoint for debugging.
+- [ ] Add dead-letter queue model for failed channel deliveries/side effects.
 - [ ] Add minimal telemetry:
   - model latency,
   - tool latency,
   - step count,
   - token usage when available.
+- [ ] Add baseline SLO telemetry:
+  - run success rate
+  - P95 run latency
+  - retry counts
+  - dead-letter count
 
 ### Phase 10 — Validation, QA, and Demo Scenarios
 - [ ] E2E scenario 1: single-step factual question.
@@ -263,6 +330,7 @@ Implementation-relevant facts:
 - One user message can trigger multiple tool actions in a single run.
 - Same runtime crate path used by desktop and server targets.
 - Run/event traces visible in GUI and persisted.
+- Side-effect actions follow deterministic lifecycle with auditable state transitions.
 - Failure paths return structured user-visible errors without app crash.
 
 ## 10. Risks and Mitigations
