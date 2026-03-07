@@ -6,8 +6,12 @@ use std::{
 use agent_core::models::run::RunError;
 use serde_json::{Map, Value};
 
-pub const AGENT_DECK_GEMINI_MODEL_ALIAS: &str = "agentdeck-flash-thinking";
-const GEMINI_MODEL_ID: &str = "gemini-3-flash-preview";
+pub const AGENT_DECK_GEMINI_ACK_ALIAS: &str = "agentdeck-ack";
+pub const AGENT_DECK_GEMINI_DEEP_DEFAULT_ALIAS: &str = "agentdeck-deep-default";
+pub const AGENT_DECK_GEMINI_DEEP_ESCALATE_ALIAS: &str = "agentdeck-deep-escalate";
+const GEMINI_ACK_MODEL_ID: &str = "gemini-2.5-flash-lite";
+const GEMINI_DEEP_DEFAULT_MODEL_ID: &str = "gemini-3-flash-preview";
+const GEMINI_DEEP_ESCALATE_MODEL_ID: &str = "gemini-3-pro-preview";
 
 pub fn ensure_workspace_context() -> Result<PathBuf, RunError> {
     let workspace_dir = resolve_workspace_dir()?;
@@ -173,7 +177,7 @@ fn ensure_alias_config(root: &mut Value) {
     );
     root_object.insert(
         "model".to_string(),
-        serde_json::json!({ "name": AGENT_DECK_GEMINI_MODEL_ALIAS }),
+        serde_json::json!({ "name": AGENT_DECK_GEMINI_DEEP_DEFAULT_ALIAS }),
     );
 
     let model_configs = root_object
@@ -192,24 +196,55 @@ fn ensure_alias_config(root: &mut Value) {
         *custom_aliases = Value::Object(Map::new());
     }
 
-    custom_aliases
+    let aliases = custom_aliases
         .as_object_mut()
-        .expect("customAliases must be object")
-        .insert(
-            AGENT_DECK_GEMINI_MODEL_ALIAS.to_string(),
-            serde_json::json!({
-                "modelConfig": {
-                    "model": GEMINI_MODEL_ID,
-                    "generateContentConfig": {
-                        "tools": [
-                            { "googleSearch": {} }
-                        ],
-                        "thinkingConfig": {
-                            "includeThoughts": true,
-                            "thinkingLevel": "HIGH"
-                        }
+        .expect("customAliases must be object");
+
+    aliases.insert(
+        AGENT_DECK_GEMINI_ACK_ALIAS.to_string(),
+        serde_json::json!({
+            "modelConfig": {
+                "model": GEMINI_ACK_MODEL_ID,
+                "generateContentConfig": {
+                    "thinkingConfig": {
+                        "thinkingBudget": 0
                     }
                 }
-            }),
-        );
+            }
+        }),
+    );
+    aliases.insert(
+        AGENT_DECK_GEMINI_DEEP_DEFAULT_ALIAS.to_string(),
+        serde_json::json!({
+            "modelConfig": {
+                "model": GEMINI_DEEP_DEFAULT_MODEL_ID,
+                "generateContentConfig": {
+                    "tools": [
+                        { "googleSearch": {} }
+                    ],
+                    "thinkingConfig": {
+                        "includeThoughts": true,
+                        "thinkingLevel": "HIGH"
+                    }
+                }
+            }
+        }),
+    );
+    aliases.insert(
+        AGENT_DECK_GEMINI_DEEP_ESCALATE_ALIAS.to_string(),
+        serde_json::json!({
+            "modelConfig": {
+                "model": GEMINI_DEEP_ESCALATE_MODEL_ID,
+                "generateContentConfig": {
+                    "tools": [
+                        { "googleSearch": {} }
+                    ],
+                    "thinkingConfig": {
+                        "includeThoughts": true,
+                        "thinkingLevel": "HIGH"
+                    }
+                }
+            }
+        }),
+    );
 }

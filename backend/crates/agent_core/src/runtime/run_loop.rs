@@ -35,6 +35,7 @@ impl<'a, M: ModelInferencePort, T: TraceStorePort> RunLoop<'a, M, T> {
             workspace_id: request.workspace_id,
             run_id: request.run_id.clone(),
             prompt: format!("{} -> {}", request.input.sender, request.input.recipient),
+            model_profile: None,
         };
 
         match self.inference.infer(infer_req) {

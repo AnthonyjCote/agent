@@ -5,6 +5,7 @@ pub struct InferenceRequest {
     pub workspace_id: String,
     pub run_id: String,
     pub prompt: String,
+    pub model_profile: Option<String>,
 }
 
 #[derive(Debug, Clone)]

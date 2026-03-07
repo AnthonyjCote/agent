@@ -12,13 +12,16 @@ use super::{
     invoke_stream::{build_headless_command, GeminiInvokeRequest},
     parse_events::extract_text_chunks,
     types::GeminiOutputFormat,
-    workspace::{ensure_workspace_context, AGENT_DECK_GEMINI_MODEL_ALIAS},
+    workspace::{
+        ensure_workspace_context, AGENT_DECK_GEMINI_ACK_ALIAS,
+        AGENT_DECK_GEMINI_DEEP_DEFAULT_ALIAS, AGENT_DECK_GEMINI_DEEP_ESCALATE_ALIAS,
+    },
 };
 
 #[derive(Debug, Default)]
 pub struct GeminiCliModelInference;
 
-fn default_model_name() -> Option<String> {
+fn default_model_name(profile: Option<&str>) -> Option<String> {
     let configured = std::env::var("AGENT_DECK_GEMINI_MODEL")
         .ok()
         .map(|value| value.trim().to_string())
@@ -26,7 +29,24 @@ fn default_model_name() -> Option<String> {
     if configured.is_some() {
         return configured;
     }
-    Some(AGENT_DECK_GEMINI_MODEL_ALIAS.to_string())
+
+    match profile.unwrap_or("deep_default") {
+        "ack" => std::env::var("AGENT_DECK_GEMINI_MODEL_ACK")
+            .ok()
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty())
+            .or_else(|| Some(AGENT_DECK_GEMINI_ACK_ALIAS.to_string())),
+        "deep_escalate" => std::env::var("AGENT_DECK_GEMINI_MODEL_DEEP_ESCALATE")
+            .ok()
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty())
+            .or_else(|| Some(AGENT_DECK_GEMINI_DEEP_ESCALATE_ALIAS.to_string())),
+        _ => std::env::var("AGENT_DECK_GEMINI_MODEL_DEEP_DEFAULT")
+            .ok()
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty())
+            .or_else(|| Some(AGENT_DECK_GEMINI_DEEP_DEFAULT_ALIAS.to_string())),
+    }
 }
 
 impl ModelInferencePort for GeminiCliModelInference {
@@ -35,8 +55,9 @@ impl ModelInferencePort for GeminiCliModelInference {
     }
 
     fn infer(&self, request: InferenceRequest) -> Result<Vec<InferenceEvent>, RunError> {
+        let model_profile = request.model_profile.as_deref();
         let invoke = GeminiInvokeRequest {
-            model: default_model_name(),
+            model: default_model_name(model_profile),
             prompt: request.prompt,
             output_format: GeminiOutputFormat::Text,
         };
@@ -79,9 +100,10 @@ impl ModelInferencePort for GeminiCliModelInference {
         request: InferenceRequest,
         on_event: &mut dyn FnMut(InferenceEvent),
     ) -> Result<Vec<InferenceEvent>, RunError> {
+        let model_profile = request.model_profile.as_deref();
         let fallback_request = request.clone();
         let invoke = GeminiInvokeRequest {
-            model: default_model_name(),
+            model: default_model_name(model_profile),
             prompt: request.prompt,
             output_format: GeminiOutputFormat::StreamJson,
         };

@@ -159,11 +159,20 @@ function resolveAssistantPendingStatus(events: RuntimeRunEvent[]): string {
     .reverse()
     .find((event) => event.event === 'debug_model_request');
   if (modelRequest && typeof modelRequest.phase === 'string') {
+    if (modelRequest.phase === 'ack_stage') {
+      return 'Acknowledging...';
+    }
     if (modelRequest.phase === 'planner') {
       return 'Planning...';
     }
     if (modelRequest.phase === 'synthesis') {
       return 'Writing response...';
+    }
+    if (modelRequest.phase === 'deep_default') {
+      return 'Working...';
+    }
+    if (modelRequest.phase === 'deep_escalate') {
+      return 'Escalated analysis...';
     }
     if (modelRequest.phase === 'agent_loop') {
       return 'Working...';
@@ -284,7 +293,18 @@ function resolvePendingAssistantState(events: RuntimeRunEvent[]): {
       continue;
     }
 
-    if (phase !== 'synthesis' && phase !== 'direct' && phase !== 'agent_loop') {
+    if (phase === 'ack_stage') {
+      responseDraft += chunk;
+      continue;
+    }
+
+    if (
+      phase !== 'synthesis' &&
+      phase !== 'direct' &&
+      phase !== 'agent_loop' &&
+      phase !== 'deep_default' &&
+      phase !== 'deep_escalate'
+    ) {
       continue;
     }
 
