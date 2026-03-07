@@ -47,6 +47,7 @@ Each agent is a versioned object (editable + exportable):
 - Tools: allowed tools + scopes + approval requirements
 - Memory: RAG namespace(s), retention, indexing rules
 - Relationships: allowed messaging, delegation paths, shared memory rules
+- Channel identity refs: optional email address/phone refs + channel policy pointers
 
 ### 6.2 Relationship Graph (policy edges)
 Edges are not just visual lines—they encode “who can do what”:
@@ -63,6 +64,15 @@ A “run” is a unit of execution:
 - Artifacts: outputs, files, structured results
 - Metrics: tokens/cost/time/tool calls
 - Replay pointers: resume from step N with changes
+
+### 6.4 Channel Message Model
+All communication is normalized to a common envelope:
+- `channel`: `chat_ui | internal_agent | email | sms`
+- sender/recipient ids
+- thread + correlation ids
+- channel metadata (subject, headers, phone metadata)
+- delivery state lifecycle (`queued|sent|delivered|failed|retried`)
+- persisted per-agent inbox/outbox records
 
 ---
 
@@ -115,6 +125,15 @@ The GUI must never couple to a specific model/provider implementation.
 - Provider-specific parsing, command invocation, and request mapping stay inside adapters only.
 - UI and domain logic consume only `AgentRuntimeClient` + normalized runtime events.
 
+### 7.5 Channel-adapter runtime boundary (required)
+Communication channels are adapter-based, parallel to model adapters:
+- `ChatUiChannelAdapter` (active in V1)
+- `InternalAgentChannelAdapter` (active in V1 for delegation/consultation)
+- `EmailChannelAdapter` (schema + ingress stubs in V1)
+- `SmsChannelAdapter` (schema + ingress stubs in V1)
+
+Runtime owns orchestration and policy. Channel adapters only map ingress/egress payloads.
+
 ---
 
 ## 8. Desktop Runtime Target (Built in Tandem with Web)
@@ -132,7 +151,7 @@ The GUI must never couple to a specific model/provider implementation.
 - Tauri v2 (Rust backend + web UI)
 
 ### 8.3 Local Storage
-- SQLite for structured data (agents, relationships, runs, settings)
+- SQLite for structured data (agents, relationships, runs, settings, inbox/outbox, delegation records)
 - Indexing/RAG options (choose one for V1, keep interfaces abstract):
   - BM25: Tantivy (fast local search)
   - Vectors: embedded store (e.g., sqlite-backed or a local vector DB)
@@ -184,6 +203,9 @@ The GUI must never couple to a specific model/provider implementation.
 - Webhooks (V1):
   - local listener for inbound events (dev + local automation)
   - map webhook → triggers agent run
+- Channel ingress (V1 foundations):
+  - internal agent messaging/delegation active
+  - email/sms ingress API stubs available for later connector rollout
 
 ### 9.5 Run Console (trace + replay foundation)
 - Timeline view of steps
@@ -350,6 +372,8 @@ Tauri app and Server app both depend on `agent_core`.
   - step timeline
   - tool call details (redacted)
   - final output
+- Inter-agent delegation events are traceable and persisted.
+- Per-agent inbox/outbox records persist and render consistently in desktop and web targets.
 
 ---
 

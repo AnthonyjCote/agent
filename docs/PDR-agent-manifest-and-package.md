@@ -98,6 +98,10 @@ Define:
   - namespace, retention, retrieval strategy, summary policy
 - `runtime_policy`
   - token budget, context assembly limits, timeout profile
+- `channel_identity`
+  - optional external communication identifiers (email address ref, sms number ref)
+  - channel enable/disable flags per agent
+  - delivery and escalation policy references
 
 ### 4.3 Always-on prompt fields (small)
 - `name`
@@ -207,6 +211,7 @@ Fields grouped by:
 ### 7.2 Package contents
 - `manifest/agent-manifest.json`
 - `assets/avatar/*`
+- `assets/channel-identities.json` (optional references/placeholders, no raw secrets)
 - `knowledge/`
   - source metadata
   - chunks/documents
@@ -222,6 +227,7 @@ Fields grouped by:
 - secrets are excluded by default
 - secret references/placeholders included when needed
 - import flow requires rebinding missing secrets
+- external channel credentials (email/sms providers) are never exported as plaintext.
 
 ### 7.4 Import behavior
 - validate schema version
@@ -242,6 +248,7 @@ Fields grouped by:
 - Orchestration engine consumes deterministic fields for behavior/policy enforcement.
 - Provider adapters receive fully assembled context package from app runtime.
 - Providers must not be source-of-truth for long-term agent memory.
+- Channel adapters consume `channel_identity` policy and runtime-managed inbox/outbox events.
 
 ## 10. Granular Implementation Checklist
 
@@ -250,6 +257,7 @@ Fields grouped by:
 - [ ] Define TypeScript manifest type in `packages/schemas`.
 - [ ] Define Rust manifest struct in backend runtime/storage crate.
 - [ ] Define storage model for required + deterministic + optional fields.
+- [ ] Define `channel_identity` schema and storage refs (no plaintext secrets).
 - [ ] Add schema validation tests.
 - [ ] Add TS↔Rust compatibility fixture tests for manifest serialization.
 
@@ -271,10 +279,12 @@ Fields grouped by:
 ### Phase 3 — Policy Integration
 - [ ] Wire deterministic fields into orchestration decisions.
 - [ ] Enforce authority/approval/escalation at runtime.
+- [ ] Enforce channel identity and delivery/escalation policy at runtime.
 - [ ] Add unit tests for policy outcomes.
 
 ### Phase 4 — Package Export
 - [ ] Implement `.agentpkg` writer with manifest/assets/config/knowledge.
+- [ ] Include channel identity references/placeholders in export.
 - [ ] Implement checksum generation.
 - [ ] Add export mode selection (`full`, `template`).
 
@@ -294,4 +304,5 @@ Fields grouped by:
 - Optional context fields are available, collapsed by default, and clearly cost-labeled.
 - Agents exhibit distinct role behavior via deterministic policy + optional context.
 - Exported packages re-import with manifest, avatar, knowledge, and config intact.
+- Channel identity refs/policies survive export/import without exposing secrets.
 - Runtime remains provider-agnostic and app-controlled for context assembly.

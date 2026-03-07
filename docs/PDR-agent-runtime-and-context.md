@@ -4,6 +4,7 @@
 Define a provider-agnostic agent runtime that supports:
 - multi-step agentic execution (planning, iteration, tool calling, approvals),
 - inter-agent collaboration,
+- multi-channel communication intake/dispatch (GUI, internal agent, email, SMS),
 - memory/RAG retrieval across documents, databases, and web sources,
 - desktop-first CLI provider integrations that work out of the box,
 - app-managed conversation/context state with long-horizon retrieval.
@@ -11,6 +12,7 @@ Define a provider-agnostic agent runtime that supports:
 ## 2. Core Decisions
 - Inference is adapter-driven and provider-specific.
 - Orchestration is platform-owned and provider-agnostic.
+- Communication channels are adapter-driven and channel-specific.
 - Conversation history/context is owned by the app, not provider sessions.
 - Desktop starts with CLI adapters (Gemini, Codex, Claude Code) using native auth flows.
 - Same runtime contracts are used across desktop and server targets.
@@ -33,9 +35,21 @@ Define a provider-agnostic agent runtime that supports:
   - planning and multi-step execution
   - tool routing/policy/approval gates
   - inter-agent delegation and messaging
+  - channel-agnostic message routing (`chat_ui|internal_agent|email|sms`)
   - run trace generation
   - context assembly policy
 - Depends only on abstract inference port, never concrete providers.
+
+### 3.4 Channel Adapters (thin layer)
+- Implement channel adapters behind runtime channel ports:
+  - `ChatUiChannelAdapter` (V1 active)
+  - `InternalAgentChannelAdapter` (V1 active for delegation/consultation)
+  - `EmailChannelAdapter` (V1 schema + ingress stub)
+  - `SmsChannelAdapter` (V1 schema + ingress stub)
+- Responsibilities:
+  - channel ingress normalization into canonical message envelope
+  - outbound delivery dispatch + status mapping
+  - channel-specific metadata handling (headers, phone metadata, etc)
 
 ### 3.3 Context Engine (app-owned)
 - App stores full history and artifacts.
@@ -115,12 +129,18 @@ Define a provider-agnostic agent runtime that supports:
 - `MemoryRetriever` (ranked retrieval over hot/warm/cold stores)
 - `ToolExecutionPort` (policy-aware tool invocation)
 - `RunTracePort` (append-only structured event timeline)
+- `ChannelPort` (inbound receive, outbound send, delivery status updates)
 
 ## 8. Data and Trace Requirements
 - Canonical message schema independent of provider output format.
+- Canonical channel envelope schema:
+  - channel type, sender, recipient, thread id, correlation id, metadata.
 - Canonical run-step schema for:
   - model events
   - tool calls
+  - delegation/consultation events
+  - channel ingress/egress events
+  - delivery status events
   - approvals
   - retrieval operations
   - compression/summarization operations
@@ -140,7 +160,9 @@ Define a provider-agnostic agent runtime that supports:
 
 ### Phase 0 — Contracts and Schemas
 - [ ] Define TS + Rust canonical schemas for messages, run traces, provider health, capabilities.
+- [ ] Define canonical channel envelope schema and delivery status schema.
 - [ ] Define inference/context/memory/tool ports and version them.
+- [ ] Define channel ports and version them.
 - [ ] Add contract tests for serialization and compatibility.
 
 ### Phase 1 — Runtime Core Skeleton
@@ -148,6 +170,7 @@ Define a provider-agnostic agent runtime that supports:
 - [ ] Add pluggable policy engine for tool gating.
 - [ ] Add deterministic run state machine with step ids and replay pointers.
 - [ ] Add canonical static-vs-dynamic context partition in `ContextAssembler`.
+- [ ] Add delegation state handling with linked parent/child run ids.
 
 ### Phase 2 — CLI Adapter Foundation
 - [ ] Implement shared CLI adapter base (spawn, stream, timeout, cancel, parse hooks).
@@ -174,11 +197,13 @@ Define a provider-agnostic agent runtime that supports:
 - [ ] Implement multi-step planning + iteration loop.
 - [ ] Implement inter-agent messaging/delegation contracts.
 - [ ] Add guardrails for max iterations, max tool calls, and timeout budgets.
+- [ ] Emit structured channel events for inbound/outbound/deferred delivery.
 
 ### Phase 6 — Settings and UX Integration
 - [ ] Wire provider status + config to app-settings provider cards.
 - [ ] Show actionable install/auth remediation per provider.
 - [ ] Add runtime capability signals for desktop vs server behavior.
+- [ ] Add channel capability signals (`email_enabled`, `sms_enabled`, `internal_agent_enabled`).
 
 ### Phase 7 — Observability and Replay
 - [ ] Add append-only trace writer with structured event taxonomy.
@@ -191,6 +216,7 @@ Define a provider-agnostic agent runtime that supports:
 - [ ] Add stress tests for long-history conversations.
 - [ ] Add CI checks for boundary violations and file-size risk.
 - [ ] Add regression tests that fail on repeated system/tool/profile blocks in prompt assembly.
+- [ ] Add channel delivery reconciliation tests (sent/delivered/failed/retried).
 
 ## 11. Acceptance Criteria
 - Desktop can run at least one full chat flow through CLI adapter with native auth.
@@ -198,5 +224,6 @@ Define a provider-agnostic agent runtime that supports:
 - App-managed context assembly controls all model input windows.
 - Truncated history remains retrievable via memory engine.
 - Run traces capture inference, retrieval, tools, and approvals end-to-end.
+- Run traces capture delegation and channel delivery lifecycle events end-to-end.
 - Assembled context contains only one instance of static agent/tool/directive blocks per run/session.
 - Per-turn context includes pruning/de-duplication metrics and shows measurable token savings.

@@ -9,6 +9,7 @@ Define a storage and sync architecture where a single user account can access th
 - `localStorage` is not a primary datastore for agent payloads.
 - Agent/runtime entities use stable IDs and revision metadata for deterministic sync.
 - Conversation history is persisted server-side, not only client-side.
+- Channel communication records (GUI/internal-agent/email/SMS) are syncable first-class entities.
 
 ## 3. Data Consistency Goals
 - Same account sees the same agents, threads, and messages on any device.
@@ -23,6 +24,8 @@ Define a storage and sync architecture where a single user account can access th
   - agents
   - threads
   - messages
+  - agent inbox/outbox records
+  - delegation records
   - agent assets metadata
   - settings
 - Server assigns canonical revision/version for conflict control.
@@ -40,6 +43,9 @@ Define a storage and sync architecture where a single user account can access th
   - `AgentRepository`
   - `ThreadRepository`
   - `MessageRepository`
+  - `InboxRepository`
+  - `OutboxRepository`
+  - `DelegationRepository`
   - `AssetRepository`
   - `SettingsRepository`
 - UI must never read/write persistence primitives directly.
@@ -80,6 +86,19 @@ Define a storage and sync architecture where a single user account can access th
   - edits (if supported)
   - deletes/tombstones
   - tool/run artifacts metadata (as model evolves)
+  - channel metadata and delivery states
+
+## 8.1 Agent communication requirements
+- Persist and sync per-agent inbox/outbox records:
+  - channel (`chat_ui|internal_agent|email|sms`)
+  - delivery status
+  - correlation ids
+  - timestamps
+- Persist and sync delegation lifecycle records:
+  - request
+  - accept/reject
+  - complete/fail
+  - linked run ids
 
 ## 9. Export / Import / Share Compatibility
 - Runtime persistence and portable sharing are separate concerns.
@@ -100,7 +119,7 @@ Define a storage and sync architecture where a single user account can access th
 ## 12. Granular Implementation Checklist
 
 ### Phase 0 — Contracts
-- [ ] Define shared sync entity schemas (agents, threads, messages, settings, tombstones).
+- [ ] Define shared sync entity schemas (agents, threads, messages, inbox, outbox, delegation, settings, tombstones).
 - [ ] Define repository interfaces and dependency injection boundary for UI/runtime.
 - [ ] Define sync cursor and idempotency key formats.
 
@@ -123,6 +142,8 @@ Define a storage and sync architecture where a single user account can access th
 - [ ] Persist thread/message entities to repositories on creation/update.
 - [ ] Sync conversation history end-to-end between clients.
 - [ ] Add tombstone propagation for deleted threads/messages.
+- [ ] Persist/sync inbox-outbox channel delivery records.
+- [ ] Persist/sync delegation records with lifecycle updates.
 
 ### Phase 5 — Migration
 - [ ] One-time migration from legacy local storage to repository-backed storage.
@@ -137,6 +158,7 @@ Define a storage and sync architecture where a single user account can access th
 ## 13. Acceptance Criteria
 - A user can create/edit/delete agents on desktop and see identical state on web after sync.
 - Conversation threads and messages remain consistent across both clients.
+- Agent inbox/outbox and delegation records remain consistent across both clients.
 - App remains usable offline and reconciles successfully when online.
 - Data survives app restarts and device changes without `localStorage` quota failures.
 - Export/import agent package flow remains functional and compatible with synced storage.

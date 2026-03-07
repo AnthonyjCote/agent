@@ -25,7 +25,7 @@ Define how Agent Deck supports autonomous multi-action execution for complex bus
 ### 5.1 Model-led action loop
 Per user task, the model iterates autonomously:
 1. assess objective and current state
-2. choose next action (`tool`, `delegate`, `respond`, `request_input`, `complete`)
+2. choose next action (`tool`, `delegate`, `respond`, `request_input`, `send_channel`, `complete`)
 3. execute action
 4. evaluate progress against completion criteria
 5. continue or complete
@@ -37,6 +37,7 @@ Runtime is responsible for:
 - trace and audit,
 - approvals for high-risk side effects,
 - structured completion validation.
+- channel delivery governance (send/retry/fail/escalate) for email/sms/internal messages.
 
 ## 6. Governance Framework
 
@@ -127,6 +128,7 @@ Throughput rule:
 - `CompletionValidator` (evidence/criteria validation)
 - `ToolRiskClassifier` (classify and gate tool calls)
 - `ReviewerEvaluationPort` (optional second-agent quality pass)
+- `ChannelDeliveryPolicyPort` (channel delivery rules, retries, escalation)
 
 ## 9. UX Requirements
 - Show live run state:
@@ -154,7 +156,7 @@ Throughput rule:
 
 ### Phase 2 — Model-Led Loop Integration
 - [ ] Integrate model action loop with runtime governance checks.
-- [ ] Support next-action types (`tool`, `delegate`, `respond`, `request_input`, `complete`).
+- [ ] Support next-action types (`tool`, `delegate`, `respond`, `request_input`, `send_channel`, `complete`).
 - [ ] Enforce policy checks before each side-effect action.
 - [ ] Add graceful stop behavior on budget exhaustion.
 
@@ -182,6 +184,7 @@ Throughput rule:
 - [ ] Add run console panels for budget usage and approval gates.
 - [ ] Add completion packet UI with criteria + artifacts.
 - [ ] Add token and tool-economics summaries per run.
+- [ ] Add channel delivery lifecycle and retry/escalation visibility in run console.
 - [ ] Add alerting for repeated budget extension failures.
 
 ### Phase 7 — Hardening
