@@ -12,15 +12,30 @@
 
 export type ChatRole = 'user' | 'assistant';
 
+export type SearchQueryLink = {
+  query: string;
+  url: string;
+};
+
 export type ChatMessage = {
   id: string;
   role: ChatRole;
   content: string;
   createdAt: number;
+  runId?: string;
+  isPending?: boolean;
+  pendingReasoning?: string;
+  agentName?: string;
+  agentRole?: string;
+  avatarUrl?: string;
+  searchQueries?: SearchQueryLink[];
 };
 
 export type ActiveAgent = {
   id: string;
   name: string;
+  role?: string;
+  systemDirectiveShort?: string;
+  toolsPolicyRef?: string;
   avatarUrl?: string;
 };

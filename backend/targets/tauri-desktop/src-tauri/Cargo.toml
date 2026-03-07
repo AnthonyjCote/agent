@@ -9,5 +9,7 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 adapter = { path = "../../../crates/adapter" }
 agent_desktop = { path = "../../../crates/agent_desktop" }
+open = "5"
 serde = { version = "1", features = ["derive"] }
+serde_json = "1"
 tauri = { version = "2", features = [] }

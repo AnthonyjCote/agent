@@ -1,3 +1,6 @@
+pub mod gemini;
+pub mod provider_adapter;
+
 use serde::Serialize;
 
 #[derive(Debug, Clone, Serialize)]
