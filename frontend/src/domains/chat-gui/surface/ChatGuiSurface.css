@@ -233,14 +233,6 @@
   color: color-mix(in srgb, var(--text-primary) 88%, #fff);
 }
 
-.chat-gui-message.role-assistant.is-pending .chat-gui-message-content:not(.is-shimmering) {
-  color: color-mix(in srgb, var(--text-muted) 88%, #fff);
-}
-
-.chat-gui-message.role-assistant.is-pending .chat-gui-message-content.is-shimmering {
-  display: inline-block;
-}
-
 .chat-gui-pending-block {
   display: grid;
   gap: 8px;
@@ -274,6 +266,13 @@
   -webkit-text-fill-color: transparent;
   pointer-events: none;
   animation: chat-gui-shimmer 1.2s linear infinite;
+}
+
+.chat-gui-pending-draft {
+  color: color-mix(in srgb, var(--text-primary) 95%, #fff);
+  line-height: 1.56;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .chat-gui-pending-reasoning {

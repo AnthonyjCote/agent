@@ -350,12 +350,20 @@ export function useChatGuiState(activeAgent: ActiveAgent, runtimeClient: AgentRu
     content: string,
     isPending: boolean,
     pendingReasoning?: string,
-    searchQueries?: SearchQueryLink[]
+    searchQueries?: SearchQueryLink[],
+    pendingStatus?: string
   ) => {
     setMessages((current) =>
       current.map((message) =>
         message.role === 'assistant' && message.runId === runId
-          ? { ...message, content, isPending, pendingReasoning: pendingReasoning || '', searchQueries: searchQueries || [] }
+          ? {
+              ...message,
+              content,
+              isPending,
+              pendingStatus: pendingStatus || '',
+              pendingReasoning: pendingReasoning || '',
+              searchQueries: searchQueries || []
+            }
           : message
       )
     );
@@ -373,7 +381,7 @@ export function useChatGuiState(activeAgent: ActiveAgent, runtimeClient: AgentRu
       const events = await runtimeClient.listRunEvents(runId);
       setRunEvents(events);
       const pendingState = resolvePendingAssistantState(events);
-      updatePendingAssistantMessage(runId, pendingState.responseDraft || pendingState.status, true, pendingState.reasoning);
+      updatePendingAssistantMessage(runId, pendingState.responseDraft, true, pendingState.reasoning, undefined, pendingState.status);
       upsertDebugRun(runId, (record) => ({
         ...record,
         runtimeEvents: events,
@@ -417,7 +425,7 @@ export function useChatGuiState(activeAgent: ActiveAgent, runtimeClient: AgentRu
 
     setRunEvents(resolved);
     const pendingState = resolvePendingAssistantState(resolved);
-    updatePendingAssistantMessage(runId, pendingState.responseDraft || pendingState.status, true, pendingState.reasoning);
+    updatePendingAssistantMessage(runId, pendingState.responseDraft, true, pendingState.reasoning, undefined, pendingState.status);
     setClientDebugEvents((current) => [...current, timeoutEvent]);
     upsertDebugRun(runId, (record) => ({
       ...record,
@@ -464,7 +472,8 @@ export function useChatGuiState(activeAgent: ActiveAgent, runtimeClient: AgentRu
         role: 'assistant',
         runId,
         isPending: true,
-        content: 'Connecting...',
+        content: '',
+        pendingStatus: 'Connecting...',
         createdAt: now + 1,
         pendingReasoning: '',
         agentName: activeAgent.name,
@@ -525,7 +534,7 @@ export function useChatGuiState(activeAgent: ActiveAgent, runtimeClient: AgentRu
         status: resolveRunStatus(events, record.status)
       }));
 
-      updatePendingAssistantMessage(runId, buildAssistantContent(events), false, '', buildSearchQueryLinks(events));
+      updatePendingAssistantMessage(runId, buildAssistantContent(events), false, '', buildSearchQueryLinks(events), '');
     } catch (error) {
       const runtimeErrorEvent: RuntimeRunEvent = {
         event: 'client_runtime_error',
@@ -543,6 +552,7 @@ export function useChatGuiState(activeAgent: ActiveAgent, runtimeClient: AgentRu
         role: 'assistant',
         runId,
         isPending: false,
+        pendingStatus: '',
         content: `Runtime request failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
         createdAt: Date.now(),
         agentName: activeAgent.name,

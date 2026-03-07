@@ -10,6 +10,7 @@ use crate::{
     runtime::memory_trace_store::MemoryTraceStore,
     tools::toolbox::{allowed_tool_ids_from_metadata, render_toolbox_summary},
 };
+use chrono::Local;
 
 const FINAL_RESPONSE_SENTINEL: &str = "[[FINAL_RESPONSE]]";
 
@@ -45,6 +46,7 @@ fn agent_prompt(
     toolbox_summary: &str,
     user_prompt: &str,
 ) -> String {
+    let now = Local::now().format("%Y-%m-%d %H:%M:%S %:z").to_string();
     let history_section = if history_excerpt.trim().is_empty() {
         "Conversation history: (empty)\n".to_string()
     } else {
@@ -56,6 +58,7 @@ fn agent_prompt(
 
     format!(
         "You are {agent_name}, acting as {agent_role}.\n\
+Current datetime: {now}\n\
 Directive: {directive}\n\
 {history_section}\
 Toolbox summary (only these app tools are explicitly allowed):\n\

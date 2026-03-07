@@ -24,6 +24,7 @@ export type ChatMessage = {
   createdAt: number;
   runId?: string;
   isPending?: boolean;
+  pendingStatus?: string;
   pendingReasoning?: string;
   agentName?: string;
   agentRole?: string;

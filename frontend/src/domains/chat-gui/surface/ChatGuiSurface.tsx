@@ -527,12 +527,15 @@ export function ChatGuiSurface() {
                     </div>
                   </header>
                 ) : null}
-                <div className={`chat-gui-message-content ${message.isPending ? 'is-shimmering' : ''}`}>
+                <div className="chat-gui-message-content">
                   {message.isPending ? (
                     <div className="chat-gui-pending-block">
-                      <span className="chat-gui-pending-text" data-text={message.content}>
-                        {message.content}
-                      </span>
+                      {message.pendingStatus ? (
+                        <span className="chat-gui-pending-text" data-text={message.pendingStatus}>
+                          {message.pendingStatus}
+                        </span>
+                      ) : null}
+                      {message.content ? <div className="chat-gui-pending-draft">{message.content}</div> : null}
                       {message.pendingReasoning ? (
                         <div className="chat-gui-pending-reasoning">{message.pendingReasoning}</div>
                       ) : null}
