@@ -36,16 +36,40 @@ export function AgentChartSurface() {
   const { agents, createAgent, updateAgent, deleteAgent } = useAgentManifestStore();
   const [createEntityKind, setCreateEntityKind] = useState<'business_unit' | 'org_unit' | 'operator' | null>(null);
   const [createActorDefaultOrgUnitId, setCreateActorDefaultOrgUnitId] = useState('');
+  const manifestById = useMemo(() => new Map(agents.map((agent) => [agent.agentId, agent])), [agents]);
+  const displayOperators = useMemo(
+    () =>
+      operators.map((operator) => {
+        if (!operator.sourceAgentId) {
+          return operator;
+        }
+        const manifest = manifestById.get(operator.sourceAgentId);
+        if (!manifest) {
+          return operator;
+        }
+        return {
+          ...operator,
+          name: manifest.name,
+          title: manifest.role,
+          primaryObjective: manifest.primaryObjective,
+          systemDirective: manifest.systemDirectiveShort,
+          avatarSourceDataUrl: manifest.avatarSourceDataUrl,
+          avatarDataUrl: manifest.avatarDataUrl
+        };
+      }),
+    [operators, manifestById]
+  );
+  const getDisplayOperatorById = (id: string) => displayOperators.find((operator) => operator.id === id);
 
   const selection = useOrgChartSelectionState({
     businessUnits,
     orgUnits,
-    operators,
+    operators: displayOperators,
     getOrgUnitById,
-    getOperatorById
+    getOperatorById: getDisplayOperatorById
   });
   const collapse = useOrgChartCollapseState();
-  const treeProjection = useOrgChartTreeProjection({ operators, orgUnits, businessUnits });
+  const treeProjection = useOrgChartTreeProjection({ operators: displayOperators, orgUnits, businessUnits });
   const actions = useOrgChartSurfaceActions({
     execute,
     selectedNode: selection.selectedNode,
@@ -75,12 +99,15 @@ export function AgentChartSurface() {
         });
         return;
       }
-      actions.executeCommand({
-        kind: 'set_operator_avatar',
-        operatorId: target.id,
-        sourceDataUrl,
-        croppedDataUrl
-      });
+      const operator = getOperatorById(target.id);
+      if (!operator?.sourceAgentId) {
+        actions.executeCommand({
+          kind: 'set_operator_avatar',
+          operatorId: target.id,
+          sourceDataUrl,
+          croppedDataUrl
+        });
+      }
       syncLinkedAgentManifest(target.id, undefined, { sourceDataUrl, croppedDataUrl });
     }
   });
@@ -89,7 +116,7 @@ export function AgentChartSurface() {
     enabled: selection.hierarchyMode,
     orgUnits,
     businessUnits,
-    operators,
+    operators: displayOperators,
     onCommand: actions.executeCommand
   });
   const selectedBusinessUnit = selection.selectedBusinessUnit;
@@ -153,12 +180,12 @@ export function AgentChartSurface() {
   const createManagerOptions = useMemo(
     () => [
       { value: '', label: 'No manager' },
-      ...operators.map((operator) => ({
+      ...displayOperators.map((operator) => ({
         value: operator.id,
         label: `${operator.name} (${operator.title})`
       }))
     ],
-    [operators]
+    [displayOperators]
   );
 
   const buildAgentInput = (input: {
@@ -198,7 +225,7 @@ export function AgentChartSurface() {
             onRedo={redo}
             selectedNode={selection.selectedNode}
             setSelectedNode={selection.setSelectedNode}
-            operators={operators}
+            operators={displayOperators}
             orgUnits={orgUnits}
             businessUnits={businessUnits}
             businessUnitTree={treeProjection.businessUnitTree}
@@ -225,11 +252,13 @@ export function AgentChartSurface() {
             selectedOperator={selectedOperator}
             executeCommand={actions.executeCommand}
             onSaveOperatorPatch={(operator, patch) => {
-              actions.executeCommand({
-                kind: 'update_operator',
-                operatorId: operator.id,
-                patch
-              });
+              if (!operator.sourceAgentId) {
+                actions.executeCommand({
+                  kind: 'update_operator',
+                  operatorId: operator.id,
+                  patch
+                });
+              }
               syncLinkedAgentManifest(operator.id, patch);
             }}
             setPendingDelete={actions.setPendingDelete}

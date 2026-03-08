@@ -21,7 +21,7 @@ import {
   type PropsWithChildren
 } from 'react';
 import { useRuntimeClient } from '../../../app/runtime/RuntimeProvider';
-import { AGENT_MANIFESTS_CHANGED_EVENT, loadAgentManifests } from '../agents/agent-storage';
+import { loadAgentManifests } from '../agents/agent-storage';
 import type { AgentManifest } from '../agents';
 import {
   canRedoOrgCommand,
@@ -203,7 +203,6 @@ function useOrgChartStoreState(): OrgChartStoreValue {
   const [data, setData] = useState<OrgChartData>(() => createInitialOrgChartData());
   const [hydrated, setHydrated] = useState(false);
   const persistTimerRef = useRef<number | null>(null);
-  const backgroundSyncTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -278,42 +277,6 @@ function useOrgChartStoreState(): OrgChartStoreValue {
       }
     };
   }, [data, hydrated, runtimeClient]);
-
-  useEffect(() => {
-    const syncNow = () => {
-      runtimeClient
-        .listAgentManifests()
-        .then((manifests) => {
-          setData((current) =>
-            syncOperatorsFromAgents(current, manifests as AgentManifest[], {
-              createMissingOperators: false
-            })
-          );
-        })
-        .catch(() => {
-          setData((current) =>
-            syncOperatorsFromAgents(current, loadAgentManifests(), {
-              createMissingOperators: false
-            })
-          );
-        });
-    };
-
-    if (backgroundSyncTimerRef.current != null) {
-      window.clearTimeout(backgroundSyncTimerRef.current);
-    }
-    backgroundSyncTimerRef.current = window.setTimeout(() => {
-      syncNow();
-    }, 600);
-    window.addEventListener(AGENT_MANIFESTS_CHANGED_EVENT, syncNow);
-    return () => {
-      if (backgroundSyncTimerRef.current != null) {
-        window.clearTimeout(backgroundSyncTimerRef.current);
-        backgroundSyncTimerRef.current = null;
-      }
-      window.removeEventListener(AGENT_MANIFESTS_CHANGED_EVENT, syncNow);
-    };
-  }, [runtimeClient]);
 
   const orgUnits = useMemo(() => sortOrgUnits(data.snapshot.orgUnits), [data.snapshot.orgUnits]);
   const businessUnits = useMemo(() => sortBusinessUnits(data.snapshot.businessUnits), [data.snapshot.businessUnits]);

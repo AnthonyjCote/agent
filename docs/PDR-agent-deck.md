@@ -293,6 +293,13 @@ Tauri app and Server app both depend on `agent_core`.
 - Shared schemas/events stay canonical across desktop and web targets.
 - Rust implementation must follow `docs/RUST-ARCHITECTURE-RULES.md` (module boundaries, file-size limits, trait-first seams, CI checks).
 
+### 11.5 Startup bootstrap gate (hydration UX)
+- Add an app-level startup bootstrap state machine: `booting -> ready`.
+- Show a splash screen while app-level providers hydrate core state (agents, org chart, chat/session caches, capability snapshot).
+- Do not render domain surfaces until bootstrap reaches `ready` (prevents page-by-page unhydrated flashes).
+- Keep stores/provider lifetimes app-scoped so hydration happens once per app session, not per tab switch.
+- Keep background revalidation non-blocking after `ready`.
+
 ---
 
 ## 12. Security Model (V1 → V2 consistent)
@@ -374,6 +381,7 @@ Tauri app and Server app both depend on `agent_core`.
   - final output
 - Inter-agent delegation events are traceable and persisted.
 - Per-agent inbox/outbox records persist and render consistently in desktop and web targets.
+- First-load hydration happens behind splash/bootstrap gate; no visible unhydrated domain state during initial app launch.
 
 ---
 
