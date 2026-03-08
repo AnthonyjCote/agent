@@ -43,12 +43,6 @@ export type OrgChartSelectionState = {
   setActorTitleDraft: Dispatch<SetStateAction<string>>;
   businessUnitOverviewDraft: string;
   setBusinessUnitOverviewDraft: Dispatch<SetStateAction<string>>;
-  businessUnitObjectivesDraft: string;
-  setBusinessUnitObjectivesDraft: Dispatch<SetStateAction<string>>;
-  businessUnitProductsDraft: string;
-  setBusinessUnitProductsDraft: Dispatch<SetStateAction<string>>;
-  businessUnitMetricsDraft: string;
-  setBusinessUnitMetricsDraft: Dispatch<SetStateAction<string>>;
   orgOverviewDraft: string;
   setOrgOverviewDraft: Dispatch<SetStateAction<string>>;
   orgResponsibilitiesDraft: string;
@@ -89,9 +83,6 @@ export function useOrgChartSelectionState(input: {
   const [orgNameDraft, setOrgNameDraft] = useState('');
   const [businessUnitNameDraft, setBusinessUnitNameDraft] = useState('');
   const [businessUnitOverviewDraft, setBusinessUnitOverviewDraft] = useState('');
-  const [businessUnitObjectivesDraft, setBusinessUnitObjectivesDraft] = useState('');
-  const [businessUnitProductsDraft, setBusinessUnitProductsDraft] = useState('');
-  const [businessUnitMetricsDraft, setBusinessUnitMetricsDraft] = useState('');
   const [actorNameDraft, setActorNameDraft] = useState('');
   const [actorTitleDraft, setActorTitleDraft] = useState('');
   const [orgOverviewDraft, setOrgOverviewDraft] = useState('');
@@ -140,9 +131,6 @@ export function useOrgChartSelectionState(input: {
     if (selectedBusinessUnit) {
       setBusinessUnitNameDraft(selectedBusinessUnit.name);
       setBusinessUnitOverviewDraft(selectedBusinessUnit.overview);
-      setBusinessUnitObjectivesDraft(selectedBusinessUnit.objectives);
-      setBusinessUnitProductsDraft(selectedBusinessUnit.primaryProductsOrServices);
-      setBusinessUnitMetricsDraft(selectedBusinessUnit.successMetrics);
       setOrgNameDraft('');
       setOrgOverviewDraft('');
       setOrgResponsibilitiesDraft('');
@@ -164,9 +152,6 @@ export function useOrgChartSelectionState(input: {
       setOrgWorkingModelDraft(selectedOrg.workingModel);
       setBusinessUnitNameDraft('');
       setBusinessUnitOverviewDraft('');
-      setBusinessUnitObjectivesDraft('');
-      setBusinessUnitProductsDraft('');
-      setBusinessUnitMetricsDraft('');
       setActorNameDraft('');
       setActorTitleDraft('');
       setActorPrimaryObjectiveDraft('');
@@ -183,9 +168,6 @@ export function useOrgChartSelectionState(input: {
       setActorRoleBriefDraft(selectedOperator.roleBrief);
       setBusinessUnitNameDraft('');
       setBusinessUnitOverviewDraft('');
-      setBusinessUnitObjectivesDraft('');
-      setBusinessUnitProductsDraft('');
-      setBusinessUnitMetricsDraft('');
       setOrgNameDraft('');
       setOrgOverviewDraft('');
       setOrgResponsibilitiesDraft('');
@@ -196,9 +178,6 @@ export function useOrgChartSelectionState(input: {
 
     setBusinessUnitNameDraft('');
     setBusinessUnitOverviewDraft('');
-    setBusinessUnitObjectivesDraft('');
-    setBusinessUnitProductsDraft('');
-    setBusinessUnitMetricsDraft('');
     setOrgNameDraft('');
     setOrgOverviewDraft('');
     setOrgResponsibilitiesDraft('');
@@ -294,12 +273,6 @@ export function useOrgChartSelectionState(input: {
     setActorTitleDraft,
     businessUnitOverviewDraft,
     setBusinessUnitOverviewDraft,
-    businessUnitObjectivesDraft,
-    setBusinessUnitObjectivesDraft,
-    businessUnitProductsDraft,
-    setBusinessUnitProductsDraft,
-    businessUnitMetricsDraft,
-    setBusinessUnitMetricsDraft,
     orgOverviewDraft,
     setOrgOverviewDraft,
     orgResponsibilitiesDraft,

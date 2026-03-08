@@ -7,9 +7,6 @@ type BusinessUnit = {
   logoSourceDataUrl: string;
   logoDataUrl: string;
   overview: string;
-  objectives: string;
-  primaryProductsOrServices: string;
-  successMetrics: string;
 };
 
 type BusinessUnitDetailsCardProps = {
@@ -18,12 +15,6 @@ type BusinessUnitDetailsCardProps = {
   setBusinessUnitNameDraft: (next: string) => void;
   businessUnitOverviewDraft: string;
   setBusinessUnitOverviewDraft: (next: string) => void;
-  businessUnitObjectivesDraft: string;
-  setBusinessUnitObjectivesDraft: (next: string) => void;
-  businessUnitProductsDraft: string;
-  setBusinessUnitProductsDraft: (next: string) => void;
-  businessUnitMetricsDraft: string;
-  setBusinessUnitMetricsDraft: (next: string) => void;
   businessUnitParentOptions: DropdownOption[];
   onMoveParent: (value: string) => void;
   onSave: () => void;
@@ -38,12 +29,6 @@ export function BusinessUnitDetailsCard(props: BusinessUnitDetailsCardProps) {
     setBusinessUnitNameDraft,
     businessUnitOverviewDraft,
     setBusinessUnitOverviewDraft,
-    businessUnitObjectivesDraft,
-    setBusinessUnitObjectivesDraft,
-    businessUnitProductsDraft,
-    setBusinessUnitProductsDraft,
-    businessUnitMetricsDraft,
-    setBusinessUnitMetricsDraft,
     businessUnitParentOptions,
     onMoveParent,
     onSave,
@@ -71,22 +56,6 @@ export function BusinessUnitDetailsCard(props: BusinessUnitDetailsCardProps) {
         Overview
       </label>
       <TextAreaField value={businessUnitOverviewDraft} onValueChange={setBusinessUnitOverviewDraft} ariaLabel="Business unit overview" />
-      <label className="agent-chart-field-label" htmlFor="business-unit-objectives">
-        Objectives
-      </label>
-      <TextAreaField value={businessUnitObjectivesDraft} onValueChange={setBusinessUnitObjectivesDraft} ariaLabel="Business unit objectives" />
-      <label className="agent-chart-field-label" htmlFor="business-unit-products">
-        Primary Products/Services
-      </label>
-      <TextAreaField
-        value={businessUnitProductsDraft}
-        onValueChange={setBusinessUnitProductsDraft}
-        ariaLabel="Business unit primary products and services"
-      />
-      <label className="agent-chart-field-label" htmlFor="business-unit-success-metrics">
-        Success Metrics
-      </label>
-      <TextAreaField value={businessUnitMetricsDraft} onValueChange={setBusinessUnitMetricsDraft} ariaLabel="Business unit success metrics" />
       <label className="agent-chart-field-label" htmlFor="business-unit-parent">
         Parent Business Unit
       </label>

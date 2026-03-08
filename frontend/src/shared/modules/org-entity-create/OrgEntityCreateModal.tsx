@@ -21,9 +21,6 @@ type ActorDraft = {
 type BusinessUnitDraft = {
   name: string;
   overview: string;
-  objectives: string;
-  primaryProductsOrServices: string;
-  successMetrics: string;
   logoSourceDataUrl: string;
   logoDataUrl: string;
 };
@@ -84,9 +81,6 @@ export function OrgEntityCreateModal(props: OrgEntityCreateModalProps) {
   const [businessUnit, setBusinessUnit] = useState<BusinessUnitDraft>({
     name: '',
     overview: '',
-    objectives: '',
-    primaryProductsOrServices: '',
-    successMetrics: '',
     logoSourceDataUrl: '',
     logoDataUrl: ''
   });
@@ -132,9 +126,6 @@ export function OrgEntityCreateModal(props: OrgEntityCreateModalProps) {
     setBusinessUnit({
       name: '',
       overview: '',
-      objectives: '',
-      primaryProductsOrServices: '',
-      successMetrics: '',
       logoSourceDataUrl: '',
       logoDataUrl: ''
     });
@@ -171,10 +162,7 @@ export function OrgEntityCreateModal(props: OrgEntityCreateModalProps) {
     (operator.kind === 'agent' ? !operator.systemDirective.trim() : !operator.roleBrief.trim());
   const businessUnitMissingRequired =
     !businessUnit.name.trim() ||
-    !businessUnit.overview.trim() ||
-    !businessUnit.objectives.trim() ||
-    !businessUnit.primaryProductsOrServices.trim() ||
-    !businessUnit.successMetrics.trim();
+    !businessUnit.overview.trim();
   const orgUnitMissingRequired =
     !orgUnit.name.trim() ||
     !orgUnit.overview.trim() ||
@@ -327,18 +315,6 @@ export function OrgEntityCreateModal(props: OrgEntityCreateModalProps) {
           <label className="org-entity-modal-field span-2">
             <FieldLabel label="Overview" info="What this business unit does." />
             <TextAreaField value={businessUnit.overview} ariaLabel="Business unit overview" invalid={submitAttempted && !businessUnit.overview.trim()} onValueChange={(next) => setBusinessUnit((current) => ({ ...current, overview: next }))} />
-          </label>
-          <label className="org-entity-modal-field span-2">
-            <FieldLabel label="Objectives" info="Top goals for this unit." />
-            <TextAreaField value={businessUnit.objectives} ariaLabel="Business unit objectives" invalid={submitAttempted && !businessUnit.objectives.trim()} onValueChange={(next) => setBusinessUnit((current) => ({ ...current, objectives: next }))} />
-          </label>
-          <label className="org-entity-modal-field span-2">
-            <FieldLabel label="Primary Products/Services" info="Main products or services owned by this unit." />
-            <TextAreaField value={businessUnit.primaryProductsOrServices} ariaLabel="Business unit products" invalid={submitAttempted && !businessUnit.primaryProductsOrServices.trim()} onValueChange={(next) => setBusinessUnit((current) => ({ ...current, primaryProductsOrServices: next }))} />
-          </label>
-          <label className="org-entity-modal-field span-2">
-            <FieldLabel label="Success Metrics" info="KPIs used to evaluate this unit." />
-            <TextAreaField value={businessUnit.successMetrics} ariaLabel="Business unit success metrics" invalid={submitAttempted && !businessUnit.successMetrics.trim()} onValueChange={(next) => setBusinessUnit((current) => ({ ...current, successMetrics: next }))} />
           </label>
         </div>
       ) : null}

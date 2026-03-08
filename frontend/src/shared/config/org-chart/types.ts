@@ -39,9 +39,6 @@ export type BusinessUnit = {
   id: BusinessUnitId;
   name: string;
   overview: string;
-  objectives: string;
-  primaryProductsOrServices: string;
-  successMetrics: string;
   parentBusinessUnitId: BusinessUnitId | null;
   logoSourceDataUrl: string;
   logoDataUrl: string;
@@ -108,9 +105,6 @@ export type OrgCommand =
       payload: {
         name: string;
         overview?: string;
-        objectives?: string;
-        primaryProductsOrServices?: string;
-        successMetrics?: string;
         logoSourceDataUrl?: string;
         logoDataUrl?: string;
       };
@@ -129,9 +123,7 @@ export type OrgCommand =
   | {
       kind: 'update_business_unit';
       nodeId: BusinessUnitId;
-      patch: Partial<
-        Pick<BusinessUnit, 'name' | 'overview' | 'objectives' | 'primaryProductsOrServices' | 'successMetrics'>
-      >;
+      patch: Partial<Pick<BusinessUnit, 'name' | 'overview'>>;
     }
   | {
       kind: 'create_org_unit';

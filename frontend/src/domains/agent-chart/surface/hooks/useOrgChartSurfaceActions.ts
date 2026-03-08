@@ -28,9 +28,6 @@ type OrgChartSurfaceActions = {
   createBusinessUnit: (input: {
     name: string;
     overview: string;
-    objectives: string;
-    primaryProductsOrServices: string;
-    successMetrics: string;
     logoSourceDataUrl: string;
     logoDataUrl: string;
   }) => void;
@@ -148,9 +145,6 @@ export function useOrgChartSurfaceActions(input: UseOrgChartSurfaceActionsInput)
   const createBusinessUnit = (input: {
     name: string;
     overview: string;
-    objectives: string;
-    primaryProductsOrServices: string;
-    successMetrics: string;
     logoSourceDataUrl: string;
     logoDataUrl: string;
   }) => {
@@ -160,9 +154,6 @@ export function useOrgChartSurfaceActions(input: UseOrgChartSurfaceActionsInput)
       payload: {
         name: input.name.trim() || 'New Business Unit',
         overview: input.overview,
-        objectives: input.objectives,
-        primaryProductsOrServices: input.primaryProductsOrServices,
-        successMetrics: input.successMetrics,
         logoSourceDataUrl: input.logoSourceDataUrl,
         logoDataUrl: input.logoDataUrl
       }

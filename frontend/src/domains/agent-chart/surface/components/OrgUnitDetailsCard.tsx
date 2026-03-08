@@ -117,9 +117,9 @@ export function OrgUnitDetailsCard(props: OrgUnitDetailsCardProps) {
       </label>
       <DropdownSelector value={orgUnit.parentOrgUnitId ?? ''} options={orgParentOptions} onValueChange={onMoveParent} ariaLabel="Org unit parent" />
       <div className="agent-chart-child-org-list">
-        <span className="agent-chart-field-label">Direct Child Org Units</span>
+        <span className="agent-chart-field-label">Sub-units</span>
         {selectedOrgChildren.length === 0 ? (
-          <p className="agent-chart-field-hint">No child org units.</p>
+          <p className="agent-chart-field-hint">No sub-units.</p>
         ) : (
           <ul className="agent-chart-child-org-items">
             {selectedOrgChildren.map((unit) => (

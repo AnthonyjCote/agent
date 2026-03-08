@@ -35,13 +35,9 @@ function normalizeStoredData(parsed: StoredOrgChart): OrgChartData {
 
   const normalized = parsed as OrgChartData;
   normalized.snapshot.businessUnits = Array.isArray(parsed.snapshot.businessUnits)
-    ? (parsed.snapshot.businessUnits as OrgChartData['snapshot']['businessUnits']).map((businessUnit) => ({
+      ? (parsed.snapshot.businessUnits as OrgChartData['snapshot']['businessUnits']).map((businessUnit) => ({
         ...businessUnit,
         overview: typeof businessUnit.overview === 'string' ? businessUnit.overview : '',
-        objectives: typeof businessUnit.objectives === 'string' ? businessUnit.objectives : '',
-        primaryProductsOrServices:
-          typeof businessUnit.primaryProductsOrServices === 'string' ? businessUnit.primaryProductsOrServices : '',
-        successMetrics: typeof businessUnit.successMetrics === 'string' ? businessUnit.successMetrics : '',
         logoSourceDataUrl: typeof businessUnit.logoSourceDataUrl === 'string' ? businessUnit.logoSourceDataUrl : '',
         logoDataUrl: typeof businessUnit.logoDataUrl === 'string' ? businessUnit.logoDataUrl : '',
         parentBusinessUnitId:

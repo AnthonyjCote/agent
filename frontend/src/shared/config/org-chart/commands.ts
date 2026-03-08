@@ -269,9 +269,6 @@ function applyCreateBusinessUnit(
     id: createId('bu'),
     name: command.payload.name.trim() || 'Untitled Business Unit',
     overview: command.payload.overview?.trim() ?? '',
-    objectives: command.payload.objectives?.trim() ?? '',
-    primaryProductsOrServices: command.payload.primaryProductsOrServices?.trim() ?? '',
-    successMetrics: command.payload.successMetrics?.trim() ?? '',
     parentBusinessUnitId: command.parentId,
     logoSourceDataUrl: command.payload.logoSourceDataUrl ?? '',
     logoDataUrl: command.payload.logoDataUrl ?? '',
@@ -366,15 +363,6 @@ function applyUpdateBusinessUnit(
   }
   if (command.patch.overview != null) {
     unit.overview = command.patch.overview;
-  }
-  if (command.patch.objectives != null) {
-    unit.objectives = command.patch.objectives;
-  }
-  if (command.patch.primaryProductsOrServices != null) {
-    unit.primaryProductsOrServices = command.patch.primaryProductsOrServices;
-  }
-  if (command.patch.successMetrics != null) {
-    unit.successMetrics = command.patch.successMetrics;
   }
   unit.updatedAt = nowIso();
   next.links = rebuildLinks(next);

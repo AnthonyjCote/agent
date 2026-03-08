@@ -1,0 +1,219 @@
+# PDR: Multi-DB Persistence with Business-Unit Knowledge Stores (V1)
+
+## Purpose
+Define a persistence architecture for Agent Deck that:
+- supports both desktop and server targets from the same Rust internals,
+- keeps operational/core state stable and fast,
+- isolates high-churn runtime logs/history,
+- stores knowledge in business-unit-specific databases for clean divestiture/export.
+
+## Decision Summary
+1. SQLite is the primary persistence engine in V1.
+2. Persistence is split across multiple SQLite files by data domain.
+3. Knowledge data is split by business unit (one knowledge DB per BU).
+4. Org chart, manifests, and config remain centralized in core DB.
+5. Conversation/runtime history is isolated in runtime DB.
+6. Persistence access is DB-agnostic at the repository boundary (engine adapters behind stable interfaces).
+
+## Scope
+This PDR covers desktop and server storage internals only.
+It does not define cloud sync or external managed databases yet.
+
+## DB-Agnostic Requirement (Explicit)
+All persistence must be implemented through stable repository interfaces owned by `agent_persistence`.
+
+Rules:
+1. Domain/runtime services must not depend on SQLite-specific APIs.
+2. SQL engine details must be isolated behind adapter implementations.
+3. Frontend and command contracts must not change when swapping storage engines.
+4. Engine migration (SQLite -> Postgres for core/runtime) must require adapter/config changes, not domain logic rewrites.
+5. BU knowledge portability semantics (`kb-<business_unit_id>.sqlite` export package) must remain stable regardless of primary core/runtime backend.
+
+## Goals
+- deterministic persistence behavior across targets,
+- strong backup and restore ergonomics,
+- low risk of DB bloat impacting core UX,
+- clean BU-level data handoff for divestiture,
+- minimal rewrite risk for future scaling.
+
+## Non-Goals (V1)
+- managed distributed SQL,
+- multi-region replication,
+- per-org-unit knowledge DB sharding,
+- automatic vector DB migration.
+
+## Storage Topology
+Workspace root (per workspace):
+- `data/core.sqlite`
+- `data/runtime.sqlite`
+- `data/knowledge/kb-core.sqlite`
+- `data/knowledge/kb-<business_unit_id>.sqlite`
+- `backups/`
+
+### `core.sqlite`
+Source of truth for structural and governance entities:
+- business units,
+- org units,
+- operators,
+- agent manifests,
+- global and BU-level config,
+- policy and permission metadata,
+- external integration config metadata (non-secret references only).
+
+### `runtime.sqlite`
+High-churn operational data:
+- threads,
+- messages,
+- run records,
+- tool call records,
+- runtime events,
+- inbox/outbox state,
+- status transitions.
+
+### `kb-core.sqlite`
+Shared/global knowledge not owned by a single BU:
+- platform SOPs,
+- enterprise-wide policy docs,
+- shared reference indexes,
+- shared KB metadata/chunks.
+
+### `kb-<business_unit_id>.sqlite`
+Business-unit-owned knowledge store:
+- BU SOPs,
+- BU docs/wiki/KB metadata,
+- chunk metadata and retrieval indexes,
+- BU-scoped source references.
+
+This file is the primary unit for BU data portability/divestiture.
+
+## Key IDs and Cross-DB Linking
+Use canonical IDs in all DBs:
+- `workspace_id`
+- `business_unit_id`
+- `org_unit_id`
+- `operator_id`
+- `agent_id`
+- `thread_id`
+- `run_id`
+- `doc_id`
+
+Cross-DB joins are resolved in application/repository layer, not SQL cross-file joins.
+
+## Agent Runtime Workspace Isolation
+Each operator has a dedicated runtime folder:
+- `operators/<operator_id>/runtime/`
+- `operators/<operator_id>/artifacts/`
+- `operators/<operator_id>/logs/`
+
+CLI agents launch from operator runtime folder only.
+DB files are outside runtime folders and never exposed as tool working directories.
+
+## Media Storage Rule (Explicit)
+Profile images, logos, and other UI media are file-based assets under workspace storage, not SQLite BLOB payloads.
+
+Canonical rule:
+1. SQLite stores media metadata + relative path only.
+2. Paths must be relative to workspace root (never absolute machine-specific paths).
+3. Backup/export must include both DB files and media folder tree.
+4. Import/restore must remap relative paths against the new workspace root automatically.
+
+Suggested media layout:
+- `media/operators/<operator_id>/avatar.<ext>`
+- `media/business-units/<business_unit_id>/logo.<ext>`
+
+Suggested metadata fields:
+- `*_path` (relative path)
+- `mime_type`
+- `width`
+- `height`
+- `size_bytes`
+- `sha256`
+
+## Knowledge Routing Rules
+1. Each knowledge write is tagged with `business_unit_id` (nullable).
+2. If `business_unit_id` is set, write to `kb-<business_unit_id>.sqlite`.
+3. If no BU ownership, write to `kb-core.sqlite`.
+4. Retrieval resolves candidate DBs by context scope first, then executes ranked search.
+
+## Divestiture / BU Export Rules
+For a BU handoff:
+1. Export BU record and dependencies from `core.sqlite`.
+2. Export BU-relevant runtime subset from `runtime.sqlite`.
+3. Export `kb-<business_unit_id>.sqlite` file directly.
+4. Package outputs with manifest and checksums.
+
+## Backup Strategy (V1)
+- scheduled backups per DB file,
+- timestamped snapshots under `backups/`,
+- optional JSON export bundles for human/audit portability,
+- backup/export package always includes media folder content referenced by relative paths,
+- restore supports full workspace or per-DB restoration.
+
+## Security and Secrets
+- secrets are not stored as plaintext in these DBs,
+- DB stores secret references/keys IDs only,
+- actual secrets resolved through platform secret storage mechanism.
+
+## Why This Architecture
+- prevents core DB slowdown from runtime/KB growth,
+- keeps BU knowledge cleanly separable,
+- reduces future rewrite risk,
+- supports desktop and server with same persistence crate contracts,
+- preserves engine flexibility via DB-agnostic repositories.
+
+## Tradeoffs
+- app-layer cross-DB orchestration is required,
+- more files to manage than single-DB design,
+- transaction boundaries are per DB (not global).
+
+Accepted due to clear operational and portability benefits.
+
+## Implementation Checklist
+### Phase 1: Persistence Foundation
+- [ ] Create Rust crate: `backend/crates/agent_persistence`.
+- [ ] Define DB-agnostic repository interfaces for core/runtime/knowledge domains.
+- [ ] Define DB registry/resolver for workspace paths.
+- [ ] Implement SQLite adapter for repository interfaces (`core`, `runtime`, `kb-core`, `kb-<business_unit_id>`).
+- [ ] Add migration runner per DB type.
+- [ ] Add workspace bootstrap routine to create required DB files/folders.
+
+### Phase 2: Core Schema + Repositories
+- [ ] Add core schema migrations for org, operator, agent manifest, config entities.
+- [ ] Implement repository interfaces for core entities.
+- [ ] Replace local-storage adapters in frontend bridge paths with backend calls (desktop target first).
+
+### Phase 3: Runtime Schema + Repositories
+- [ ] Add runtime schema migrations for threads/messages/runs/events/tool calls.
+- [ ] Implement runtime repositories with append/query APIs.
+- [ ] Wire chat runtime persistence paths to runtime repository.
+
+### Phase 4: Knowledge Split by BU
+- [ ] Add knowledge schema migrations (core + BU DBs).
+- [ ] Implement knowledge repository router by `business_unit_id`.
+- [ ] Add helper for lazy creation of `kb-<business_unit_id>.sqlite`.
+- [ ] Wire KB writes and retrieval lookups through router.
+
+### Phase 5: Export/Backup
+- [ ] Implement DB snapshot utility per DB file.
+- [ ] Add BU export command packaging core/runtime subset + BU knowledge DB.
+- [ ] Add checksum manifest generation.
+- [ ] Add restore paths for full workspace and per-BU package.
+
+### Phase 6: Guardrails
+- [ ] Enforce runtime working-directory restrictions for CLI launches.
+- [ ] Add path guards blocking DB paths from tool workspace exposure.
+- [ ] Add structured logging around DB routing decisions.
+
+### Phase 7: Tests
+- [ ] Unit tests for DB resolver/routing.
+- [ ] Migration tests per DB type.
+- [ ] Integration tests for BU knowledge write/read routing.
+- [ ] Integration tests for BU export package integrity.
+- [ ] Regression test: deleting/moving BU does not orphan routing metadata.
+
+## Open Follow-Ups
+- Server deployment strategy for SQLite file locking and backups.
+- Add Postgres adapter for `core/runtime` using same repository interfaces when scale/concurrency demands it.
+
+## Status
+Proposed for immediate implementation after review.

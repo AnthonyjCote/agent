@@ -76,12 +76,6 @@ export function OrgChartRightPane(props: OrgChartRightPaneProps) {
           setBusinessUnitNameDraft={selection.setBusinessUnitNameDraft}
           businessUnitOverviewDraft={selection.businessUnitOverviewDraft}
           setBusinessUnitOverviewDraft={selection.setBusinessUnitOverviewDraft}
-          businessUnitObjectivesDraft={selection.businessUnitObjectivesDraft}
-          setBusinessUnitObjectivesDraft={selection.setBusinessUnitObjectivesDraft}
-          businessUnitProductsDraft={selection.businessUnitProductsDraft}
-          setBusinessUnitProductsDraft={selection.setBusinessUnitProductsDraft}
-          businessUnitMetricsDraft={selection.businessUnitMetricsDraft}
-          setBusinessUnitMetricsDraft={selection.setBusinessUnitMetricsDraft}
           businessUnitParentOptions={selection.businessUnitParentOptions}
           onMoveParent={(value) =>
             executeCommand({
@@ -96,10 +90,7 @@ export function OrgChartRightPane(props: OrgChartRightPaneProps) {
               nodeId: selectedBusinessUnit.id,
               patch: {
                 name: selection.businessUnitNameDraft,
-                overview: selection.businessUnitOverviewDraft,
-                objectives: selection.businessUnitObjectivesDraft,
-                primaryProductsOrServices: selection.businessUnitProductsDraft,
-                successMetrics: selection.businessUnitMetricsDraft
+                overview: selection.businessUnitOverviewDraft
               }
             })
           }
