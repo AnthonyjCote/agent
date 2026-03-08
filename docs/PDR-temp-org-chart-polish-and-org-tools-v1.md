@@ -90,6 +90,23 @@ Default V1 behavior:
 ### Tool ID
 `org_manage_entities_v1`
 
+### Action classes (explicit)
+1. Query/read actions (`read.*`) — default allowed for all agents:
+   - `read.snapshot`
+   - `read.node`
+   - `read.children`
+   - `read.operator_relations`
+2. Write actions (`write.*`) — permission-gated:
+   - `create_business_unit`
+   - `create_org_unit`
+   - `create_operator`
+   - `update_business_unit`
+   - `update_org_unit`
+   - `update_operator`
+   - `move_org_unit`
+   - `move_operator`
+   - `set_operator_manager`
+
 ### Allowed actions
 1. `create_business_unit`
 2. `create_org_unit`
@@ -100,6 +117,40 @@ Default V1 behavior:
 2. Same validation and transaction path as UI.
 3. Return canonical IDs and placement metadata.
 4. Emit activity events with actor=`agent:<id>`.
+
+### Policy model (V1 seam)
+1. Policy shape supports:
+   - `org_read: boolean`
+   - `org_write: none | limited | full`
+   - optional scoped allow-lists for business units / org units
+2. Authorization is centralized in backend runtime/tool guard:
+   - `authorize(agent_id, action, scope)` -> allow/deny
+3. Permission-denied responses must be structured:
+   - `code: permission_denied`
+   - machine-readable reason + required capability
+
+### Temporary dev default (locked for current sandbox)
+1. Until Tools domain policy UI is shipped, runtime policy mode is:
+   - `allow_all`
+2. In `allow_all` mode:
+   - all agents may execute both `read.*` and `write.*` org actions for testing
+3. Runtime must still keep the authorization seam in place for future enforcement.
+4. Future switch:
+   - `allow_all` -> `enforce` without refactoring tool handlers.
+
+## Future Tools Domain Ownership
+Tool policy configuration is intentionally deferred from agent profile edit and owned by a dedicated Tools domain.
+
+Planned policy hierarchy in Tools domain:
+1. Global defaults
+2. Business-unit overrides
+3. Org-unit overrides
+4. Operator overrides
+
+Requirements for that future domain:
+1. Effective-policy resolver view per operator/agent.
+2. Clear inheritance/debug display (what value came from which layer).
+3. Deep-link from operator profile to tools policy management surface.
 
 ### V1 non-goals for tool
 1. No delete/move bulk operations in first release.
