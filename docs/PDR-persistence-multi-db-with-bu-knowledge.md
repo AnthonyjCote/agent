@@ -347,13 +347,16 @@ Default API limits:
 - [ ] Add backpressure-safe append path for run events.
 
 ### Phase 3A: Conversation Browser (Modal Grid) + Persistence
-- [ ] Add thread metadata schema in `runtime.sqlite` (`thread_id`, `operator_id`, title, summary, status, counts, timestamps).
-- [ ] Add thread list APIs with filter rail support (BU/org/operator/status/sort/search).
-- [ ] Add thread card DTO for modal grid.
+- [x] Add thread metadata schema in `runtime.sqlite` (`thread_id`, `operator_id`, title, summary, status, counts, timestamps).
+- [x] Add thread list APIs with filter rail support (BU/org/operator/status/sort/search) for V1 conversation modal behavior.
+- [x] Add thread card DTO for modal grid.
 - [ ] Add message pagination API + cursor contract for thread hydration.
-- [ ] Build Chat GUI `Conversations` modal (grid cards + top filter rail + typed search bar).
-- [ ] Wire open/rename/archive/delete thread actions in modal to runtime persistence APIs.
+- [x] Build Chat GUI `Conversations` modal (grid cards + top filter rail + typed search bar).
+- [x] Wire open/create/delete thread actions in modal to runtime persistence APIs.
 - [ ] Persist selected thread per active operator and restore on reopen.
+
+V2 deferral note:
+- Thread rename/archive actions are explicitly deferred to V2 and are not required for V1 sign-off.
 
 ### Phase 4: Knowledge Split by BU
 - [ ] Add knowledge schema migrations (core + BU DBs).
@@ -390,4 +393,4 @@ Default API limits:
 - Add Postgres adapter for `core/runtime` using same repository interfaces when scale/concurrency demands it.
 
 ## Status
-In progress. Persistence foundation and core cutover are partially implemented; runtime thread/message persistence and conversation browser UI are the next active slice.
+In progress. Persistence foundation and core cutover are partially implemented; runtime thread/message persistence and conversation browser UI (V1 subset: open/create/delete, no rename/archive) are the next active slice.
