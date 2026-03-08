@@ -70,6 +70,11 @@ struct ModelToolCall {
     args: serde_json::Value,
 }
 
+struct CollectedInference {
+    text: String,
+    delta_chunks: Vec<String>,
+}
+
 fn collect_text(events: &[InferenceEvent]) -> String {
     let mut parts = Vec::new();
 
@@ -160,6 +165,7 @@ fn deep_prompt(
     toolbox_summary: &str,
     prefetched_tool_details: &str,
     tool_results_log: &[String],
+    work_log: &[String],
     step_index: usize,
     user_prompt: &str,
 ) -> String {
@@ -188,6 +194,11 @@ fn deep_prompt(
             tool_results_log.join("\n")
         )
     };
+    let work_log_section = if work_log.is_empty() {
+        "Run work log: (empty)\n".to_string()
+    } else {
+        format!("Run work log (latest first):\n{}\n", work_log.join("\n"))
+    };
 
     format!(
         "You are {agent_name}, acting as {agent_role}. This is step {step_index}.\n\
@@ -198,6 +209,7 @@ Toolbox summary (only these app tools are explicitly allowed):\n\
 {toolbox_summary}\n\
 {prefetch_section}\
 {tool_results_section}\
+{work_log_section}\
 User prompt: {user_prompt}\n\n\
 Runtime instructions:\n\
 - You may use native model capabilities/tools (for example web search) when needed.\n\
@@ -242,7 +254,7 @@ Runtime instructions:\n\
 - Keep formatting minimal by default: prefer plain paragraphs and only use bullets/bold/numbering when they add clear readability value.\n\
 - When you are ready to deliver the user-facing final answer, the FIRST token must be {FINAL_RESPONSE_SENTINEL}.\n\
 - Do not emit {FINAL_RESPONSE_SENTINEL} until final answer.\n\
-- Final answer should be concise and directly useful."
+"
     )
 }
 
@@ -427,6 +439,26 @@ fn format_tool_error_for_prompt(tool_name: &str, error: &RunError) -> String {
     )
 }
 
+fn compact_for_log(input: &str, max_len: usize) -> String {
+    let compact = input.split_whitespace().collect::<Vec<_>>().join(" ");
+    if compact.len() <= max_len {
+        compact
+    } else {
+        format!("{}...", &compact[..max_len])
+    }
+}
+
+fn extract_reasoning_for_work_log(text: &str) -> String {
+    let mut value = text.to_string();
+    if let Some(index) = value.find(FINAL_RESPONSE_SENTINEL) {
+        value = value[..index].to_string();
+    }
+    if let Some(index) = value.find("{\"tool_calls\"") {
+        value = value[..index].to_string();
+    }
+    compact_for_log(value.trim(), 700)
+}
+
 fn infer_and_collect<M: ModelInferencePort>(
     inference: &M,
     workspace_id: &str,
@@ -437,7 +469,7 @@ fn infer_and_collect<M: ModelInferencePort>(
     prompt: String,
     on_event: &mut dyn FnMut(RunEvent),
     trace_store: &MemoryTraceStore,
-) -> Result<String, RunError> {
+) -> Result<CollectedInference, RunError> {
     let mut streamed_parts = Vec::new();
     let mut on_inference_event = |event: InferenceEvent| {
         if let InferenceEvent::Delta(text) = event {
@@ -488,11 +520,15 @@ fn infer_and_collect<M: ModelInferencePort>(
     )?;
 
     let collected = collect_text(&events);
-    if collected.trim().is_empty() && !streamed_parts.is_empty() {
-        Ok(streamed_parts.join(""))
+    let text = if collected.trim().is_empty() && !streamed_parts.is_empty() {
+        streamed_parts.join("")
     } else {
-        Ok(collected)
-    }
+        collected
+    };
+    Ok(CollectedInference {
+        text,
+        delta_chunks: streamed_parts,
+    })
 }
 
 fn append_event(
@@ -600,7 +636,7 @@ pub fn execute_run_once_with_tools<M: ModelInferencePort>(
         on_event,
         &trace_store,
     ) {
-        Ok(value) => value,
+        Ok(value) => value.text,
         Err(error) => {
             append_event(
                 &trace_store,
@@ -682,6 +718,7 @@ pub fn execute_run_once_with_tools<M: ModelInferencePort>(
         .to_string();
     let prefetched_tool_details = render_tool_details(&ack_envelope.prefetch_tools, &allowed_tool_ids);
     let mut tool_results_log: Vec<String> = Vec::new();
+    let mut work_log: Vec<String> = Vec::new();
 
     let mut step: usize = 1;
     loop {
@@ -693,6 +730,7 @@ pub fn execute_run_once_with_tools<M: ModelInferencePort>(
             &toolbox_summary,
             &prefetched_tool_details,
             &tool_results_log,
+            &work_log,
             step,
             &prompt,
         );
@@ -706,7 +744,7 @@ pub fn execute_run_once_with_tools<M: ModelInferencePort>(
             },
         );
 
-        let deep_output = match infer_and_collect(
+        let deep_collected = match infer_and_collect(
             inference,
             &workspace_id,
             &run_id,
@@ -730,6 +768,14 @@ pub fn execute_run_once_with_tools<M: ModelInferencePort>(
                 return trace_store.snapshot();
             }
         };
+        let deep_output = deep_collected.text.clone();
+        let streamed_notes = extract_reasoning_for_work_log(&deep_collected.delta_chunks.join(""));
+        if !streamed_notes.is_empty() {
+            work_log.insert(0, format!("Step {} notes: {}", step, streamed_notes));
+            if work_log.len() > 24 {
+                work_log.truncate(24);
+            }
+        }
 
         append_event(
             &trace_store,
@@ -803,6 +849,19 @@ pub fn execute_run_once_with_tools<M: ModelInferencePort>(
 
         for (index, call) in tool_calls.iter().enumerate() {
             let call_id = format!("tool_{}_{}_{}", step, index + 1, call.tool);
+            let call_args_preview = serde_json::to_string(&call.args).unwrap_or_else(|_| "{}".to_string());
+            work_log.insert(
+                0,
+                format!(
+                    "Step {} tool call: {} args={}",
+                    step,
+                    call.tool,
+                    compact_for_log(&call_args_preview, 280)
+                ),
+            );
+            if work_log.len() > 24 {
+                work_log.truncate(24);
+            }
             if !allowed_tool_ids.iter().any(|tool_id| tool_id == call.tool.as_str()) {
                 append_event(
                     &trace_store,
@@ -836,6 +895,16 @@ pub fn execute_run_once_with_tools<M: ModelInferencePort>(
                     },
                 );
                 tool_results_log.insert(0, format_tool_error_for_prompt(&call.tool, &error));
+                work_log.insert(
+                    0,
+                    format!(
+                        "Step {} tool failed: {} [{}] {}",
+                        step, call.tool, error.code, error.message
+                    ),
+                );
+                if work_log.len() > 24 {
+                    work_log.truncate(24);
+                }
                 if tool_results_log.len() > 12 {
                     tool_results_log.truncate(12);
                 }
@@ -890,6 +959,18 @@ pub fn execute_run_once_with_tools<M: ModelInferencePort>(
                         },
                     );
                     tool_results_log.insert(0, format_tool_result_for_prompt(&call.tool, &output));
+                    work_log.insert(
+                        0,
+                        format!(
+                            "Step {} tool completed: {} -> {}",
+                            step,
+                            call.tool,
+                            compact_for_log(&output.summary, 260)
+                        ),
+                    );
+                    if work_log.len() > 24 {
+                        work_log.truncate(24);
+                    }
                     if tool_results_log.len() > 12 {
                         tool_results_log.truncate(12);
                     }
@@ -927,6 +1008,16 @@ pub fn execute_run_once_with_tools<M: ModelInferencePort>(
                         },
                     );
                     tool_results_log.insert(0, format_tool_error_for_prompt(&call.tool, &error));
+                    work_log.insert(
+                        0,
+                        format!(
+                            "Step {} tool failed: {} [{}] {}",
+                            step, call.tool, error.code, error.message
+                        ),
+                    );
+                    if work_log.len() > 24 {
+                        work_log.truncate(24);
+                    }
                     if tool_results_log.len() > 12 {
                         tool_results_log.truncate(12);
                     }
@@ -960,6 +1051,16 @@ pub fn execute_run_once_with_tools<M: ModelInferencePort>(
                         },
                     );
                     tool_results_log.insert(0, format_tool_error_for_prompt(&call.tool, &error));
+                    work_log.insert(
+                        0,
+                        format!(
+                            "Step {} tool failed: {} [{}] {}",
+                            step, call.tool, error.code, error.message
+                        ),
+                    );
+                    if work_log.len() > 24 {
+                        work_log.truncate(24);
+                    }
                     if tool_results_log.len() > 12 {
                         tool_results_log.truncate(12);
                     }
