@@ -1,5 +1,7 @@
 export type {
   AgentRuntimeClient,
+  LocalStorageMigrationStatus,
+  OrgChartStatePayload,
   RuntimeRunEvent,
   StartRunInput,
   StartRunResponse

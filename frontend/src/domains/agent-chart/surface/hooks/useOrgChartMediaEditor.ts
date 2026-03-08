@@ -65,7 +65,7 @@ export function useOrgChartMediaEditor(input: UseOrgChartMediaEditorInput): Medi
       return;
     }
 
-    const sourceDataUrl = pendingMediaSource || croppedDataUrl;
+    const sourceDataUrl = croppedDataUrl;
     onSave(pendingMediaTarget, sourceDataUrl, croppedDataUrl);
     setCropOpen(false);
     setPendingMediaSource(null);

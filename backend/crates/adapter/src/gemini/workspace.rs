@@ -1,8 +1,9 @@
 use std::{
-    env, fs,
+    fs,
     path::{Path, PathBuf},
 };
 
+use agent_persistence::bootstrap_workspace;
 use agent_core::models::run::RunError;
 use serde_json::{Map, Value};
 
@@ -14,7 +15,12 @@ const GEMINI_DEEP_DEFAULT_MODEL_ID: &str = "gemini-3-flash-preview";
 const GEMINI_DEEP_ESCALATE_MODEL_ID: &str = "gemini-3-pro-preview";
 
 pub fn ensure_workspace_context() -> Result<PathBuf, RunError> {
-    let workspace_dir = resolve_workspace_dir()?;
+    let bootstrap = bootstrap_workspace().map_err(map_persistence_error)?;
+    let workspace_dir = bootstrap
+        .paths
+        .operators_dir
+        .join("system")
+        .join("runtime");
     fs::create_dir_all(&workspace_dir).map_err(|error| RunError {
         code: "gemini_workspace_create_failed".to_string(),
         message: format!(
@@ -28,86 +34,11 @@ pub fn ensure_workspace_context() -> Result<PathBuf, RunError> {
     Ok(workspace_dir)
 }
 
-fn resolve_workspace_dir() -> Result<PathBuf, RunError> {
-    if let Some(override_dir) = env::var("AGENT_DECK_WORKSPACE_DIR")
-        .ok()
-        .map(|value| value.trim().to_string())
-        .filter(|value| !value.is_empty())
-    {
-        return Ok(PathBuf::from(override_dir));
-    }
-
-    #[cfg(target_os = "macos")]
-    {
-        let home = env::var("HOME").map_err(|_| RunError {
-            code: "gemini_workspace_home_missing".to_string(),
-            message: "HOME is not set; cannot resolve macOS Application Support path.".to_string(),
-            retryable: false,
-        })?;
-        return Ok(
-            PathBuf::from(home)
-                .join("Library")
-                .join("Application Support")
-                .join("AgentDeck")
-                .join("workspaces")
-                .join("default"),
-        );
-    }
-
-    #[cfg(target_os = "windows")]
-    {
-        let app_data = env::var("APPDATA")
-            .ok()
-            .filter(|value| !value.trim().is_empty())
-            .map(PathBuf::from)
-            .or_else(|| {
-                env::var("USERPROFILE")
-                    .ok()
-                    .filter(|value| !value.trim().is_empty())
-                    .map(|value| PathBuf::from(value).join("AppData").join("Roaming"))
-            })
-            .ok_or_else(|| RunError {
-                code: "gemini_workspace_appdata_missing".to_string(),
-                message: "APPDATA and USERPROFILE are not set; cannot resolve Windows application data path."
-                    .to_string(),
-                retryable: false,
-            })?;
-        return Ok(
-            app_data
-                .join("AgentDeck")
-                .join("workspaces")
-                .join("default"),
-        );
-    }
-
-    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
-    {
-        if let Some(data_home) = env::var("XDG_DATA_HOME")
-            .ok()
-            .map(|value| value.trim().to_string())
-            .filter(|value| !value.is_empty())
-        {
-            return Ok(
-                PathBuf::from(data_home)
-                    .join("agent-deck")
-                    .join("workspaces")
-                    .join("default"),
-            );
-        }
-
-        let home = env::var("HOME").map_err(|_| RunError {
-            code: "gemini_workspace_home_missing".to_string(),
-            message: "HOME is not set; cannot resolve Linux data path.".to_string(),
-            retryable: false,
-        })?;
-        Ok(
-            PathBuf::from(home)
-                .join(".local")
-                .join("share")
-                .join("agent-deck")
-                .join("workspaces")
-                .join("default"),
-        )
+fn map_persistence_error(error: agent_persistence::PersistenceError) -> RunError {
+    RunError {
+        code: "persistence_bootstrap_failed".to_string(),
+        message: error.to_string(),
+        retryable: false,
     }
 }
 

@@ -39,6 +39,7 @@ impl RuntimeService {
         let run_id = request.run_id.clone();
         let workspace_id = request.workspace_id.clone();
         let thread_id = request.thread_id.clone();
+        let thread_id_for_error = thread_id.clone();
         let user_message = request
             .input
             .metadata
@@ -76,7 +77,7 @@ impl RuntimeService {
                 RunEvent::RunStarted {
                     workspace_id,
                     run_id: run_id.clone(),
-                    thread_id,
+                    thread_id: thread_id_for_error,
                     policy_snapshot_version: "v1".to_string(),
                     context_hash: "panic_recovery".to_string(),
                 },

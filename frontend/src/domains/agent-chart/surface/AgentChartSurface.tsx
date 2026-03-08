@@ -33,7 +33,7 @@ import './AgentChartSurface.css';
 export function AgentChartSurface() {
   const { businessUnits, orgUnits, operators, execute, canUndo, canRedo, undo, redo, getOrgUnitById, getOperatorById } =
     useOrgChartStore();
-  const { createAgent } = useAgentManifestStore();
+  const { createAgent, deleteAgent } = useAgentManifestStore();
   const [createEntityKind, setCreateEntityKind] = useState<'business_unit' | 'org_unit' | 'operator' | null>(null);
   const [createActorDefaultOrgUnitId, setCreateActorDefaultOrgUnitId] = useState('');
 
@@ -51,7 +51,8 @@ export function AgentChartSurface() {
     selectedNode: selection.selectedNode,
     setSelectedNode: selection.setSelectedNode,
     orgUnits,
-    getOperatorById
+    getOperatorById,
+    deleteAgent
   });
 
   const mediaEditor = useOrgChartMediaEditor({

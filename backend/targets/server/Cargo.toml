@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 adapter = { path = "../../crates/adapter" }
+agent_persistence = { path = "../../crates/agent_persistence" }
 agent_core = { path = "../../crates/agent_core" }
 agent_server = { path = "../../crates/agent_server" }
 axum = "0.8"

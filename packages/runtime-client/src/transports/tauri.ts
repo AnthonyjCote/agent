@@ -1,5 +1,12 @@
 import type { AgentSummary, RuntimeCapabilities } from '@agent-deck/schemas';
-import type { AgentRuntimeClient, RuntimeRunEvent, StartRunInput, StartRunResponse } from '../types';
+import type {
+  AgentRuntimeClient,
+  LocalStorageMigrationStatus,
+  OrgChartStatePayload,
+  RuntimeRunEvent,
+  StartRunInput,
+  StartRunResponse
+} from '../types';
 
 type TauriInvoke = <T>(command: string, args?: Record<string, unknown>) => Promise<T>;
 
@@ -14,6 +21,36 @@ export class TauriTransport implements AgentRuntimeClient {
   async listAgents(): Promise<AgentSummary[]> {
     const invoke = await this.getInvoke();
     return invoke<AgentSummary[]>('list_agents');
+  }
+
+  async getLocalStorageMigrationStatus(): Promise<LocalStorageMigrationStatus> {
+    const invoke = await this.getInvoke();
+    return invoke<LocalStorageMigrationStatus>('get_localstorage_migration_status');
+  }
+
+  async completeLocalStorageMigration(): Promise<LocalStorageMigrationStatus> {
+    const invoke = await this.getInvoke();
+    return invoke<LocalStorageMigrationStatus>('complete_localstorage_migration');
+  }
+
+  async listAgentManifests(): Promise<unknown[]> {
+    const invoke = await this.getInvoke();
+    return invoke<unknown[]>('list_agent_manifests');
+  }
+
+  async replaceAgentManifests(manifests: unknown[]): Promise<void> {
+    const invoke = await this.getInvoke();
+    await invoke<void>('replace_agent_manifests', { manifests });
+  }
+
+  async getOrgChartState(): Promise<OrgChartStatePayload | null> {
+    const invoke = await this.getInvoke();
+    return invoke<OrgChartStatePayload | null>('get_org_chart_state');
+  }
+
+  async saveOrgChartState(payload: OrgChartStatePayload): Promise<void> {
+    const invoke = await this.getInvoke();
+    await invoke<void>('save_org_chart_state', { payload });
   }
 
   async startRun(input: StartRunInput): Promise<StartRunResponse> {

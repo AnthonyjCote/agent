@@ -7,7 +7,8 @@ type UseOrgChartSurfaceActionsInput = {
   selectedNode: SelectedNode;
   setSelectedNode: Dispatch<SetStateAction<SelectedNode>>;
   orgUnits: Array<{ id: string }>;
-  getOperatorById: (id: string) => { orgUnitId: string } | undefined;
+  getOperatorById: (id: string) => { orgUnitId: string; sourceAgentId?: string | null } | undefined;
+  deleteAgent: (agentId: string) => void;
 };
 
 type OrgChartSurfaceActions = {
@@ -46,7 +47,7 @@ type OrgChartSurfaceActions = {
 };
 
 export function useOrgChartSurfaceActions(input: UseOrgChartSurfaceActionsInput): OrgChartSurfaceActions {
-  const { execute, selectedNode, setSelectedNode, orgUnits, getOperatorById } = input;
+  const { execute, selectedNode, setSelectedNode, orgUnits, getOperatorById, deleteAgent } = input;
   const [errorMessage, setErrorMessage] = useState('');
   const [pendingDelete, setPendingDelete] = useState<PendingDelete>(null);
 
@@ -203,6 +204,10 @@ export function useOrgChartSurfaceActions(input: UseOrgChartSurfaceActionsInput)
     } else if (pendingDelete.kind === 'org_unit') {
       executeCommand({ kind: 'delete_org_unit', nodeId: pendingDelete.id });
     } else if (pendingDelete.kind === 'operator') {
+      const operator = getOperatorById(pendingDelete.id);
+      if (operator?.sourceAgentId) {
+        deleteAgent(operator.sourceAgentId);
+      }
       executeCommand({ kind: 'delete_operator', operatorId: pendingDelete.id });
     }
 

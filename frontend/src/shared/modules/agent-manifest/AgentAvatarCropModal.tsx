@@ -44,7 +44,7 @@ type AgentAvatarCropModalProps = {
 };
 
 const VIEWPORT_SIZE = 320;
-const OUTPUT_SIZE = 512;
+const OUTPUT_SIZE = 320;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
@@ -102,7 +102,7 @@ function buildCroppedAvatar(
     frame.drawHeight * scale
   );
 
-  return canvas.toDataURL('image/png');
+  return canvas.toDataURL('image/webp', 0.86);
 }
 
 export function AgentAvatarCropModal({

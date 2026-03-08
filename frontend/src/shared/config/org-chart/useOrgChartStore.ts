@@ -10,7 +10,8 @@
 // @domain: shared
 // @adr: none
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useRuntimeClient } from '../../../app/runtime/RuntimeProvider';
 import { AGENT_MANIFESTS_CHANGED_EVENT, loadAgentManifests } from '../agents/agent-storage';
 import type { AgentManifest } from '../agents';
 import {
@@ -20,7 +21,8 @@ import {
   redoOrgCommand,
   undoOrgCommand
 } from './commands';
-import { loadOrgChartData, saveOrgChartData } from './storage';
+import { loadOrgChartData } from './storage';
+import { createInitialOrgChartData } from './seed';
 import type { OperatorId, BusinessUnitId, OrgChartData, OrgCommand, OrgUnitId } from './types';
 
 type OrgCommandResult =
@@ -42,12 +44,21 @@ function sortActors(operators: OrgChartData['snapshot']['operators']) {
   return [...operators].sort((a, b) => a.name.localeCompare(b.name));
 }
 
-function syncOperatorsFromAgents(current: OrgChartData): OrgChartData {
-  const manifests = loadAgentManifests();
-  if (manifests.length === 0) {
-    return current;
-  }
+function buildPersistedOrgChartState(data: OrgChartData) {
+  return {
+    snapshot: data.snapshot,
+    activityEvents: [] as OrgChartData['activityEvents'],
+    commandHistory: [] as OrgChartData['commandHistory'],
+    historyCursor: -1
+  };
+}
 
+function syncOperatorsFromAgents(
+  current: OrgChartData,
+  manifests: AgentManifest[],
+  options?: { createMissingOperators?: boolean }
+): OrgChartData {
+  const createMissingOperators = options?.createMissingOperators ?? false;
   let next = current;
   let changed = false;
 
@@ -56,7 +67,7 @@ function syncOperatorsFromAgents(current: OrgChartData): OrgChartData {
     changed = true;
   };
 
-  if (next.snapshot.orgUnits.length === 0) {
+  if (manifests.length > 0 && next.snapshot.orgUnits.length === 0) {
     apply({
       kind: 'create_org_unit',
       parentId: null,
@@ -68,7 +79,7 @@ function syncOperatorsFromAgents(current: OrgChartData): OrgChartData {
   }
 
   const defaultOrgUnitId = next.snapshot.orgUnits[0]?.id;
-  if (!defaultOrgUnitId) {
+  if (manifests.length > 0 && !defaultOrgUnitId) {
     return next;
   }
 
@@ -82,21 +93,26 @@ function syncOperatorsFromAgents(current: OrgChartData): OrgChartData {
   manifests.forEach((manifest: AgentManifest) => {
     const existing = bySourceAgentId.get(manifest.agentId);
     if (!existing) {
-      apply({
-        kind: 'create_operator',
-        targetOrgUnitId: defaultOrgUnitId,
-        payload: {
-          sourceAgentId: manifest.agentId,
-          name: manifest.name,
-          title: manifest.role,
-          kind: 'agent',
-          primaryObjective: manifest.primaryObjective,
-          systemDirective: manifest.systemDirectiveShort,
-          roleBrief: '',
-          avatarSourceDataUrl: manifest.avatarSourceDataUrl,
-          avatarDataUrl: manifest.avatarDataUrl
-        }
-      });
+      if (!createMissingOperators) {
+        return;
+      }
+      if (defaultOrgUnitId) {
+        apply({
+          kind: 'create_operator',
+          targetOrgUnitId: defaultOrgUnitId,
+          payload: {
+            sourceAgentId: manifest.agentId,
+            name: manifest.name,
+            title: manifest.role,
+            kind: 'agent',
+            primaryObjective: manifest.primaryObjective,
+            systemDirective: manifest.systemDirectiveShort,
+            roleBrief: '',
+            avatarSourceDataUrl: manifest.avatarSourceDataUrl,
+            avatarDataUrl: manifest.avatarDataUrl
+          }
+        });
+      }
       return;
     }
 
@@ -155,23 +171,121 @@ function syncOperatorsFromAgents(current: OrgChartData): OrgChartData {
 }
 
 export function useOrgChartStore() {
-  const [data, setData] = useState<OrgChartData>(() => syncOperatorsFromAgents(loadOrgChartData()));
+  const runtimeClient = useRuntimeClient();
+  const [data, setData] = useState<OrgChartData>(() => createInitialOrgChartData());
+  const [hydrated, setHydrated] = useState(false);
+  const persistTimerRef = useRef<number | null>(null);
+  const backgroundSyncTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
-    saveOrgChartData(data);
-  }, [data]);
+    let cancelled = false;
+
+    const hydrate = async () => {
+      try {
+        const remote = await runtimeClient.getOrgChartState();
+        if (remote) {
+          const next = {
+            snapshot: remote.snapshot as OrgChartData['snapshot'],
+            activityEvents: [],
+            commandHistory: [],
+            historyCursor: -1
+          } satisfies OrgChartData;
+          if (!cancelled) {
+            setData(next);
+            setHydrated(true);
+          }
+          return;
+        }
+
+        const legacy = loadOrgChartData();
+        const manifests = loadAgentManifests();
+        const migrated = syncOperatorsFromAgents(legacy, manifests, {
+          createMissingOperators: legacy.snapshot.operators.length === 0
+        });
+        await runtimeClient.saveOrgChartState(buildPersistedOrgChartState(migrated));
+        await runtimeClient.completeLocalStorageMigration().catch(() => undefined);
+        if (!cancelled) {
+          setData(migrated);
+          setHydrated(true);
+        }
+      } catch {
+        if (!cancelled) {
+          const legacy = loadOrgChartData();
+          setData(
+            syncOperatorsFromAgents(legacy, loadAgentManifests(), {
+              createMissingOperators: legacy.snapshot.operators.length === 0
+            })
+          );
+          setHydrated(true);
+        }
+      }
+    };
+
+    void hydrate();
+    return () => {
+      cancelled = true;
+    };
+  }, [runtimeClient]);
+
+  useEffect(() => {
+    if (!hydrated) {
+      return;
+    }
+    if (persistTimerRef.current != null) {
+      window.clearTimeout(persistTimerRef.current);
+    }
+    const payload = {
+      ...buildPersistedOrgChartState(data)
+    };
+    persistTimerRef.current = window.setTimeout(() => {
+      void runtimeClient.saveOrgChartState(payload).catch((error) => {
+        console.error('Failed to persist org chart state.', error);
+      });
+    }, 180);
+
+    return () => {
+      if (persistTimerRef.current != null) {
+        window.clearTimeout(persistTimerRef.current);
+        persistTimerRef.current = null;
+      }
+    };
+  }, [data, hydrated, runtimeClient]);
 
   useEffect(() => {
     const syncNow = () => {
-      setData((current) => syncOperatorsFromAgents(current));
+      runtimeClient
+        .listAgentManifests()
+        .then((manifests) => {
+          setData((current) =>
+            syncOperatorsFromAgents(current, manifests as AgentManifest[], {
+              createMissingOperators: false
+            })
+          );
+        })
+        .catch(() => {
+          setData((current) =>
+            syncOperatorsFromAgents(current, loadAgentManifests(), {
+              createMissingOperators: false
+            })
+          );
+        });
     };
 
-    syncNow();
+    if (backgroundSyncTimerRef.current != null) {
+      window.clearTimeout(backgroundSyncTimerRef.current);
+    }
+    backgroundSyncTimerRef.current = window.setTimeout(() => {
+      syncNow();
+    }, 600);
     window.addEventListener(AGENT_MANIFESTS_CHANGED_EVENT, syncNow);
     return () => {
+      if (backgroundSyncTimerRef.current != null) {
+        window.clearTimeout(backgroundSyncTimerRef.current);
+        backgroundSyncTimerRef.current = null;
+      }
       window.removeEventListener(AGENT_MANIFESTS_CHANGED_EVENT, syncNow);
     };
-  }, []);
+  }, [runtimeClient]);
 
   const orgUnits = useMemo(() => sortOrgUnits(data.snapshot.orgUnits), [data.snapshot.orgUnits]);
   const businessUnits = useMemo(() => sortBusinessUnits(data.snapshot.businessUnits), [data.snapshot.businessUnits]);

@@ -6,3 +6,4 @@ edition = "2021"
 [dependencies]
 agent_core = { path = "../agent_core" }
 adapter = { path = "../adapter" }
+serde_json = "1"

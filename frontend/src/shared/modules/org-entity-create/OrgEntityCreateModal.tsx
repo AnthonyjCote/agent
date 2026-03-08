@@ -248,7 +248,7 @@ export function OrgEntityCreateModal(props: OrgEntityCreateModalProps) {
   };
 
   const handleCropConfirm = (croppedDataUrl: string) => {
-    const sourceDataUrl = pendingImageSource || croppedDataUrl;
+    const sourceDataUrl = croppedDataUrl;
     if (entityKind === 'operator') {
       setActor((current) => ({ ...current, avatarSourceDataUrl: sourceDataUrl, avatarDataUrl: croppedDataUrl }));
     } else if (entityKind === 'business_unit') {
