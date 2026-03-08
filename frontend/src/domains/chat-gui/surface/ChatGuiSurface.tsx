@@ -441,7 +441,7 @@ function renderAssistantMarkdown(
 
 export function ChatGuiSurface() {
   const { agents, updateAgent, deleteAgent } = useAgentManifestStore();
-  const { businessUnits, orgUnits, operators, execute: executeOrgCommand } = useOrgChartStore();
+  const { businessUnits, orgUnits, operators, execute: executeOrgCommand, refreshFromRuntime } = useOrgChartStore();
   const [agentPickerOpen, setAgentPickerOpen] = useState(false);
   const [conversationsOpen, setConversationsOpen] = useState(false);
   const [threadSearch, setThreadSearch] = useState('');
@@ -453,6 +453,7 @@ export function ChatGuiSurface() {
   const [editingAgent, setEditingAgent] = useState<AgentManifest | undefined>(undefined);
   const [activeAgentId, setActiveAgentId] = useState<string>(() => localStorage.getItem(ACTIVE_AGENT_STORAGE_KEY) ?? '');
   const historyScrollRef = useRef<HTMLDivElement | null>(null);
+  const syncedOrgMutationRunsRef = useRef<Set<string>>(new Set());
   const activeManifest = useMemo(() => {
     if (activeAgentId) {
       const match = agents.find((agent) => agent.agentId === activeAgentId);
@@ -462,17 +463,39 @@ export function ChatGuiSurface() {
     }
     return agents[0];
   }, [agents, activeAgentId]);
+  const operatorByAgentId = useMemo(
+    () => new Map(operators.filter((operator) => operator.sourceAgentId).map((operator) => [operator.sourceAgentId as string, operator])),
+    [operators]
+  );
+  const orgUnitById = useMemo(() => new Map(orgUnits.map((unit) => [unit.id, unit])), [orgUnits]);
+  const businessUnitById = useMemo(() => new Map(businessUnits.map((unit) => [unit.id, unit])), [businessUnits]);
+  const activeOperator = useMemo(
+    () => (activeManifest ? operatorByAgentId.get(activeManifest.agentId) : undefined),
+    [activeManifest, operatorByAgentId]
+  );
+  const activeBusinessUnitName = useMemo(() => {
+    if (!activeOperator) {
+      return '';
+    }
+    const orgUnit = orgUnitById.get(activeOperator.orgUnitId);
+    if (!orgUnit?.businessUnitId) {
+      return '';
+    }
+    return businessUnitById.get(orgUnit.businessUnitId)?.name ?? '';
+  }, [activeOperator, businessUnitById, orgUnitById]);
   const activeAgent = useMemo(
     () => ({
       id: activeManifest?.agentId ?? 'agent-default',
       name: activeManifest?.name || 'Coordinator',
       role: activeManifest?.role || 'General Assistant',
+      businessUnitName: activeBusinessUnitName || undefined,
+      primaryObjective: activeOperator?.primaryObjective || '',
       systemDirectiveShort:
         activeManifest?.systemDirectiveShort || 'Be concise, clear, and helpful.',
       toolsPolicyRef: activeManifest?.toolsPolicyRef || 'policy_default',
       avatarUrl: activeManifest?.avatarDataUrl || undefined
     }),
-    [activeManifest]
+    [activeBusinessUnitName, activeManifest, activeOperator?.primaryObjective]
   );
   const {
     messages,
@@ -597,6 +620,51 @@ export function ChatGuiSurface() {
     }
   }, [selectedDebugRunId, setSelectedDebugRunId, threadDebugRuns]);
 
+  useEffect(() => {
+    if (!selectedDebugRun?.runId) {
+      return;
+    }
+    const runtimeEvents = selectedDebugRun.runtimeEvents || [];
+    if (syncedOrgMutationRunsRef.current.has(selectedDebugRun.runId)) {
+      return;
+    }
+    const hasTerminal = runtimeEvents.some(
+      (event) => event.event === 'run_completed' || event.event === 'run_failed' || event.event === 'run_cancelled'
+    );
+    if (!hasTerminal) {
+      return;
+    }
+    const mutatedByOrgTool = runtimeEvents.some((event) => {
+      if (event.event !== 'debug_tool_result' || event.tool_name !== 'org_manage_entities_v1') {
+        return false;
+      }
+      const output = event.output as
+        | { operations?: Array<{ action?: string; status?: string }> }
+        | undefined;
+      const operations = Array.isArray(output?.operations) ? output.operations : [];
+      return operations.some((operation) => {
+        const action = (operation?.action || '').toLowerCase();
+        const status = (operation?.status || '').toLowerCase();
+        if (status !== 'ok') {
+          return false;
+        }
+        return (
+          action.startsWith('create_') ||
+          action.startsWith('update_') ||
+          action.startsWith('delete_') ||
+          action.startsWith('move_') ||
+          action.startsWith('assign_') ||
+          action.startsWith('set_')
+        );
+      });
+    });
+    if (!mutatedByOrgTool) {
+      return;
+    }
+    syncedOrgMutationRunsRef.current.add(selectedDebugRun.runId);
+    void refreshFromRuntime();
+  }, [refreshFromRuntime, selectedDebugRun]);
+
   const handleSelectAgent = (agentId: string) => {
     setActiveAgentId(agentId);
   };
@@ -605,10 +673,16 @@ export function ChatGuiSurface() {
     if (operatorId !== activeAgent.id) {
       const manifest = agents.find((agent) => agent.agentId === operatorId);
       if (manifest) {
+        const targetOperator = operatorByAgentId.get(manifest.agentId);
+        const targetOrgUnit = targetOperator ? orgUnitById.get(targetOperator.orgUnitId) : undefined;
+        const targetBusinessUnitName =
+          targetOrgUnit?.businessUnitId ? businessUnitById.get(targetOrgUnit.businessUnitId)?.name ?? '' : '';
         targetAgent = {
           id: manifest.agentId,
           name: manifest.name || 'Coordinator',
           role: manifest.role || 'General Assistant',
+          businessUnitName: targetBusinessUnitName || undefined,
+          primaryObjective: targetOperator?.primaryObjective || '',
           systemDirectiveShort: manifest.systemDirectiveShort || 'Be concise, clear, and helpful.',
           toolsPolicyRef: manifest.toolsPolicyRef || 'policy_default',
           avatarUrl: manifest.avatarDataUrl || undefined
@@ -651,11 +725,6 @@ export function ChatGuiSurface() {
         .map((operator) => ({ value: operator.id, label: `${operator.name} (${operator.title})` }))
     ],
     [editingOperator?.id, operators]
-  );
-  const orgUnitById = useMemo(() => new Map(orgUnits.map((unit) => [unit.id, unit])), [orgUnits]);
-  const operatorByAgentId = useMemo(
-    () => new Map(operators.filter((operator) => operator.sourceAgentId).map((operator) => [operator.sourceAgentId as string, operator])),
-    [operators]
   );
   const threadFilterBusinessUnitOptions = useMemo(
     () => [{ value: 'all', label: 'All business units' }, ...businessUnits.map((unit) => ({ value: unit.id, label: unit.name }))],

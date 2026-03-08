@@ -268,6 +268,10 @@ struct StartRunPayload {
     agent_id: String,
     agent_name: String,
     agent_role: String,
+    #[serde(default)]
+    agent_business_unit_name: String,
+    #[serde(default)]
+    agent_primary_objective: String,
     system_directive_short: String,
     sender: String,
     recipient: String,
@@ -296,6 +300,8 @@ fn start_run(runtime: State<'_, Arc<RuntimeService>>, payload: StartRunPayload) 
             agent_id: payload.agent_id,
             agent_name: payload.agent_name,
             agent_role: payload.agent_role,
+            agent_business_unit_name: payload.agent_business_unit_name,
+            agent_primary_objective: payload.agent_primary_objective,
             system_directive_short: payload.system_directive_short,
             sender: payload.sender,
             recipient: payload.recipient,
@@ -324,7 +330,9 @@ fn main() {
     let _ = agent_desktop::desktop_ready();
     let persistence_bootstrap =
         bootstrap_workspace().expect("failed to bootstrap persistence workspace");
-    let runtime = Arc::new(RuntimeService::new());
+    let workspace_id = persistence_bootstrap.metadata.workspace_id.clone();
+    let runtime_store = PersistenceStateStore::new(persistence_bootstrap.paths.clone());
+    let runtime = Arc::new(RuntimeService::new(runtime_store, workspace_id));
     let persistence_health = Arc::new(persistence_bootstrap.health);
     let persistence_state_store = Arc::new(PersistenceStateStore::new(
         persistence_bootstrap.paths.clone(),

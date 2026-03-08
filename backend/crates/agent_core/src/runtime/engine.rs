@@ -2,15 +2,20 @@ use crate::{
     models::{
         blocks::MessageBlock,
         run::{RunError, RunEvent, RunRequest, RunUsage},
+        side_effect::SideEffectLifecycleState,
+        tool::ToolOutputEnvelope,
     },
     ports::{
         model_inference::{InferenceEvent, InferenceRequest, ModelInferencePort},
         trace_store::TraceStorePort,
     },
     runtime::memory_trace_store::MemoryTraceStore,
-    tools::toolbox::{
+    tools::{
+        registry::execute_tool_by_id,
+        toolbox::{
         allowed_tool_ids_from_metadata, render_tool_details, render_toolbox_summary,
         sanitize_requested_tool_ids,
+        },
     },
 };
 use chrono::Local;
@@ -50,6 +55,21 @@ struct AckEnvelope {
     prefetch_tools: Vec<String>,
 }
 
+#[derive(Debug, Deserialize)]
+struct ModelToolEnvelope {
+    #[serde(default)]
+    tool_calls: Vec<ModelToolCall>,
+    #[serde(default)]
+    final_response: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ModelToolCall {
+    tool: String,
+    #[serde(default)]
+    args: serde_json::Value,
+}
+
 fn collect_text(events: &[InferenceEvent]) -> String {
     let mut parts = Vec::new();
 
@@ -77,7 +97,8 @@ fn collect_text(events: &[InferenceEvent]) -> String {
 fn ack_prompt(
     agent_name: &str,
     agent_role: &str,
-    directive: &str,
+    business_unit_name: &str,
+    primary_objective: &str,
     history_excerpt: &str,
     toolbox_summary: &str,
     user_prompt: &str,
@@ -93,9 +114,10 @@ fn ack_prompt(
     };
 
     format!(
-        "You are {agent_name}, acting as {agent_role}. You are in fast-ack stage.\n\
+        "You are the acknowledgement router for agent {agent_name} ({agent_role}).\n\
+Business unit: {business_unit_name}\n\
+Primary objective: {primary_objective}\n\
 Current datetime: {now}\n\
-Directive: {directive}\n\
 {history_section}\
 Toolbox summary (only these app tools are explicitly allowed):\n\
 {toolbox_summary}\n\
@@ -107,20 +129,19 @@ Runtime instructions:\n\
   - ack_only\n\
   - handoff_deep_default\n\
   - handoff_deep_escalate\n\
-- Routing behavior (critical):\n\
-- Your job is to route and acknowledge, not to refuse tasks.\n\
-- Never return a refusal in ack_text.\n\
-- Do not run tools, do not perform web searches, and do not attempt deep analysis in ack stage.\n\
-- If the task requires tools, web search, or substantive research, provide a brief helpful acknowledgment and choose handoff_deep_default or handoff_deep_escalate.\n\
-- If a request requires current events, news, market updates, projections, external research, or tool use, choose a handoff decision (usually handoff_deep_default; use handoff_deep_escalate only when complexity/risk is clearly high).\n\
-- If the request is simple social chat, use ack_only.\n\
-- If the request is ambiguous, ask one clarification question with ack_only.\n\
-- ack_text must be a short progress-oriented acknowledgment when handing off.\n\
-- Do not claim lack of capability in ack_text; routing exists specifically so deep stage can perform the work.\n\
-- If prompt is ambiguous/underspecified, ask exactly one clarification question in ack_text and use ack_only.\n\
-- If prompt is trivial/social, use ack_only with a short conversational ack.\n\
-- If prompt requires meaningful analysis/research/multi-step work, use a handoff decision.\n\
-- You may set prefetch_tools to likely-needed app tool IDs from toolbox summary.\n\
+- Critical policy:\n\
+- You are not the deep worker. You are only the acknowledgement + routing layer.\n\
+- Under no circumstance may you run tools, perform web search, or do substantive analysis.\n\
+- Never output tool calls in ack stage.\n\
+- Never refuse the user; route work to deep when needed.\n\
+- Allowed `ack_only` cases: simple pleasantries/basic contextual chat, or one clarifying question.\n\
+- For anything requiring research, tools, multi-step execution, current events, planning, or non-trivial analysis, choose handoff_deep_default.\n\
+- Use handoff_deep_escalate only for clearly high-risk/high-complexity cases.\n\
+- For handoff decisions, ack_text must be short progress acknowledgment only.\n\
+- Tool expansion policy:\n\
+- If the user request requires any app tool from toolbox summary, you must pre-expand it on handoff by listing its tool ID in `prefetch_tools`.\n\
+- `prefetch_tools` is the explicit handoff mechanism used to provide expanded tool schema/instructions to deep stage.\n\
+- Include every app tool that is likely required for first-pass execution, up to the cap.\n\
 - Keep prefetch_tools small (max 5).\n\
 - Required JSON schema:\n\
 {{\"decision\":\"ack_only|handoff_deep_default|handoff_deep_escalate\",\"ack_text\":\"short user-facing text\",\"prefetch_tools\":[\"tool_id\"]}}"
@@ -138,6 +159,8 @@ fn deep_prompt(
     history_excerpt: &str,
     toolbox_summary: &str,
     prefetched_tool_details: &str,
+    tool_results_log: &[String],
+    step_index: usize,
     user_prompt: &str,
 ) -> String {
     let now = Local::now().format("%Y-%m-%d %H:%M:%S %:z").to_string();
@@ -157,19 +180,41 @@ fn deep_prompt(
             prefetched_tool_details.trim()
         )
     };
+    let tool_results_section = if tool_results_log.is_empty() {
+        "App tool results: (none)\n".to_string()
+    } else {
+        format!(
+            "App tool results (latest first):\n{}\n",
+            tool_results_log.join("\n")
+        )
+    };
 
     format!(
-        "You are {agent_name}, acting as {agent_role}.\n\
+        "You are {agent_name}, acting as {agent_role}. This is step {step_index}.\n\
 Current datetime: {now}\n\
 Directive: {directive}\n\
 {history_section}\
 Toolbox summary (only these app tools are explicitly allowed):\n\
 {toolbox_summary}\n\
 {prefetch_section}\
+{tool_results_section}\
 User prompt: {user_prompt}\n\n\
 Runtime instructions:\n\
 - You may use native model capabilities/tools (for example web search) when needed.\n\
 - Think/work in normal language while solving the request.\n\
+- To call app tools from the toolbox, output one JSON object at the end of your message with this exact shape:\n\
+  {{\"tool_calls\":[{{\"tool\":\"tool_id\",\"args\":{{}}}}],\"final_response\":null}}\n\
+- For app tool calls: keep reasoning short, keep tool_calls minimal, and only use tool IDs listed in toolbox summary.\n\
+- Do not repeat the same tool call with the same args if prior app tool results already provide the needed data.\n\
+- If prior app tool results are sufficient to answer, output {FINAL_RESPONSE_SENTINEL} and finalize instead of calling tools again.\n\
+- Termination contract (critical):\n\
+- After a successful mutating app tool call (create/update/delete/move/assign/set), re-evaluate remaining requested work.\n\
+- If requested work is complete, do NOT call more tools; output {FINAL_RESPONSE_SENTINEL} and deliver the final user-facing result.\n\
+- Never emit the same mutating app tool call again after a success unless the user explicitly asks to repeat it.\n\
+- `final_response`: null is only valid when unresolved requested actions remain.\n\
+- If all requested actions are satisfied, terminate the loop in the next response.\n\
+- In your final response for creation/update workflows, confirm completion and include created/updated entity names and IDs when available from tool results.\n\
+- Do not wrap tool call JSON in markdown fences.\n\
 - If web search is used for factual claims, include inline refs like [1], [2] beside those claims.\n\
 - If web search is used, append a final `Sources:` section.\n\
 - If you output a table, use valid markdown table format:\n\
@@ -305,6 +350,83 @@ fn resolve_ack_envelope(raw_ack_output: &str, allowed_tool_ids: &[String]) -> Re
     })
 }
 
+fn parse_model_tool_envelope(raw_output: &str) -> Option<ModelToolEnvelope> {
+    fn parse_candidate(candidate: &str) -> Option<ModelToolEnvelope> {
+        let trimmed = candidate.trim();
+        if trimmed.is_empty() {
+            return None;
+        }
+        let start = trimmed.find('{')?;
+        let end = trimmed.rfind('}')?;
+        if end <= start {
+            return None;
+        }
+        serde_json::from_str::<ModelToolEnvelope>(&trimmed[start..=end]).ok()
+    }
+
+    let trimmed = raw_output.trim();
+    if let Some(parsed) = parse_candidate(trimmed) {
+        return Some(parsed);
+    }
+    for (index, ch) in trimmed.char_indices().rev() {
+        if ch != '{' {
+            continue;
+        }
+        if let Some(parsed) = parse_candidate(&trimmed[index..]) {
+            return Some(parsed);
+        }
+    }
+    None
+}
+
+fn format_tool_result_for_prompt(tool_name: &str, output: &ToolOutputEnvelope) -> String {
+    let structured_preview = output
+        .structured_data
+        .as_ref()
+        .and_then(|value| serde_json::to_string(value).ok())
+        .map(|value| {
+            if value.len() > 700 {
+                format!("{}...", &value[..700])
+            } else {
+                value
+            }
+        })
+        .unwrap_or_else(|| "null".to_string());
+    format!(
+        "Tool {} -> summary: {} | structured_preview: {}",
+        tool_name, output.summary, structured_preview
+    )
+}
+
+fn format_debug_tool_output(output: &ToolOutputEnvelope) -> serde_json::Value {
+    let structured_preview = output
+        .structured_data
+        .as_ref()
+        .and_then(|value| serde_json::to_string(value).ok())
+        .map(|value| {
+            if value.len() > 1600 {
+                format!("{}...", &value[..1600])
+            } else {
+                value
+            }
+        })
+        .unwrap_or_else(|| "null".to_string());
+
+    serde_json::json!({
+        "summary": output.summary,
+        "structuredDataPreview": structured_preview,
+        "artifacts": output.artifacts,
+        "errors": output.errors
+    })
+}
+
+fn format_tool_error_for_prompt(tool_name: &str, error: &RunError) -> String {
+    format!(
+        "Tool {} failed: [{}] {}. Adjust args and retry if needed.",
+        tool_name, error.code, error.message
+    )
+}
+
 fn infer_and_collect<M: ModelInferencePort>(
     inference: &M,
     workspace_id: &str,
@@ -387,6 +509,17 @@ pub fn execute_run_once<M: ModelInferencePort>(
     inference: &M,
     on_event: &mut dyn FnMut(RunEvent),
 ) -> Vec<RunEvent> {
+    execute_run_once_with_tools(request, inference, on_event, None)
+}
+
+pub fn execute_run_once_with_tools<M: ModelInferencePort>(
+    request: RunRequest,
+    inference: &M,
+    on_event: &mut dyn FnMut(RunEvent),
+    mut tool_executor: Option<
+        &mut dyn FnMut(&str, &serde_json::Value) -> Result<Option<ToolOutputEnvelope>, RunError>,
+    >,
+) -> Vec<RunEvent> {
     let run_id = request.run_id.clone();
     let workspace_id = request.workspace_id.clone();
     let thread_id = request.thread_id.clone();
@@ -408,6 +541,20 @@ pub fn execute_run_once<M: ModelInferencePort>(
     let toolbox_summary = render_toolbox_summary(&allowed_tool_ids);
     let agent_name = request.agent_name.clone();
     let agent_role = request.agent_role.clone();
+    let business_unit_name = request
+        .input
+        .metadata
+        .get("agent_business_unit_name")
+        .and_then(|value| value.as_str())
+        .unwrap_or("")
+        .to_string();
+    let primary_objective = request
+        .input
+        .metadata
+        .get("agent_primary_objective")
+        .and_then(|value| value.as_str())
+        .unwrap_or("")
+        .to_string();
     let directive = request.system_directive_short.clone();
 
     let trace_store = MemoryTraceStore::new();
@@ -426,7 +573,8 @@ pub fn execute_run_once<M: ModelInferencePort>(
     let ack_prompt_text = ack_prompt(
         &agent_name,
         &agent_role,
-        &directive,
+        &business_unit_name,
+        &primary_objective,
         &history_excerpt,
         &toolbox_summary,
         &prompt,
@@ -454,7 +602,14 @@ pub fn execute_run_once<M: ModelInferencePort>(
     ) {
         Ok(value) => value,
         Err(error) => {
-            append_event(&trace_store, on_event, RunEvent::RunFailed { run_id, error });
+            append_event(
+                &trace_store,
+                on_event,
+                RunEvent::RunFailed {
+                    run_id: run_id.clone(),
+                    error,
+                },
+            );
             return trace_store.snapshot();
         }
     };
@@ -472,7 +627,14 @@ pub fn execute_run_once<M: ModelInferencePort>(
     let ack_envelope = match resolve_ack_envelope(&ack_output, &allowed_tool_ids) {
         Ok(value) => value,
         Err(error) => {
-            append_event(&trace_store, on_event, RunEvent::RunFailed { run_id, error });
+            append_event(
+                &trace_store,
+                on_event,
+                RunEvent::RunFailed {
+                    run_id: run_id.clone(),
+                    error,
+                },
+            );
             return trace_store.snapshot();
         }
     };
@@ -519,80 +681,292 @@ pub fn execute_run_once<M: ModelInferencePort>(
         .unwrap_or("deep_default")
         .to_string();
     let prefetched_tool_details = render_tool_details(&ack_envelope.prefetch_tools, &allowed_tool_ids);
-    let deep_prompt_text = deep_prompt(
-        &agent_name,
-        &agent_role,
-        &directive,
-        &history_excerpt,
-        &toolbox_summary,
-        &prefetched_tool_details,
-        &prompt,
-    );
-    append_event(
-        &trace_store,
-        on_event,
-        RunEvent::DebugModelRequest {
-            run_id: run_id.clone(),
-            phase: deep_phase.clone(),
-            payload: deep_prompt_text.clone(),
-        },
-    );
+    let mut tool_results_log: Vec<String> = Vec::new();
 
-    let deep_output = match infer_and_collect(
-        inference,
-        &workspace_id,
-        &run_id,
-        deep_phase.as_str(),
-        deep_phase.as_str(),
-        true,
-        deep_prompt_text,
-        on_event,
-        &trace_store,
-    ) {
-        Ok(value) => value,
-        Err(error) => {
-            append_event(&trace_store, on_event, RunEvent::RunFailed { run_id, error });
+    let mut step: usize = 1;
+    loop {
+        let deep_prompt_text = deep_prompt(
+            &agent_name,
+            &agent_role,
+            &directive,
+            &history_excerpt,
+            &toolbox_summary,
+            &prefetched_tool_details,
+            &tool_results_log,
+            step,
+            &prompt,
+        );
+        append_event(
+            &trace_store,
+            on_event,
+            RunEvent::DebugModelRequest {
+                run_id: run_id.clone(),
+                phase: deep_phase.clone(),
+                payload: deep_prompt_text.clone(),
+            },
+        );
+
+        let deep_output = match infer_and_collect(
+            inference,
+            &workspace_id,
+            &run_id,
+            deep_phase.as_str(),
+            deep_phase.as_str(),
+            true,
+            deep_prompt_text,
+            on_event,
+            &trace_store,
+        ) {
+            Ok(value) => value,
+            Err(error) => {
+                append_event(
+                    &trace_store,
+                    on_event,
+                    RunEvent::RunFailed {
+                        run_id: run_id.clone(),
+                        error,
+                    },
+                );
+                return trace_store.snapshot();
+            }
+        };
+
+        append_event(
+            &trace_store,
+            on_event,
+            RunEvent::DebugModelResponse {
+                run_id: run_id.clone(),
+                phase: deep_phase.clone(),
+                payload: deep_output.clone(),
+            },
+        );
+
+        let maybe_tool_envelope = parse_model_tool_envelope(&deep_output);
+        let tool_calls = maybe_tool_envelope
+            .as_ref()
+            .map(|value| value.tool_calls.as_slice())
+            .unwrap_or_default();
+
+        if tool_calls.is_empty() {
+            let final_text = if let Some(marker_index) = deep_output.find(FINAL_RESPONSE_SENTINEL) {
+                strip_final_response_sentinel(&deep_output[marker_index..])
+            } else if let Some(envelope) = maybe_tool_envelope {
+                envelope
+                    .final_response
+                    .unwrap_or_else(|| deep_output.trim().to_string())
+                    .trim()
+                    .to_string()
+            } else {
+                deep_output.trim().to_string()
+            };
+
+            append_event(
+                &trace_store,
+                on_event,
+                RunEvent::BlocksProduced {
+                    run_id: run_id.clone(),
+                    blocks: vec![MessageBlock::AssistantText { text: final_text }],
+                },
+            );
+            append_event(
+                &trace_store,
+                on_event,
+                RunEvent::RunCompleted {
+                    run_id,
+                    usage: Some(RunUsage {
+                        prompt_tokens: 0,
+                        completion_tokens: 0,
+                        pruned_tokens: 0,
+                        latency_ms: 0,
+                    }),
+                },
+            );
+
             return trace_store.snapshot();
         }
-    };
 
-    append_event(
-        &trace_store,
-        on_event,
-        RunEvent::DebugModelResponse {
-            run_id: run_id.clone(),
-            phase: deep_phase,
-            payload: deep_output.clone(),
-        },
-    );
+        let Some(executor) = tool_executor.as_deref_mut() else {
+            append_event(
+                &trace_store,
+                on_event,
+                RunEvent::RunFailed {
+                    run_id,
+                    error: RunError {
+                        code: "tool_execution_unavailable".to_string(),
+                        message: "Model requested app tool calls but no app tool executor is configured.".to_string(),
+                        retryable: false,
+                    },
+                },
+            );
+            return trace_store.snapshot();
+        };
 
-    let final_text = if let Some(marker_index) = deep_output.find(FINAL_RESPONSE_SENTINEL) {
-        strip_final_response_sentinel(&deep_output[marker_index..])
-    } else {
-        deep_output.trim().to_string()
-    };
+        for (index, call) in tool_calls.iter().enumerate() {
+            let call_id = format!("tool_{}_{}_{}", step, index + 1, call.tool);
+            if !allowed_tool_ids.iter().any(|tool_id| tool_id == call.tool.as_str()) {
+                append_event(
+                    &trace_store,
+                    on_event,
+                    RunEvent::ToolResult {
+                        run_id: run_id.clone(),
+                        call_id: call_id.clone(),
+                        tool_name: call.tool.clone(),
+                        lifecycle: SideEffectLifecycleState::Failed,
+                    },
+                );
+                let error = RunError {
+                    code: "tool_not_allowed".to_string(),
+                    message: format!("Tool is not allowed for this agent: {}", call.tool),
+                    retryable: false,
+                };
+                append_event(
+                    &trace_store,
+                    on_event,
+                    RunEvent::DebugToolResult {
+                        run_id: run_id.clone(),
+                        call_id,
+                        tool_name: call.tool.clone(),
+                        output: serde_json::json!({
+                            "error": {
+                                "code": &error.code,
+                                "message": &error.message,
+                                "retryable": error.retryable
+                            }
+                        }),
+                    },
+                );
+                tool_results_log.insert(0, format_tool_error_for_prompt(&call.tool, &error));
+                if tool_results_log.len() > 12 {
+                    tool_results_log.truncate(12);
+                }
+                continue;
+            }
+            append_event(
+                &trace_store,
+                on_event,
+                RunEvent::ToolUse {
+                    run_id: run_id.clone(),
+                    call_id: call_id.clone(),
+                    tool_name: call.tool.clone(),
+                    lifecycle: SideEffectLifecycleState::Proposed,
+                },
+            );
+            append_event(
+                &trace_store,
+                on_event,
+                RunEvent::ToolUse {
+                    run_id: run_id.clone(),
+                    call_id: call_id.clone(),
+                    tool_name: call.tool.clone(),
+                    lifecycle: SideEffectLifecycleState::Dispatched,
+                },
+            );
 
-    append_event(
-        &trace_store,
-        on_event,
-        RunEvent::BlocksProduced {
-            run_id: run_id.clone(),
-            blocks: vec![MessageBlock::AssistantText { text: final_text }],
-        },
-    );
-    append_event(
-        &trace_store,
-        on_event,
-        RunEvent::RunCompleted {
-            run_id,
-            usage: Some(RunUsage {
-                prompt_tokens: 0,
-                completion_tokens: 0,
-                pruned_tokens: 0,
-                latency_ms: 0,
-            }),
-        },
-    );
-
-    trace_store.snapshot()
+            let tool_result = match execute_tool_by_id(&call.tool, &call.args) {
+                Ok(Some(builtin)) => Ok(Some(builtin)),
+                Ok(None) => executor(&call.tool, &call.args),
+                Err(error) => Err(error),
+            };
+            match tool_result {
+                Ok(Some(output)) => {
+                    append_event(
+                        &trace_store,
+                        on_event,
+                        RunEvent::ToolResult {
+                            run_id: run_id.clone(),
+                            call_id: call_id.clone(),
+                            tool_name: call.tool.clone(),
+                            lifecycle: SideEffectLifecycleState::Completed,
+                        },
+                    );
+                    append_event(
+                        &trace_store,
+                        on_event,
+                        RunEvent::DebugToolResult {
+                            run_id: run_id.clone(),
+                            call_id,
+                            tool_name: call.tool.clone(),
+                            output: format_debug_tool_output(&output),
+                        },
+                    );
+                    tool_results_log.insert(0, format_tool_result_for_prompt(&call.tool, &output));
+                    if tool_results_log.len() > 12 {
+                        tool_results_log.truncate(12);
+                    }
+                }
+                Ok(None) => {
+                    append_event(
+                        &trace_store,
+                        on_event,
+                        RunEvent::ToolResult {
+                            run_id: run_id.clone(),
+                            call_id: call_id.clone(),
+                            tool_name: call.tool.clone(),
+                            lifecycle: SideEffectLifecycleState::Failed,
+                        },
+                    );
+                    let error = RunError {
+                        code: "tool_not_implemented".to_string(),
+                        message: format!("Tool is not implemented: {}", call.tool),
+                        retryable: false,
+                    };
+                    append_event(
+                        &trace_store,
+                        on_event,
+                        RunEvent::DebugToolResult {
+                            run_id: run_id.clone(),
+                            call_id,
+                            tool_name: call.tool.clone(),
+                            output: serde_json::json!({
+                                "error": {
+                                    "code": &error.code,
+                                    "message": &error.message,
+                                    "retryable": error.retryable
+                                }
+                            }),
+                        },
+                    );
+                    tool_results_log.insert(0, format_tool_error_for_prompt(&call.tool, &error));
+                    if tool_results_log.len() > 12 {
+                        tool_results_log.truncate(12);
+                    }
+                    continue;
+                }
+                Err(error) => {
+                    append_event(
+                        &trace_store,
+                        on_event,
+                        RunEvent::ToolResult {
+                            run_id: run_id.clone(),
+                            call_id: call_id.clone(),
+                            tool_name: call.tool.clone(),
+                            lifecycle: SideEffectLifecycleState::Failed,
+                        },
+                    );
+                    append_event(
+                        &trace_store,
+                        on_event,
+                        RunEvent::DebugToolResult {
+                            run_id: run_id.clone(),
+                            call_id,
+                            tool_name: call.tool.clone(),
+                            output: serde_json::json!({
+                                "error": {
+                                    "code": &error.code,
+                                    "message": &error.message,
+                                    "retryable": error.retryable
+                                }
+                            }),
+                        },
+                    );
+                    tool_results_log.insert(0, format_tool_error_for_prompt(&call.tool, &error));
+                    if tool_results_log.len() > 12 {
+                        tool_results_log.truncate(12);
+                    }
+                    continue;
+                }
+            }
+        }
+        step = step.saturating_add(1);
+    }
 }

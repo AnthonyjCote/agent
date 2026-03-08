@@ -189,6 +189,7 @@ type OrgChartStoreValue = {
   canUndo: boolean;
   canRedo: boolean;
   execute: (command: OrgCommand) => OrgCommandResult;
+  refreshFromRuntime: () => Promise<boolean>;
   undo: () => void;
   redo: () => void;
   getBusinessUnitById: (id: BusinessUnitId) => OrgChartData['snapshot']['businessUnits'][number] | undefined;
@@ -292,6 +293,25 @@ function useOrgChartStoreState(): OrgChartStoreValue {
     }
   };
 
+  const refreshFromRuntime = async (): Promise<boolean> => {
+    try {
+      const remote = await runtimeClient.getOrgChartState();
+      if (!remote) {
+        return false;
+      }
+      const next = {
+        snapshot: remote.snapshot as OrgChartData['snapshot'],
+        activityEvents: [],
+        commandHistory: [],
+        historyCursor: -1
+      } satisfies OrgChartData;
+      setData(next);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
   const undo = () => {
     setData((current) => undoOrgCommand(current));
   };
@@ -314,6 +334,7 @@ function useOrgChartStoreState(): OrgChartStoreValue {
     canUndo: canUndoOrgCommand(data),
     canRedo: canRedoOrgCommand(data),
     execute,
+    refreshFromRuntime,
     undo,
     redo,
     getBusinessUnitById,

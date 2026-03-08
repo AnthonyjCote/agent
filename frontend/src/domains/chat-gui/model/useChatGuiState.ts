@@ -489,10 +489,11 @@ export function useChatGuiState(runtimeClient: AgentRuntimeClient) {
     }
   };
   const resolveAllowedToolIds = (toolsPolicyRef?: string): string[] => {
+    const defaultTools = ['weather_open_meteo', 'org_manage_entities_v1'];
     if (toolsPolicyRef === 'policy_default') {
-      return ['weather_open_meteo'];
+      return defaultTools;
     }
-    return ['weather_open_meteo'];
+    return defaultTools;
   };
   const updatePendingAssistantMessage = (
     runId: string,
@@ -673,6 +674,8 @@ export function useChatGuiState(runtimeClient: AgentRuntimeClient) {
         agentId: activeAgent.id,
         agentName: activeAgent.name,
         agentRole: activeAgent.role || 'General Assistant',
+        agentBusinessUnitName: activeAgent.businessUnitName || '',
+        agentPrimaryObjective: activeAgent.primaryObjective || '',
         systemDirectiveShort: activeAgent.systemDirectiveShort || 'Be concise, clear, and helpful.',
         sender: 'user',
         recipient: activeAgent.id,

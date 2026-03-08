@@ -80,6 +80,10 @@ struct StartRunPayload {
     agent_id: String,
     agent_name: String,
     agent_role: String,
+    #[serde(default)]
+    agent_business_unit_name: String,
+    #[serde(default)]
+    agent_primary_objective: String,
     system_directive_short: String,
     sender: String,
     recipient: String,
@@ -104,6 +108,8 @@ async fn start_run(
     let agent_id = payload.agent_id;
     let agent_name = payload.agent_name;
     let agent_role = payload.agent_role;
+    let agent_business_unit_name = payload.agent_business_unit_name;
+    let agent_primary_objective = payload.agent_primary_objective;
     let system_directive_short = payload.system_directive_short;
     let sender = payload.sender;
     let recipient = payload.recipient;
@@ -128,6 +134,8 @@ async fn start_run(
             correlation_id: "corr_v1_placeholder".to_string(),
             metadata: serde_json::json!({
                 "message": message,
+                "agent_business_unit_name": agent_business_unit_name,
+                "agent_primary_objective": agent_primary_objective,
                 "allowed_tool_ids": allowed_tool_ids
             }),
         },
@@ -374,10 +382,12 @@ async fn main() {
     let state_store = Arc::new(PersistenceStateStore::new(
         persistence_bootstrap.paths.clone(),
     ));
+    let workspace_id = persistence_bootstrap.metadata.workspace_id.clone();
+    let runtime_store = PersistenceStateStore::new(persistence_bootstrap.paths.clone());
     let app_state = AppState {
-        runtime: Arc::new(RuntimeService::new()),
+        runtime: Arc::new(RuntimeService::new(runtime_store, workspace_id.clone())),
         persistence_health: Arc::new(persistence_bootstrap.health),
-        workspace_id: persistence_bootstrap.metadata.workspace_id,
+        workspace_id,
         state_store,
     };
 

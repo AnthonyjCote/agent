@@ -1,12 +1,14 @@
 use std::{collections::HashMap, sync::Mutex};
 
 use adapter::gemini::model_inference::GeminiCliModelInference;
+use agent_persistence::PersistenceStateStore;
 use agent_core::{
     models::{
         blocks::MessageBlock,
         run::{RunEvent, RunRequest},
+        tool::ToolOutputEnvelope,
     },
-    runtime::engine::execute_run_once,
+    runtime::engine::execute_run_once_with_tools,
 };
 
 const MAX_THREAD_MESSAGES: usize = 80;
@@ -19,19 +21,22 @@ struct ThreadMessage {
     content: String,
 }
 
-#[derive(Default)]
 pub struct RuntimeService {
     events_by_run: Mutex<HashMap<String, Vec<RunEvent>>>,
     history_by_thread: Mutex<HashMap<String, Vec<ThreadMessage>>>,
     inference: GeminiCliModelInference,
+    state_store: PersistenceStateStore,
+    workspace_id: String,
 }
 
 impl RuntimeService {
-    pub fn new() -> Self {
+    pub fn new(state_store: PersistenceStateStore, workspace_id: String) -> Self {
         Self {
             events_by_run: Mutex::new(HashMap::new()),
             history_by_thread: Mutex::new(HashMap::new()),
             inference: GeminiCliModelInference,
+            state_store,
+            workspace_id,
         }
     }
 
@@ -69,8 +74,28 @@ impl RuntimeService {
             }
         };
 
+        let state_store = self.state_store.clone();
+        let workspace_id_for_tools = self.workspace_id.clone();
         let events = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            execute_run_once(request, &self.inference, &mut stream_event)
+            let mut tool_executor = |tool_name: &str, args: &serde_json::Value| -> Result<Option<ToolOutputEnvelope>, agent_core::models::run::RunError> {
+                if tool_name != "org_manage_entities_v1" {
+                    return Ok(None);
+                }
+                let output = state_store
+                    .execute_org_manage_entities_v1(&workspace_id_for_tools, args)
+                    .map_err(|error| agent_core::models::run::RunError {
+                        code: "org_manage_tool_failed".to_string(),
+                        message: error.to_string(),
+                        retryable: false,
+                    })?;
+                Ok(Some(ToolOutputEnvelope {
+                    summary: output.summary,
+                    structured_data: Some(output.structured_data),
+                    artifacts: Vec::new(),
+                    errors: Vec::new(),
+                }))
+            };
+            execute_run_once_with_tools(request, &self.inference, &mut stream_event, Some(&mut tool_executor))
         }))
         .unwrap_or_else(|_| {
             vec![

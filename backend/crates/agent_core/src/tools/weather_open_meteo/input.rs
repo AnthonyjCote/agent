@@ -54,3 +54,25 @@ pub fn parse_weather_input(raw_prompt: &str) -> Option<WeatherToolInput> {
 
     Some(WeatherToolInput { units })
 }
+
+pub fn parse_weather_args(args: &serde_json::Value) -> Option<WeatherToolInput> {
+    if let Some(units) = args.get("units") {
+        let parsed = serde_json::from_value::<Vec<WeatherRequestUnit>>(units.clone()).ok()?;
+        if parsed.is_empty() {
+            return None;
+        }
+        return Some(WeatherToolInput { units: parsed });
+    }
+
+    let location = args.get("location")?.as_str()?.trim().to_string();
+    if location.is_empty() {
+        return None;
+    }
+    let day_offset = args
+        .get("day_offset")
+        .and_then(|value| value.as_i64())
+        .unwrap_or(0);
+    Some(WeatherToolInput {
+        units: vec![WeatherRequestUnit { location, day_offset }],
+    })
+}
