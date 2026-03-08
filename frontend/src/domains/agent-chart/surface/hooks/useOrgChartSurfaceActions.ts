@@ -33,6 +33,7 @@ type OrgChartSurfaceActions = {
     title: string;
     kind: 'agent' | 'human';
     targetOrgUnitId: string;
+    managerOperatorId: string | null;
     sourceAgentId?: string | null;
     primaryObjective: string;
     systemDirective: string;
@@ -155,6 +156,7 @@ export function useOrgChartSurfaceActions(input: UseOrgChartSurfaceActionsInput)
     title: string;
     kind: 'agent' | 'human';
     targetOrgUnitId: string;
+    managerOperatorId: string | null;
     sourceAgentId?: string | null;
     primaryObjective: string;
     systemDirective: string;
@@ -181,6 +183,7 @@ export function useOrgChartSurfaceActions(input: UseOrgChartSurfaceActionsInput)
         name: input.name.trim() || 'New Operator',
         title: input.title.trim() || 'Role',
         kind: input.kind,
+        managerOperatorId: input.managerOperatorId,
         primaryObjective: input.primaryObjective,
         systemDirective: input.systemDirective,
         roleBrief: input.roleBrief,

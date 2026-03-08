@@ -418,6 +418,9 @@ function applyAssignOrgUnitBusinessUnit(
 
 function applyCreateActor(snapshot: OrgSnapshot, command: Extract<OrgCommand, { kind: 'create_operator' }>): OrgSnapshot {
   ensureOrgUnitExists(snapshot, command.targetOrgUnitId);
+  if (command.payload.managerOperatorId) {
+    ensureActorExists(snapshot, command.payload.managerOperatorId);
+  }
 
   const timestamp = nowIso();
   const created: Operator = {
@@ -430,7 +433,7 @@ function applyCreateActor(snapshot: OrgSnapshot, command: Extract<OrgCommand, { 
     roleBrief: command.payload.roleBrief?.trim() ?? '',
     kind: command.payload.kind,
     orgUnitId: command.targetOrgUnitId,
-    managerOperatorId: null,
+    managerOperatorId: command.payload.managerOperatorId ?? null,
     avatarSourceDataUrl: command.payload.avatarSourceDataUrl ?? '',
     avatarDataUrl: command.payload.avatarDataUrl ?? '',
     createdAt: timestamp,

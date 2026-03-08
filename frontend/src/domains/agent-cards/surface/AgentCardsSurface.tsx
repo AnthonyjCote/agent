@@ -11,7 +11,8 @@
 // @adr: none
 
 import { useState } from 'react';
-import { createDefaultAgentManifestInput, useAgentManifestStore } from '../../../shared/config/agents';
+import { useAgentManifestStore } from '../../../shared/config/agents';
+import { useOrgChartStore } from '../../../shared/config/org-chart';
 import { AgentManifestModal } from '../../../shared/modules';
 import { TextButton } from '../../../shared/ui';
 import './AgentCardsSurface.css';
@@ -19,6 +20,12 @@ import './AgentCardsSurface.css';
 export function AgentCardsSurface() {
   const [open, setOpen] = useState(false);
   const { createAgent } = useAgentManifestStore();
+  const { orgUnits, operators, execute } = useOrgChartStore();
+  const orgUnitOptions = orgUnits.map((unit) => ({ value: unit.id, label: unit.name }));
+  const managerOptions = [
+    { value: '', label: 'No manager' },
+    ...operators.map((operator) => ({ value: operator.id, label: `${operator.name} (${operator.title})` }))
+  ];
 
   return (
     <section className="agent-cards-surface">
@@ -30,7 +37,32 @@ export function AgentCardsSurface() {
         open={open}
         mode="create"
         onClose={() => setOpen(false)}
-        onSubmit={(input) => createAgent(input)}
+        orgUnitOptions={orgUnitOptions}
+        managerOptions={managerOptions}
+        defaultOrgUnitId={orgUnits[0]?.id ?? ''}
+        defaultManagerOperatorId={null}
+        onSubmit={(input, placement) => {
+          const created = createAgent(input);
+          if (!placement.orgUnitId) {
+            return;
+          }
+          execute({
+            kind: 'create_operator',
+            targetOrgUnitId: placement.orgUnitId,
+            payload: {
+              sourceAgentId: created.agentId,
+              name: input.name.trim() || 'New Operator',
+              title: input.role.trim() || 'Role',
+              kind: 'agent',
+              managerOperatorId: placement.managerOperatorId ?? null,
+              primaryObjective: input.primaryObjective,
+              systemDirective: input.systemDirectiveShort,
+              roleBrief: '',
+              avatarSourceDataUrl: input.avatarSourceDataUrl,
+              avatarDataUrl: input.avatarDataUrl
+            }
+          });
+        }}
         initialAgent={undefined}
       />
 

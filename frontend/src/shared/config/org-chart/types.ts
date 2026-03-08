@@ -144,6 +144,7 @@ export type OrgCommand =
         name: string;
         title: string;
         kind: OperatorKind;
+        managerOperatorId?: OperatorId | null;
         primaryObjective?: string;
         systemDirective?: string;
         roleBrief?: string;

@@ -14,6 +14,7 @@
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRuntimeClient } from '../../../app/runtime/RuntimeProvider';
 import { type AgentManifest, useAgentManifestStore } from '../../../shared/config/agents';
+import { useOrgChartStore } from '../../../shared/config/org-chart';
 import { AgentManifestModal } from '../../../shared/modules';
 import { AgentAvatar, AgentGrid, CenteredEmptyState, ChatComposerShell, MessageThreadShell, ModalShell, TextButton } from '../../../shared/ui';
 import type { SearchQueryLink } from '../lib';
@@ -430,6 +431,7 @@ function renderAssistantMarkdown(
 export function ChatGuiSurface() {
   const runtimeClient = useRuntimeClient();
   const { agents, updateAgent, deleteAgent } = useAgentManifestStore();
+  const { orgUnits, operators, execute: executeOrgCommand } = useOrgChartStore();
   const [agentPickerOpen, setAgentPickerOpen] = useState(false);
   const [debugOpen, setDebugOpen] = useState(false);
   const [editingAgent, setEditingAgent] = useState<AgentManifest | undefined>(undefined);
@@ -562,6 +564,102 @@ export function ChatGuiSurface() {
     setAgentPickerOpen(false);
     setEditingAgent(match);
   };
+  const editingOperator = useMemo(
+    () => (editingAgent ? operators.find((operator) => operator.sourceAgentId === editingAgent.agentId) : undefined),
+    [editingAgent, operators]
+  );
+  const orgUnitOptions = useMemo(
+    () => orgUnits.map((unit) => ({ value: unit.id, label: unit.name })),
+    [orgUnits]
+  );
+  const managerOptions = useMemo(
+    () => [
+      { value: '', label: 'No manager' },
+      ...operators
+        .filter((operator) => operator.id !== editingOperator?.id)
+        .map((operator) => ({ value: operator.id, label: `${operator.name} (${operator.title})` }))
+    ],
+    [editingOperator?.id, operators]
+  );
+
+  const agentPickerModal = (
+    <ModalShell
+      open={agentPickerOpen}
+      onClose={() => setAgentPickerOpen(false)}
+      size="large"
+      title="Select Agent"
+      footer={<TextButton label="Close" variant="ghost" onClick={() => setAgentPickerOpen(false)} />}
+    >
+      <AgentGrid
+        agents={agents}
+        activeAgentId={activeAgent.id}
+        onSelectAgent={handleSelectAgent}
+        onEditAgent={handleEditAgent}
+      />
+    </ModalShell>
+  );
+
+  const agentEditModal = (
+    <AgentManifestModal
+      open={Boolean(editingAgent)}
+      mode="edit"
+      initialAgent={editingAgent}
+      orgUnitOptions={orgUnitOptions}
+      managerOptions={managerOptions}
+      defaultOrgUnitId={editingOperator?.orgUnitId || orgUnits[0]?.id || ''}
+      defaultManagerOperatorId={editingOperator?.managerOperatorId ?? null}
+      onClose={() => setEditingAgent(undefined)}
+      onSubmit={(input, placement) => {
+        if (!editingAgent) {
+          return;
+        }
+        updateAgent(editingAgent.agentId, input);
+        if (!placement.orgUnitId) {
+          return;
+        }
+        if (!editingOperator) {
+          executeOrgCommand({
+            kind: 'create_operator',
+            targetOrgUnitId: placement.orgUnitId,
+            payload: {
+              sourceAgentId: editingAgent.agentId,
+              name: input.name.trim() || 'New Operator',
+              title: input.role.trim() || 'Role',
+              kind: 'agent',
+              managerOperatorId: placement.managerOperatorId ?? null,
+              primaryObjective: input.primaryObjective,
+              systemDirective: input.systemDirectiveShort,
+              roleBrief: '',
+              avatarSourceDataUrl: input.avatarSourceDataUrl,
+              avatarDataUrl: input.avatarDataUrl
+            }
+          });
+          return;
+        }
+        if (editingOperator.orgUnitId !== placement.orgUnitId) {
+          executeOrgCommand({
+            kind: 'move_operator',
+            operatorId: editingOperator.id,
+            targetOrgUnitId: placement.orgUnitId
+          });
+        }
+        if ((editingOperator.managerOperatorId ?? null) !== (placement.managerOperatorId ?? null)) {
+          executeOrgCommand({
+            kind: 'set_operator_manager',
+            operatorId: editingOperator.id,
+            managerOperatorId: placement.managerOperatorId ?? null
+          });
+        }
+      }}
+      onDelete={() => {
+        if (!editingAgent) {
+          return;
+        }
+        deleteAgent(editingAgent.agentId);
+        setEditingAgent(undefined);
+      }}
+    />
+  );
 
   const debugModal = (
     <ModalShell
@@ -627,40 +725,8 @@ export function ChatGuiSurface() {
           />
         </div>
 
-        <ModalShell
-          open={agentPickerOpen}
-          onClose={() => setAgentPickerOpen(false)}
-          size="large"
-          title="Select Agent"
-          footer={<TextButton label="Close" variant="ghost" onClick={() => setAgentPickerOpen(false)} />}
-        >
-          <AgentGrid
-            agents={agents}
-            activeAgentId={activeAgent.id}
-            onSelectAgent={handleSelectAgent}
-            onEditAgent={handleEditAgent}
-          />
-        </ModalShell>
-
-        <AgentManifestModal
-          open={Boolean(editingAgent)}
-          mode="edit"
-          initialAgent={editingAgent}
-          onClose={() => setEditingAgent(undefined)}
-          onSubmit={(input) => {
-            if (!editingAgent) {
-              return;
-            }
-            updateAgent(editingAgent.agentId, input);
-          }}
-          onDelete={() => {
-            if (!editingAgent) {
-              return;
-            }
-            deleteAgent(editingAgent.agentId);
-            setEditingAgent(undefined);
-          }}
-        />
+        {agentPickerModal}
+        {agentEditModal}
 
         {debugModal}
       </div>
@@ -740,40 +806,8 @@ export function ChatGuiSurface() {
         </div>
       </div>
 
-      <ModalShell
-        open={agentPickerOpen}
-        onClose={() => setAgentPickerOpen(false)}
-        size="large"
-        title="Select Agent"
-        footer={<TextButton label="Close" variant="ghost" onClick={() => setAgentPickerOpen(false)} />}
-      >
-        <AgentGrid
-          agents={agents}
-          activeAgentId={activeAgent.id}
-          onSelectAgent={handleSelectAgent}
-          onEditAgent={handleEditAgent}
-        />
-      </ModalShell>
-
-      <AgentManifestModal
-        open={Boolean(editingAgent)}
-        mode="edit"
-        initialAgent={editingAgent}
-        onClose={() => setEditingAgent(undefined)}
-        onSubmit={(input) => {
-          if (!editingAgent) {
-            return;
-          }
-          updateAgent(editingAgent.agentId, input);
-        }}
-        onDelete={() => {
-          if (!editingAgent) {
-            return;
-          }
-          deleteAgent(editingAgent.agentId);
-          setEditingAgent(undefined);
-        }}
-      />
+      {agentPickerModal}
+      {agentEditModal}
 
       {debugModal}
     </div>

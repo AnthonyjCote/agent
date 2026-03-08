@@ -1,7 +1,7 @@
 /**
  * Purpose: Define agent manifest contracts for create/edit persistence and orchestration.
  * Responsibilities:
- * - Type required, deterministic, and optional manifest fields.
+ * - Type required V1 manifest fields used by runtime and routing.
  * - Provide defaults for new agent creation.
  */
 // @tags: shared-config,agents,manifest,types
@@ -9,9 +9,6 @@
 // @owner: founder
 // @domain: shared
 // @adr: none
-
-export type AgentStylePreset = 'direct' | 'balanced' | 'collaborative';
-export type AuthorityScope = 'low' | 'medium' | 'high';
 
 export type AgentManifest = {
   schemaVersion: '1.0';
@@ -22,27 +19,7 @@ export type AgentManifest = {
   role: string;
   primaryObjective: string;
   systemDirectiveShort: string;
-  stylePreset: AgentStylePreset;
   toolsPolicyRef: string;
-  memoryProfileRef: string;
-  deterministic: {
-    authorityScope: AuthorityScope;
-    kpiTargets: string[];
-    sopRefs: string[];
-    sopSummary: string;
-  };
-  optionalContext: {
-    enabled: boolean;
-    decisionAuthorityNotes: string;
-    kpiPriorityNotes: string;
-    constraintNotes: string;
-    escalationNotes: string;
-    organizationContext: string;
-    communicationContract: string;
-    personalityProfile: string;
-    biography: string;
-    jobDescriptionLong: string;
-  };
   createdAt: string;
   updatedAt: string;
 };
@@ -57,27 +34,7 @@ export function createDefaultAgentManifestInput(): AgentManifestInput {
     role: '',
     primaryObjective: '',
     systemDirectiveShort: '',
-    stylePreset: 'direct',
     toolsPolicyRef: 'policy_default',
-    memoryProfileRef: 'memory_default',
-    deterministic: {
-      authorityScope: 'medium',
-      kpiTargets: [],
-      sopRefs: [],
-      sopSummary: ''
-    },
-    optionalContext: {
-      enabled: false,
-      decisionAuthorityNotes: '',
-      kpiPriorityNotes: '',
-      constraintNotes: '',
-      escalationNotes: '',
-      organizationContext: '',
-      communicationContract: '',
-      personalityProfile: '',
-      biography: '',
-      jobDescriptionLong: ''
-    }
   };
 }
 

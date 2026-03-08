@@ -33,7 +33,26 @@ export function loadAgentManifests(): AgentManifest[] {
   }
 
   try {
-    return JSON.parse(raw) as AgentManifest[];
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    return parsed.map((item) => {
+      const record = (item ?? {}) as Record<string, unknown>;
+      return {
+        schemaVersion: '1.0',
+        agentId: typeof record.agentId === 'string' ? record.agentId : `agt_${Math.random().toString(36).slice(2, 10)}`,
+        avatarSourceDataUrl: typeof record.avatarSourceDataUrl === 'string' ? record.avatarSourceDataUrl : '',
+        avatarDataUrl: typeof record.avatarDataUrl === 'string' ? record.avatarDataUrl : '',
+        name: typeof record.name === 'string' ? record.name : '',
+        role: typeof record.role === 'string' ? record.role : '',
+        primaryObjective: typeof record.primaryObjective === 'string' ? record.primaryObjective : '',
+        systemDirectiveShort: typeof record.systemDirectiveShort === 'string' ? record.systemDirectiveShort : '',
+        toolsPolicyRef: typeof record.toolsPolicyRef === 'string' ? record.toolsPolicyRef : 'policy_default',
+        createdAt: typeof record.createdAt === 'string' ? record.createdAt : new Date().toISOString(),
+        updatedAt: typeof record.updatedAt === 'string' ? record.updatedAt : new Date().toISOString()
+      };
+    });
   } catch {
     return [];
   }

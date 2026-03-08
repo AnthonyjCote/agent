@@ -11,6 +11,7 @@ type ActorDraft = {
   title: string;
   kind: OperatorKind;
   targetOrgUnitId: string;
+  managerOperatorId: string;
   primaryObjective: string;
   systemDirective: string;
   roleBrief: string;
@@ -37,6 +38,7 @@ type OrgEntityCreateModalProps = {
   entityKind: EntityKind;
   defaultOrgUnitId: string;
   orgUnitOptions: DropdownOption[];
+  managerOptions: DropdownOption[];
   onClose: () => void;
   onCreateBusinessUnit: (input: BusinessUnitDraft) => void;
   onCreateOrgUnit: (input: OrgUnitDraft) => void;
@@ -52,6 +54,52 @@ function FieldLabel({ label, info }: { label: string; info?: string }) {
   );
 }
 
+function NameAndShortDescriptionFields(props: {
+  nameLabel: string;
+  nameInfo: string;
+  nameValue: string;
+  nameAriaLabel: string;
+  nameInvalid: boolean;
+  onNameChange: (next: string) => void;
+  descriptionInfo: string;
+  descriptionValue: string;
+  descriptionAriaLabel: string;
+  descriptionInvalid: boolean;
+  onDescriptionChange: (next: string) => void;
+}) {
+  const {
+    nameLabel,
+    nameInfo,
+    nameValue,
+    nameAriaLabel,
+    nameInvalid,
+    onNameChange,
+    descriptionInfo,
+    descriptionValue,
+    descriptionAriaLabel,
+    descriptionInvalid,
+    onDescriptionChange
+  } = props;
+
+  return (
+    <div className="org-entity-modal-grid">
+      <label className="org-entity-modal-field">
+        <FieldLabel label={nameLabel} info={nameInfo} />
+        <TextField value={nameValue} ariaLabel={nameAriaLabel} invalid={nameInvalid} onValueChange={onNameChange} />
+      </label>
+      <label className="org-entity-modal-field span-2">
+        <FieldLabel label="Short Description" info={descriptionInfo} />
+        <TextAreaField
+          value={descriptionValue}
+          ariaLabel={descriptionAriaLabel}
+          invalid={descriptionInvalid}
+          onValueChange={onDescriptionChange}
+        />
+      </label>
+    </div>
+  );
+}
+
 export function OrgEntityCreateModal(props: OrgEntityCreateModalProps) {
   const {
     open,
@@ -61,7 +109,8 @@ export function OrgEntityCreateModal(props: OrgEntityCreateModalProps) {
     onClose,
     onCreateBusinessUnit,
     onCreateOrgUnit,
-    onCreateActor
+    onCreateActor,
+    managerOptions
   } = props;
 
   const [operator, setActor] = useState<ActorDraft>({
@@ -69,6 +118,7 @@ export function OrgEntityCreateModal(props: OrgEntityCreateModalProps) {
     title: '',
     kind: 'agent',
     targetOrgUnitId: defaultOrgUnitId,
+    managerOperatorId: '',
     primaryObjective: '',
     systemDirective: '',
     roleBrief: '',
@@ -105,6 +155,7 @@ export function OrgEntityCreateModal(props: OrgEntityCreateModalProps) {
       title: '',
       kind: 'agent',
       targetOrgUnitId: defaultOrgUnitId,
+      managerOperatorId: '',
       primaryObjective: '',
       systemDirective: '',
       roleBrief: '',
@@ -290,29 +341,35 @@ export function OrgEntityCreateModal(props: OrgEntityCreateModalProps) {
       </div>
 
       {entityKind === 'business_unit' ? (
-        <div className="org-entity-modal-grid">
-          <label className="org-entity-modal-field">
-            <FieldLabel label="Name" info="Business unit name." />
-            <TextField value={businessUnit.name} ariaLabel="Business unit name" invalid={submitAttempted && !businessUnit.name.trim()} onValueChange={(next) => setBusinessUnit((current) => ({ ...current, name: next }))} />
-          </label>
-          <label className="org-entity-modal-field span-2">
-            <FieldLabel label="Short Description" info="What this business unit does." />
-            <TextAreaField value={businessUnit.shortDescription} ariaLabel="Business unit short description" invalid={submitAttempted && !businessUnit.shortDescription.trim()} onValueChange={(next) => setBusinessUnit((current) => ({ ...current, shortDescription: next }))} />
-          </label>
-        </div>
+        <NameAndShortDescriptionFields
+          nameLabel="Name"
+          nameInfo="Business unit name."
+          nameValue={businessUnit.name}
+          nameAriaLabel="Business unit name"
+          nameInvalid={submitAttempted && !businessUnit.name.trim()}
+          onNameChange={(next) => setBusinessUnit((current) => ({ ...current, name: next }))}
+          descriptionInfo="What this business unit does."
+          descriptionValue={businessUnit.shortDescription}
+          descriptionAriaLabel="Business unit short description"
+          descriptionInvalid={submitAttempted && !businessUnit.shortDescription.trim()}
+          onDescriptionChange={(next) => setBusinessUnit((current) => ({ ...current, shortDescription: next }))}
+        />
       ) : null}
 
       {entityKind === 'org_unit' ? (
-        <div className="org-entity-modal-grid">
-          <label className="org-entity-modal-field">
-            <FieldLabel label="Name" info="Org unit name." />
-            <TextField value={orgUnit.name} ariaLabel="Org unit name" invalid={submitAttempted && !orgUnit.name.trim()} onValueChange={(next) => setOrgUnit((current) => ({ ...current, name: next }))} />
-          </label>
-          <label className="org-entity-modal-field">
-            <FieldLabel label="Short Description" info="What this team is responsible for." />
-            <TextAreaField value={orgUnit.shortDescription} ariaLabel="Org unit short description" invalid={submitAttempted && !orgUnit.shortDescription.trim()} onValueChange={(next) => setOrgUnit((current) => ({ ...current, shortDescription: next }))} />
-          </label>
-        </div>
+        <NameAndShortDescriptionFields
+          nameLabel="Name"
+          nameInfo="Org unit name."
+          nameValue={orgUnit.name}
+          nameAriaLabel="Org unit name"
+          nameInvalid={submitAttempted && !orgUnit.name.trim()}
+          onNameChange={(next) => setOrgUnit((current) => ({ ...current, name: next }))}
+          descriptionInfo="What this team is responsible for."
+          descriptionValue={orgUnit.shortDescription}
+          descriptionAriaLabel="Org unit short description"
+          descriptionInvalid={submitAttempted && !orgUnit.shortDescription.trim()}
+          onDescriptionChange={(next) => setOrgUnit((current) => ({ ...current, shortDescription: next }))}
+        />
       ) : null}
 
       {entityKind === 'operator' ? (
@@ -335,6 +392,15 @@ export function OrgEntityCreateModal(props: OrgEntityCreateModalProps) {
           <label className="org-entity-modal-field">
             <FieldLabel label="Org Unit" info="Team this operator belongs to." />
             <DropdownSelector value={operator.targetOrgUnitId} ariaLabel="Target org unit" options={orgUnitOptions} disabled={!actorHasOrgOptions} onValueChange={(next) => setActor((current) => ({ ...current, targetOrgUnitId: next }))} />
+          </label>
+          <label className="org-entity-modal-field">
+            <FieldLabel label="Reports To" info="Direct manager for this operator." />
+            <DropdownSelector
+              value={operator.managerOperatorId}
+              ariaLabel="Reports to"
+              options={managerOptions}
+              onValueChange={(next) => setActor((current) => ({ ...current, managerOperatorId: next }))}
+            />
           </label>
 
           <label className="org-entity-modal-field span-2">

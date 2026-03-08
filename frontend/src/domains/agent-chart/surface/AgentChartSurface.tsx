@@ -10,7 +10,7 @@
 // @domain: agent-chart
 // @adr: none
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { createDefaultAgentManifestInput, useAgentManifestStore, useOrgChartStore } from '../../../shared/config';
 import { ConfirmDialogModal, LeftColumnShell } from '../../../shared/ui';
 import { useOrgChartPointerDnd } from '../model';
@@ -115,6 +115,16 @@ export function AgentChartSurface() {
     setCreateActorDefaultOrgUnitId(suggestedOrgUnitId);
     setCreateEntityKind('operator');
   };
+  const createManagerOptions = useMemo(
+    () => [
+      { value: '', label: 'No manager' },
+      ...operators.map((operator) => ({
+        value: operator.id,
+        label: `${operator.name} (${operator.title})`
+      }))
+    ],
+    [operators]
+  );
 
   const buildAgentInput = (input: {
     name: string;
@@ -191,6 +201,7 @@ export function AgentChartSurface() {
         entityKind={createEntityKind ?? 'business_unit'}
         defaultOrgUnitId={createActorDefaultOrgUnitId}
         orgUnitOptions={selection.orgOptions}
+        managerOptions={createManagerOptions}
         onClose={closeCreateModal}
         onCreateBusinessUnit={(input) => {
           actions.createBusinessUnit(input);
@@ -211,6 +222,7 @@ export function AgentChartSurface() {
             );
             const created = actions.createActor({
               ...input,
+              managerOperatorId: input.managerOperatorId || null,
               sourceAgentId: createdAgent.agentId
             });
             if (!created) {
@@ -219,7 +231,10 @@ export function AgentChartSurface() {
             return true;
           }
 
-          return actions.createActor(input);
+          return actions.createActor({
+            ...input,
+            managerOperatorId: input.managerOperatorId || null
+          });
         }}
       />
       <OrgChartDragChip chip={dnd.dragChipMeta} />
