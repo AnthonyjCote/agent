@@ -5,7 +5,7 @@ import type { BusinessUnitTreeNode, SelectedNode } from '../types';
 import { useOrgChartPointerDnd, type OrgUnitTreeNode } from '../../model';
 import { OrgHierarchyTree } from './OrgHierarchyTree';
 
-type ScopeBucket = 'shared' | 'unassigned';
+type ScopeBucket = 'unassigned';
 
 type OrgChartLeftPaneProps = {
   errorMessage: string;
@@ -25,7 +25,6 @@ type OrgChartLeftPaneProps = {
   businessUnits: BusinessUnit[];
   businessUnitTree: BusinessUnitTreeNode[];
   orgRootsByBusinessUnit: Map<string, OrgUnitTreeNode[]>;
-  sharedOrgRoots: OrgUnitTreeNode[];
   unassignedOrgRoots: OrgUnitTreeNode[];
   reportCountByManager: Map<string, number>;
   collapsedBusinessUnitIds: Set<string>;
@@ -59,7 +58,6 @@ export function OrgChartLeftPane(props: OrgChartLeftPaneProps) {
     businessUnits,
     businessUnitTree,
     orgRootsByBusinessUnit,
-    sharedOrgRoots,
     unassignedOrgRoots,
     reportCountByManager,
     collapsedBusinessUnitIds,
@@ -162,7 +160,6 @@ export function OrgChartLeftPane(props: OrgChartLeftPaneProps) {
         businessUnits={businessUnits}
         businessUnitTree={businessUnitTree}
         orgRootsByBusinessUnit={orgRootsByBusinessUnit}
-        sharedOrgRoots={sharedOrgRoots}
         unassignedOrgRoots={unassignedOrgRoots}
         reportCountByManager={reportCountByManager}
         collapsedBusinessUnitIds={collapsedBusinessUnitIds}

@@ -1,13 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
-import type { Operator, BusinessUnit, OrgUnit, OrgUnitScope } from '../../../../shared/config';
+import type { Operator, BusinessUnit, OrgUnit } from '../../../../shared/config';
 import type { DropdownOption } from '../../../../shared/ui';
 import type { SelectedNode } from '../types';
-
-const ORG_SCOPE_LABELS: Record<OrgUnitScope, string> = {
-  business_unit: 'Business Unit',
-  shared: 'Shared',
-  unassigned: 'Unassigned'
-};
 
 function findTopLevelOrgUnit(units: OrgUnit[], orgUnitId: string): OrgUnit | undefined {
   let cursor = units.find((unit) => unit.id === orgUnitId);
@@ -29,10 +23,7 @@ export type OrgChartSelectionState = {
   selectedOperator: Operator | undefined;
   selectedOrgTopLevel: OrgUnit | undefined;
   selectedOrgChildren: OrgUnit[];
-  selectedOrgIsTopLevel: boolean;
-  selectedOrgEffectiveScope: OrgUnitScope;
   selectedOrgEffectiveBusinessUnitId: string | null;
-  selectedOrgEffectiveBusinessUnitName: string | null;
   orgNameDraft: string;
   setOrgNameDraft: Dispatch<SetStateAction<string>>;
   businessUnitNameDraft: string;
@@ -45,12 +36,6 @@ export type OrgChartSelectionState = {
   setBusinessUnitOverviewDraft: Dispatch<SetStateAction<string>>;
   orgOverviewDraft: string;
   setOrgOverviewDraft: Dispatch<SetStateAction<string>>;
-  orgResponsibilitiesDraft: string;
-  setOrgResponsibilitiesDraft: Dispatch<SetStateAction<string>>;
-  orgDeliverablesDraft: string;
-  setOrgDeliverablesDraft: Dispatch<SetStateAction<string>>;
-  orgWorkingModelDraft: OrgUnit['workingModel'];
-  setOrgWorkingModelDraft: Dispatch<SetStateAction<OrgUnit['workingModel']>>;
   actorPrimaryObjectiveDraft: string;
   setActorPrimaryObjectiveDraft: Dispatch<SetStateAction<string>>;
   actorSystemDirectiveDraft: string;
@@ -59,12 +44,10 @@ export type OrgChartSelectionState = {
   setActorRoleBriefDraft: Dispatch<SetStateAction<string>>;
   orgOptions: DropdownOption[];
   businessUnitOptions: DropdownOption[];
-  orgScopeOptions: DropdownOption[];
   orgParentOptions: DropdownOption[];
   businessUnitParentOptions: DropdownOption[];
   managerOptions: DropdownOption[];
   actorTypeOptions: DropdownOption[];
-  scopeLabels: Record<OrgUnitScope, string>;
 };
 
 export function useOrgChartSelectionState(input: {
@@ -86,9 +69,6 @@ export function useOrgChartSelectionState(input: {
   const [actorNameDraft, setActorNameDraft] = useState('');
   const [actorTitleDraft, setActorTitleDraft] = useState('');
   const [orgOverviewDraft, setOrgOverviewDraft] = useState('');
-  const [orgResponsibilitiesDraft, setOrgResponsibilitiesDraft] = useState('');
-  const [orgDeliverablesDraft, setOrgDeliverablesDraft] = useState('');
-  const [orgWorkingModelDraft, setOrgWorkingModelDraft] = useState<OrgUnit['workingModel']>('hybrid');
   const [actorPrimaryObjectiveDraft, setActorPrimaryObjectiveDraft] = useState('');
   const [actorSystemDirectiveDraft, setActorSystemDirectiveDraft] = useState('');
   const [actorRoleBriefDraft, setActorRoleBriefDraft] = useState('');
@@ -109,13 +89,7 @@ export function useOrgChartSelectionState(input: {
     [orgUnits, selectedOrg]
   );
 
-  const selectedOrgIsTopLevel = selectedOrg != null && selectedOrg.parentOrgUnitId == null;
   const selectedOrgEffectiveBusinessUnitId = selectedOrgTopLevel?.businessUnitId ?? selectedOrg?.businessUnitId ?? null;
-  const selectedOrgEffectiveBusinessUnitName =
-    selectedOrgEffectiveBusinessUnitId != null
-      ? businessUnits.find((unit) => unit.id === selectedOrgEffectiveBusinessUnitId)?.name ?? null
-      : null;
-  const selectedOrgEffectiveScope: OrgUnitScope = selectedOrgTopLevel?.scope ?? selectedOrg?.scope ?? 'unassigned';
 
   useEffect(() => {
     const selectionKey = selectedNode
@@ -130,12 +104,9 @@ export function useOrgChartSelectionState(input: {
 
     if (selectedBusinessUnit) {
       setBusinessUnitNameDraft(selectedBusinessUnit.name);
-      setBusinessUnitOverviewDraft(selectedBusinessUnit.overview);
+      setBusinessUnitOverviewDraft(selectedBusinessUnit.shortDescription);
       setOrgNameDraft('');
       setOrgOverviewDraft('');
-      setOrgResponsibilitiesDraft('');
-      setOrgDeliverablesDraft('');
-      setOrgWorkingModelDraft('hybrid');
       setActorNameDraft('');
       setActorTitleDraft('');
       setActorPrimaryObjectiveDraft('');
@@ -146,10 +117,7 @@ export function useOrgChartSelectionState(input: {
 
     if (selectedOrg) {
       setOrgNameDraft(selectedOrg.name);
-      setOrgOverviewDraft(selectedOrg.overview);
-      setOrgResponsibilitiesDraft(selectedOrg.coreResponsibilities);
-      setOrgDeliverablesDraft(selectedOrg.primaryDeliverables);
-      setOrgWorkingModelDraft(selectedOrg.workingModel);
+      setOrgOverviewDraft(selectedOrg.shortDescription);
       setBusinessUnitNameDraft('');
       setBusinessUnitOverviewDraft('');
       setActorNameDraft('');
@@ -170,9 +138,6 @@ export function useOrgChartSelectionState(input: {
       setBusinessUnitOverviewDraft('');
       setOrgNameDraft('');
       setOrgOverviewDraft('');
-      setOrgResponsibilitiesDraft('');
-      setOrgDeliverablesDraft('');
-      setOrgWorkingModelDraft('hybrid');
       return;
     }
 
@@ -180,9 +145,6 @@ export function useOrgChartSelectionState(input: {
     setBusinessUnitOverviewDraft('');
     setOrgNameDraft('');
     setOrgOverviewDraft('');
-    setOrgResponsibilitiesDraft('');
-    setOrgDeliverablesDraft('');
-    setOrgWorkingModelDraft('hybrid');
     setActorNameDraft('');
     setActorTitleDraft('');
     setActorPrimaryObjectiveDraft('');
@@ -199,12 +161,6 @@ export function useOrgChartSelectionState(input: {
     () => [{ value: '', label: 'Unassigned' }, ...businessUnits.map((unit) => ({ value: unit.id, label: unit.name }))],
     [businessUnits]
   );
-
-  const orgScopeOptions: DropdownOption[] = [
-    { value: 'business_unit', label: ORG_SCOPE_LABELS.business_unit },
-    { value: 'shared', label: ORG_SCOPE_LABELS.shared },
-    { value: 'unassigned', label: ORG_SCOPE_LABELS.unassigned }
-  ];
 
   const orgParentOptions = useMemo<DropdownOption[]>(() => {
     if (!selectedOrg) {
@@ -259,10 +215,7 @@ export function useOrgChartSelectionState(input: {
     selectedOperator,
     selectedOrgTopLevel,
     selectedOrgChildren,
-    selectedOrgIsTopLevel,
-    selectedOrgEffectiveScope,
     selectedOrgEffectiveBusinessUnitId,
-    selectedOrgEffectiveBusinessUnitName,
     orgNameDraft,
     setOrgNameDraft,
     businessUnitNameDraft,
@@ -275,12 +228,6 @@ export function useOrgChartSelectionState(input: {
     setBusinessUnitOverviewDraft,
     orgOverviewDraft,
     setOrgOverviewDraft,
-    orgResponsibilitiesDraft,
-    setOrgResponsibilitiesDraft,
-    orgDeliverablesDraft,
-    setOrgDeliverablesDraft,
-    orgWorkingModelDraft,
-    setOrgWorkingModelDraft,
     actorPrimaryObjectiveDraft,
     setActorPrimaryObjectiveDraft,
     actorSystemDirectiveDraft,
@@ -289,11 +236,9 @@ export function useOrgChartSelectionState(input: {
     setActorRoleBriefDraft,
     orgOptions,
     businessUnitOptions,
-    orgScopeOptions,
     orgParentOptions,
     businessUnitParentOptions,
     managerOptions,
-    actorTypeOptions,
-    scopeLabels: ORG_SCOPE_LABELS
+    actorTypeOptions
   };
 }

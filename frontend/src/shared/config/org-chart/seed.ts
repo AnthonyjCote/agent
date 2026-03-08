@@ -27,7 +27,7 @@ export function createInitialOrgChartData(): OrgChartData {
         {
           id: rootBusinessUnitId,
           name: 'Enterprise',
-          overview: '',
+          shortDescription: '',
           parentBusinessUnitId: null,
           logoSourceDataUrl: '',
           logoDataUrl: '',
@@ -40,12 +40,8 @@ export function createInitialOrgChartData(): OrgChartData {
         {
           id: rootId,
           name: 'Company',
-          overview: '',
-          coreResponsibilities: '',
-          primaryDeliverables: '',
-          workingModel: 'hybrid',
+          shortDescription: '',
           parentOrgUnitId: null,
-          scope: 'business_unit',
           businessUnitId: rootBusinessUnitId,
           iconSourceDataUrl: '',
           iconDataUrl: '',

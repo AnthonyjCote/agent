@@ -7,7 +7,6 @@ export type OrgChartTreeProjection = {
   orgTree: OrgUnitTreeNode[];
   businessUnitTree: BusinessUnitTreeNode[];
   orgRootsByBusinessUnit: Map<string, OrgUnitTreeNode[]>;
-  sharedOrgRoots: OrgUnitTreeNode[];
   unassignedOrgRoots: OrgUnitTreeNode[];
   reportCountByManager: Map<string, number>;
 };
@@ -60,7 +59,7 @@ export function useOrgChartTreeProjection(input: {
   const orgRootsByBusinessUnit = useMemo(() => {
     const map = new Map<string, OrgUnitTreeNode[]>();
     topLevelOrgRoots.forEach((node) => {
-      if (node.unit.scope !== 'business_unit' || !node.unit.businessUnitId) {
+      if (!node.unit.businessUnitId) {
         return;
       }
       const bucket = map.get(node.unit.businessUnitId) ?? [];
@@ -71,18 +70,10 @@ export function useOrgChartTreeProjection(input: {
     return map;
   }, [topLevelOrgRoots]);
 
-  const sharedOrgRoots = useMemo(
-    () =>
-      topLevelOrgRoots
-        .filter((node) => node.unit.scope === 'shared')
-        .sort((a, b) => a.unit.sortOrder - b.unit.sortOrder || a.unit.name.localeCompare(b.unit.name)),
-    [topLevelOrgRoots]
-  );
-
   const unassignedOrgRoots = useMemo(
     () =>
       topLevelOrgRoots
-        .filter((node) => node.unit.scope === 'unassigned' || node.unit.scope == null)
+        .filter((node) => node.unit.businessUnitId == null)
         .sort((a, b) => a.unit.sortOrder - b.unit.sortOrder || a.unit.name.localeCompare(b.unit.name)),
     [topLevelOrgRoots]
   );
@@ -91,7 +82,6 @@ export function useOrgChartTreeProjection(input: {
     orgTree,
     businessUnitTree,
     orgRootsByBusinessUnit,
-    sharedOrgRoots,
     unassignedOrgRoots,
     reportCountByManager
   };

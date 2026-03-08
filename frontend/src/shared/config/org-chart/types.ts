@@ -16,17 +16,12 @@ export type BusinessUnitId = string;
 export type LinkId = string;
 
 export type OperatorKind = 'agent' | 'human';
-export type OrgUnitScope = 'business_unit' | 'shared' | 'unassigned';
 
 export type OrgUnit = {
   id: OrgUnitId;
   name: string;
-  overview: string;
-  coreResponsibilities: string;
-  primaryDeliverables: string;
-  workingModel: 'human' | 'agent' | 'hybrid';
+  shortDescription: string;
   parentOrgUnitId: OrgUnitId | null;
-  scope: OrgUnitScope;
   businessUnitId: BusinessUnitId | null;
   iconSourceDataUrl: string;
   iconDataUrl: string;
@@ -38,7 +33,7 @@ export type OrgUnit = {
 export type BusinessUnit = {
   id: BusinessUnitId;
   name: string;
-  overview: string;
+  shortDescription: string;
   parentBusinessUnitId: BusinessUnitId | null;
   logoSourceDataUrl: string;
   logoDataUrl: string;
@@ -104,7 +99,7 @@ export type OrgCommand =
       parentId: BusinessUnitId | null;
       payload: {
         name: string;
-        overview?: string;
+        shortDescription?: string;
         logoSourceDataUrl?: string;
         logoDataUrl?: string;
       };
@@ -123,20 +118,16 @@ export type OrgCommand =
   | {
       kind: 'update_business_unit';
       nodeId: BusinessUnitId;
-      patch: Partial<Pick<BusinessUnit, 'name' | 'overview'>>;
+      patch: Partial<Pick<BusinessUnit, 'name' | 'shortDescription'>>;
     }
   | {
       kind: 'create_org_unit';
       parentId: OrgUnitId | null;
       payload: {
         name: string;
-        overview?: string;
-        coreResponsibilities?: string;
-        primaryDeliverables?: string;
-        workingModel?: OrgUnit['workingModel'];
+        shortDescription?: string;
         iconSourceDataUrl?: string;
         iconDataUrl?: string;
-        rootScope?: OrgUnitScope;
         rootBusinessUnitId?: BusinessUnitId | null;
       };
     }
@@ -144,12 +135,6 @@ export type OrgCommand =
       kind: 'assign_org_unit_business_unit';
       orgUnitId: OrgUnitId;
       businessUnitId: BusinessUnitId | null;
-    }
-  | {
-      kind: 'set_org_unit_scope';
-      orgUnitId: OrgUnitId;
-      scope: OrgUnitScope;
-      businessUnitId?: BusinessUnitId | null;
     }
   | {
       kind: 'create_operator';
@@ -191,9 +176,7 @@ export type OrgCommand =
   | {
       kind: 'update_org_unit';
       nodeId: OrgUnitId;
-      patch: Partial<
-        Pick<OrgUnit, 'name' | 'overview' | 'coreResponsibilities' | 'primaryDeliverables' | 'workingModel'>
-      >;
+      patch: Partial<Pick<OrgUnit, 'name' | 'shortDescription'>>;
     }
   | {
       kind: 'update_operator';

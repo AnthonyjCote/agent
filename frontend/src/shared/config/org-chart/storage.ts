@@ -37,7 +37,12 @@ function normalizeStoredData(parsed: StoredOrgChart): OrgChartData {
   normalized.snapshot.businessUnits = Array.isArray(parsed.snapshot.businessUnits)
       ? (parsed.snapshot.businessUnits as OrgChartData['snapshot']['businessUnits']).map((businessUnit) => ({
         ...businessUnit,
-        overview: typeof businessUnit.overview === 'string' ? businessUnit.overview : '',
+        shortDescription:
+          typeof businessUnit.shortDescription === 'string'
+            ? businessUnit.shortDescription
+            : typeof (businessUnit as unknown as Record<string, unknown>).overview === 'string'
+              ? ((businessUnit as unknown as Record<string, unknown>).overview as string)
+              : '',
         logoSourceDataUrl: typeof businessUnit.logoSourceDataUrl === 'string' ? businessUnit.logoSourceDataUrl : '',
         logoDataUrl: typeof businessUnit.logoDataUrl === 'string' ? businessUnit.logoDataUrl : '',
         parentBusinessUnitId:
@@ -50,21 +55,14 @@ function normalizeStoredData(parsed: StoredOrgChart): OrgChartData {
   normalized.snapshot.orgUnits = Array.isArray(parsed.snapshot.orgUnits)
     ? parsed.snapshot.orgUnits.map((orgUnit) => ({
         ...(orgUnit as OrgChartData['snapshot']['orgUnits'][number]),
-        overview: typeof orgUnit.overview === 'string' ? orgUnit.overview : '',
-        coreResponsibilities: typeof orgUnit.coreResponsibilities === 'string' ? orgUnit.coreResponsibilities : '',
-        primaryDeliverables: typeof orgUnit.primaryDeliverables === 'string' ? orgUnit.primaryDeliverables : '',
-        workingModel:
-          orgUnit.workingModel === 'human' || orgUnit.workingModel === 'agent' || orgUnit.workingModel === 'hybrid'
-            ? orgUnit.workingModel
-            : 'hybrid',
+        shortDescription:
+          typeof orgUnit.shortDescription === 'string'
+            ? orgUnit.shortDescription
+            : typeof (orgUnit as Record<string, unknown>).overview === 'string'
+              ? ((orgUnit as Record<string, unknown>).overview as string)
+              : '',
         iconSourceDataUrl: typeof orgUnit.iconSourceDataUrl === 'string' ? orgUnit.iconSourceDataUrl : '',
         iconDataUrl: typeof orgUnit.iconDataUrl === 'string' ? orgUnit.iconDataUrl : '',
-        scope:
-          orgUnit.scope === 'business_unit' || orgUnit.scope === 'shared' || orgUnit.scope === 'unassigned'
-            ? orgUnit.scope
-            : typeof orgUnit.businessUnitId === 'string'
-              ? 'business_unit'
-              : 'unassigned',
         businessUnitId:
           typeof orgUnit.businessUnitId === 'string' || orgUnit.businessUnitId === null
             ? (orgUnit.businessUnitId as string | null)
@@ -107,14 +105,7 @@ function normalizeStoredData(parsed: StoredOrgChart): OrgChartData {
   }));
   normalized.snapshot.orgUnits = normalized.snapshot.orgUnits.map((orgUnit) => ({
     ...orgUnit,
-    scope:
-      orgUnit.scope === 'business_unit' && (!orgUnit.businessUnitId || !businessUnitIds.has(orgUnit.businessUnitId))
-        ? 'unassigned'
-        : orgUnit.scope,
-    businessUnitId:
-      orgUnit.scope === 'business_unit' && orgUnit.businessUnitId && businessUnitIds.has(orgUnit.businessUnitId)
-        ? orgUnit.businessUnitId
-        : null
+    businessUnitId: orgUnit.businessUnitId && businessUnitIds.has(orgUnit.businessUnitId) ? orgUnit.businessUnitId : null
   }));
 
   return normalized;

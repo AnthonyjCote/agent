@@ -22,7 +22,7 @@ type DragPayload =
     };
 
 type RowKind = 'org_unit' | 'operator';
-type ScopeBucketId = 'shared' | 'unassigned';
+type ScopeBucketId = 'unassigned';
 type ExtendedRowKind = RowKind | 'business_unit' | 'scope_bucket';
 
 type RowEntry = {
@@ -206,11 +206,10 @@ function buildCommand(payload: DragPayload, target: DropTarget, orgUnits: OrgUni
   }
 
   if (payload.kind === 'org_unit' && target.kind === 'scope_bucket' && target.placement === 'inside') {
-    const scope = target.id as ScopeBucketId;
+    void (target.id as ScopeBucketId);
     return {
-      kind: 'set_org_unit_scope',
+      kind: 'assign_org_unit_business_unit',
       orgUnitId: payload.id,
-      scope,
       businessUnitId: null
     };
   }
@@ -414,7 +413,7 @@ export function useOrgChartPointerDnd(input: UseOrgChartPointerDndInput) {
     }
 
     if (activeDrag.payload.kind === 'org_unit' && dropTarget.kind === 'scope_bucket' && dropTarget.placement === 'inside') {
-      return dropTarget.id === 'shared' ? 'Assigning to Shared bucket' : 'Assigning to Unassigned bucket';
+      return 'Assigning to Unassigned bucket';
     }
 
     return 'Drop target not available';
@@ -482,7 +481,7 @@ export function useOrgChartPointerDnd(input: UseOrgChartPointerDndInput) {
       }
 
       if (activeDrag.payload.kind === 'org_unit' && kind === 'scope_bucket' && dropTarget.placement === 'inside') {
-        return dropTarget.id === 'shared' ? 'Set Shared' : 'Set Unassigned';
+        return 'Set Unassigned';
       }
 
       return null;

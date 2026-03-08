@@ -1,8 +1,6 @@
-import type { OrgUnitScope } from '../../../shared/config';
-
 export type SelectedNode =
   | { kind: 'business_unit'; id: string }
-  | { kind: 'scope_bucket'; scope: Exclude<OrgUnitScope, 'business_unit'> }
+  | { kind: 'scope_bucket'; scope: 'unassigned' }
   | { kind: 'org_unit'; id: string }
   | { kind: 'operator'; id: string }
   | null;
@@ -24,4 +22,3 @@ export type PendingMediaTarget =
   | { kind: 'org_unit'; id: string }
   | { kind: 'operator'; id: string }
   | null;
-

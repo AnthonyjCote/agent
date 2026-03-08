@@ -1,6 +1,6 @@
 import { useState, type Dispatch, type SetStateAction } from 'react';
 
-type ScopeBucket = 'shared' | 'unassigned';
+type ScopeBucket = 'unassigned';
 
 type CollapseState = {
   collapsedBusinessUnitIds: Set<string>;

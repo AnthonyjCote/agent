@@ -6,7 +6,7 @@ type BusinessUnit = {
   parentBusinessUnitId: string | null;
   logoSourceDataUrl: string;
   logoDataUrl: string;
-  overview: string;
+  shortDescription: string;
 };
 
 type BusinessUnitDetailsCardProps = {
@@ -53,9 +53,9 @@ export function BusinessUnitDetailsCard(props: BusinessUnitDetailsCardProps) {
         placeholder="Business unit name"
       />
       <label className="agent-chart-field-label" htmlFor="business-unit-overview">
-        Overview
+        Short Description
       </label>
-      <TextAreaField value={businessUnitOverviewDraft} onValueChange={setBusinessUnitOverviewDraft} ariaLabel="Business unit overview" />
+      <TextAreaField value={businessUnitOverviewDraft} onValueChange={setBusinessUnitOverviewDraft} ariaLabel="Business unit short description" />
       <label className="agent-chart-field-label" htmlFor="business-unit-parent">
         Parent Business Unit
       </label>

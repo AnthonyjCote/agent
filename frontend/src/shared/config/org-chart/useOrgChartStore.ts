@@ -62,11 +62,7 @@ function syncOperatorsFromAgents(current: OrgChartData): OrgChartData {
       parentId: null,
       payload: {
         name: 'Unassigned Operators',
-        overview: 'Default org unit for imported agents.',
-        coreResponsibilities: 'Unassigned operator intake.',
-        primaryDeliverables: 'Assign operators to business org units.',
-        workingModel: 'hybrid',
-        rootScope: 'unassigned'
+        shortDescription: 'Default org unit for imported agents.'
       }
     });
   }

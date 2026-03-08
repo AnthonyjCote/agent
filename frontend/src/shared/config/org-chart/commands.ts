@@ -21,7 +21,6 @@ import {
   type OrgChartData,
   type OrgCommand,
   type OrgSnapshot,
-  type OrgUnitScope,
   type OrgUnit,
   type OrgUnitId
 } from './types';
@@ -126,20 +125,14 @@ function getTopLevelOrgUnitId(units: OrgUnit[], orgUnitId: OrgUnitId): OrgUnitId
   return cursor?.id ?? orgUnitId;
 }
 
-function applyScopeToOrgSubtree(
-  units: OrgUnit[],
-  rootId: OrgUnitId,
-  scope: OrgUnitScope,
-  businessUnitId: BusinessUnitId | null
-) {
+function applyBusinessUnitToOrgSubtree(units: OrgUnit[], rootId: OrgUnitId, businessUnitId: BusinessUnitId | null) {
   const now = nowIso();
   const subtreeIds = new Set(collectOrgUnitSubtreeIds(units, rootId));
   units.forEach((unit) => {
     if (!subtreeIds.has(unit.id)) {
       return;
     }
-    unit.scope = scope;
-    unit.businessUnitId = scope === 'business_unit' ? businessUnitId : null;
+    unit.businessUnitId = businessUnitId;
     unit.updatedAt = now;
   });
 }
@@ -268,7 +261,7 @@ function applyCreateBusinessUnit(
   const created: BusinessUnit = {
     id: createId('bu'),
     name: command.payload.name.trim() || 'Untitled Business Unit',
-    overview: command.payload.overview?.trim() ?? '',
+    shortDescription: command.payload.shortDescription?.trim() ?? '',
     parentBusinessUnitId: command.parentId,
     logoSourceDataUrl: command.payload.logoSourceDataUrl ?? '',
     logoDataUrl: command.payload.logoDataUrl ?? '',
@@ -361,8 +354,8 @@ function applyUpdateBusinessUnit(
   if (command.patch.name != null) {
     unit.name = command.patch.name.trim() || unit.name;
   }
-  if (command.patch.overview != null) {
-    unit.overview = command.patch.overview;
+  if (command.patch.shortDescription != null) {
+    unit.shortDescription = command.patch.shortDescription;
   }
   unit.updatedAt = nowIso();
   next.links = rebuildLinks(next);
@@ -371,13 +364,11 @@ function applyUpdateBusinessUnit(
 
 function applyCreateOrgUnit(snapshot: OrgSnapshot, command: Extract<OrgCommand, { kind: 'create_org_unit' }>): OrgSnapshot {
   let inheritedBusinessUnitId: BusinessUnitId | null = null;
-  let inheritedScope: OrgUnitScope = command.payload.rootScope ?? 'unassigned';
   if (command.parentId) {
     ensureOrgUnitExists(snapshot, command.parentId);
     const parent = snapshot.orgUnits.find((unit) => unit.id === command.parentId);
     inheritedBusinessUnitId = parent?.businessUnitId ?? null;
-    inheritedScope = parent?.scope ?? inheritedScope;
-  } else if (command.payload.rootScope === 'business_unit') {
+  } else if (command.payload.rootBusinessUnitId) {
     inheritedBusinessUnitId = command.payload.rootBusinessUnitId ?? null;
     if (inheritedBusinessUnitId) {
       ensureBusinessUnitExists(snapshot, inheritedBusinessUnitId);
@@ -389,12 +380,8 @@ function applyCreateOrgUnit(snapshot: OrgSnapshot, command: Extract<OrgCommand, 
   const created: OrgUnit = {
     id: createId('org'),
     name: command.payload.name.trim() || 'Untitled Org Unit',
-    overview: command.payload.overview?.trim() ?? '',
-    coreResponsibilities: command.payload.coreResponsibilities?.trim() ?? '',
-    primaryDeliverables: command.payload.primaryDeliverables?.trim() ?? '',
-    workingModel: command.payload.workingModel ?? 'hybrid',
+    shortDescription: command.payload.shortDescription?.trim() ?? '',
     parentOrgUnitId: command.parentId,
-    scope: inheritedScope,
     businessUnitId: inheritedBusinessUnitId,
     iconSourceDataUrl: command.payload.iconSourceDataUrl ?? '',
     iconDataUrl: command.payload.iconDataUrl ?? '',
@@ -424,40 +411,7 @@ function applyAssignOrgUnitBusinessUnit(
     throw new OrgValidationError('org_unit_not_found', `Org unit not found: ${command.orgUnitId}`);
   }
   const topLevelOrgUnitId = getTopLevelOrgUnitId(next.orgUnits, orgUnit.id);
-  if (command.businessUnitId) {
-    applyScopeToOrgSubtree(next.orgUnits, topLevelOrgUnitId, 'business_unit', command.businessUnitId);
-  } else {
-    applyScopeToOrgSubtree(next.orgUnits, topLevelOrgUnitId, 'unassigned', null);
-  }
-  next.links = rebuildLinks(next);
-  return next;
-}
-
-function applySetOrgUnitScope(
-  snapshot: OrgSnapshot,
-  command: Extract<OrgCommand, { kind: 'set_org_unit_scope' }>
-): OrgSnapshot {
-  ensureOrgUnitExists(snapshot, command.orgUnitId);
-  if (command.scope === 'business_unit' && command.businessUnitId) {
-    ensureBusinessUnitExists(snapshot, command.businessUnitId);
-  }
-  if (command.scope === 'business_unit' && !command.businessUnitId) {
-    throw new OrgValidationError('validation_error', 'Business unit selection is required for business-unit scope.');
-  }
-
-  const next = cloneSnapshot(snapshot);
-  const orgUnit = next.orgUnits.find((item) => item.id === command.orgUnitId);
-  if (!orgUnit) {
-    throw new OrgValidationError('org_unit_not_found', `Org unit not found: ${command.orgUnitId}`);
-  }
-
-  const topLevelOrgUnitId = getTopLevelOrgUnitId(next.orgUnits, orgUnit.id);
-  applyScopeToOrgSubtree(
-    next.orgUnits,
-    topLevelOrgUnitId,
-    command.scope,
-    command.scope === 'business_unit' ? command.businessUnitId ?? null : null
-  );
+  applyBusinessUnitToOrgSubtree(next.orgUnits, topLevelOrgUnitId, command.businessUnitId ?? null);
   next.links = rebuildLinks(next);
   return next;
 }
@@ -532,10 +486,7 @@ function applyMoveOrgUnit(snapshot: OrgSnapshot, command: Extract<OrgCommand, { 
   const inheritedBusinessUnitId = command.newParentId
     ? getOrgUnitById(next.orgUnits, command.newParentId)?.businessUnitId ?? null
     : moved.businessUnitId;
-  const inheritedScope = command.newParentId
-    ? getOrgUnitById(next.orgUnits, command.newParentId)?.scope ?? moved.scope
-    : moved.scope;
-  applyScopeToOrgSubtree(next.orgUnits, moved.id, inheritedScope, inheritedBusinessUnitId);
+  applyBusinessUnitToOrgSubtree(next.orgUnits, moved.id, inheritedBusinessUnitId);
 
   next.links = rebuildLinks(next);
   return next;
@@ -613,17 +564,8 @@ function applyUpdateOrgUnit(snapshot: OrgSnapshot, command: Extract<OrgCommand, 
   if (command.patch.name != null) {
     unit.name = command.patch.name.trim() || unit.name;
   }
-  if (command.patch.overview != null) {
-    unit.overview = command.patch.overview;
-  }
-  if (command.patch.coreResponsibilities != null) {
-    unit.coreResponsibilities = command.patch.coreResponsibilities;
-  }
-  if (command.patch.primaryDeliverables != null) {
-    unit.primaryDeliverables = command.patch.primaryDeliverables;
-  }
-  if (command.patch.workingModel != null) {
-    unit.workingModel = command.patch.workingModel;
+  if (command.patch.shortDescription != null) {
+    unit.shortDescription = command.patch.shortDescription;
   }
   unit.updatedAt = nowIso();
   next.links = rebuildLinks(next);
@@ -714,7 +656,7 @@ function applyDeleteBusinessUnit(
       'Cannot delete business unit while child business units exist. Reassign or remove children first.'
     );
   }
-  if (snapshot.orgUnits.some((unit) => unit.scope === 'business_unit' && unit.businessUnitId === command.nodeId)) {
+  if (snapshot.orgUnits.some((unit) => unit.businessUnitId === command.nodeId)) {
     throw new OrgValidationError(
       'validation_error',
       'Cannot delete business unit while org units are assigned. Reassign org units first.'
@@ -785,8 +727,6 @@ function applyCommandToSnapshot(snapshot: OrgSnapshot, command: OrgCommand): Org
       return applyCreateOrgUnit(snapshot, command);
     case 'assign_org_unit_business_unit':
       return applyAssignOrgUnitBusinessUnit(snapshot, command);
-    case 'set_org_unit_scope':
-      return applySetOrgUnitScope(snapshot, command);
     case 'create_operator':
       return applyCreateActor(snapshot, command);
     case 'move_org_unit':

@@ -18,16 +18,13 @@ type OrgChartSurfaceActions = {
   executeCommand: (command: OrgCommand) => boolean;
   createOrgUnit: (input: {
     name: string;
-    overview: string;
-    coreResponsibilities: string;
-    primaryDeliverables: string;
-    workingModel: 'human' | 'agent' | 'hybrid';
+    shortDescription: string;
     iconSourceDataUrl: string;
     iconDataUrl: string;
   }) => void;
   createBusinessUnit: (input: {
     name: string;
-    overview: string;
+    shortDescription: string;
     logoSourceDataUrl: string;
     logoDataUrl: string;
   }) => void;
@@ -64,10 +61,7 @@ export function useOrgChartSurfaceActions(input: UseOrgChartSurfaceActionsInput)
 
   const createOrgUnit = (input: {
     name: string;
-    overview: string;
-    coreResponsibilities: string;
-    primaryDeliverables: string;
-    workingModel: 'human' | 'agent' | 'hybrid';
+    shortDescription: string;
     iconSourceDataUrl: string;
     iconDataUrl: string;
   }) => {
@@ -78,10 +72,7 @@ export function useOrgChartSurfaceActions(input: UseOrgChartSurfaceActionsInput)
         parentId,
         payload: {
           name: input.name.trim() || 'New Org Unit',
-          overview: input.overview,
-          coreResponsibilities: input.coreResponsibilities,
-          primaryDeliverables: input.primaryDeliverables,
-          workingModel: input.workingModel,
+          shortDescription: input.shortDescription,
           iconSourceDataUrl: input.iconSourceDataUrl,
           iconDataUrl: input.iconDataUrl
         }
@@ -95,13 +86,9 @@ export function useOrgChartSurfaceActions(input: UseOrgChartSurfaceActionsInput)
         parentId: null,
         payload: {
           name: input.name.trim() || 'New Org Unit',
-          overview: input.overview,
-          coreResponsibilities: input.coreResponsibilities,
-          primaryDeliverables: input.primaryDeliverables,
-          workingModel: input.workingModel,
+          shortDescription: input.shortDescription,
           iconSourceDataUrl: input.iconSourceDataUrl,
           iconDataUrl: input.iconDataUrl,
-          rootScope: 'business_unit',
           rootBusinessUnitId: selectedNode.id
         }
       });
@@ -114,13 +101,9 @@ export function useOrgChartSurfaceActions(input: UseOrgChartSurfaceActionsInput)
         parentId: null,
         payload: {
           name: input.name.trim() || 'New Org Unit',
-          overview: input.overview,
-          coreResponsibilities: input.coreResponsibilities,
-          primaryDeliverables: input.primaryDeliverables,
-          workingModel: input.workingModel,
+          shortDescription: input.shortDescription,
           iconSourceDataUrl: input.iconSourceDataUrl,
-          iconDataUrl: input.iconDataUrl,
-          rootScope: selectedNode.scope
+          iconDataUrl: input.iconDataUrl
         }
       });
       return;
@@ -131,20 +114,16 @@ export function useOrgChartSurfaceActions(input: UseOrgChartSurfaceActionsInput)
       parentId: null,
       payload: {
         name: input.name.trim() || 'New Org Unit',
-        overview: input.overview,
-        coreResponsibilities: input.coreResponsibilities,
-        primaryDeliverables: input.primaryDeliverables,
-        workingModel: input.workingModel,
+        shortDescription: input.shortDescription,
         iconSourceDataUrl: input.iconSourceDataUrl,
-        iconDataUrl: input.iconDataUrl,
-        rootScope: 'unassigned'
+        iconDataUrl: input.iconDataUrl
       }
     });
   };
 
   const createBusinessUnit = (input: {
     name: string;
-    overview: string;
+    shortDescription: string;
     logoSourceDataUrl: string;
     logoDataUrl: string;
   }) => {
@@ -153,7 +132,7 @@ export function useOrgChartSurfaceActions(input: UseOrgChartSurfaceActionsInput)
       parentId: null,
       payload: {
         name: input.name.trim() || 'New Business Unit',
-        overview: input.overview,
+        shortDescription: input.shortDescription,
         logoSourceDataUrl: input.logoSourceDataUrl,
         logoDataUrl: input.logoDataUrl
       }

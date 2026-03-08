@@ -11,7 +11,6 @@ type OrgChartRightPaneProps = {
   selectedBusinessUnit: BusinessUnit | undefined;
   selectedOrg: OrgUnit | undefined;
   selectedOperator: Operator | undefined;
-  businessUnits: BusinessUnit[];
   executeCommand: (command: OrgCommand) => void;
   setPendingDelete: (next: PendingDelete) => void;
   onOpenBusinessUnitMedia: (businessUnit: BusinessUnit) => void;
@@ -25,7 +24,6 @@ export function OrgChartRightPane(props: OrgChartRightPaneProps) {
     selectedBusinessUnit,
     selectedOrg,
     selectedOperator,
-    businessUnits,
     executeCommand,
     setPendingDelete,
     onOpenBusinessUnitMedia,
@@ -90,7 +88,7 @@ export function OrgChartRightPane(props: OrgChartRightPaneProps) {
               nodeId: selectedBusinessUnit.id,
               patch: {
                 name: selection.businessUnitNameDraft,
-                overview: selection.businessUnitOverviewDraft
+                shortDescription: selection.businessUnitOverviewDraft
               }
             })
           }
@@ -112,36 +110,15 @@ export function OrgChartRightPane(props: OrgChartRightPaneProps) {
           setOrgNameDraft={selection.setOrgNameDraft}
           orgOverviewDraft={selection.orgOverviewDraft}
           setOrgOverviewDraft={selection.setOrgOverviewDraft}
-          orgResponsibilitiesDraft={selection.orgResponsibilitiesDraft}
-          setOrgResponsibilitiesDraft={selection.setOrgResponsibilitiesDraft}
-          orgDeliverablesDraft={selection.orgDeliverablesDraft}
-          setOrgDeliverablesDraft={selection.setOrgDeliverablesDraft}
-          orgWorkingModelDraft={selection.orgWorkingModelDraft}
-          setOrgWorkingModelDraft={selection.setOrgWorkingModelDraft}
           orgParentOptions={selection.orgParentOptions}
           selectedOrgChildren={selection.selectedOrgChildren}
-          selectedOrgIsTopLevel={selection.selectedOrgIsTopLevel}
-          selectedOrgTopLevelName={selection.selectedOrgTopLevel?.name ?? null}
-          selectedOrgEffectiveScope={selection.selectedOrgEffectiveScope}
           selectedOrgEffectiveBusinessUnitId={selection.selectedOrgEffectiveBusinessUnitId}
-          selectedOrgEffectiveBusinessUnitName={selection.selectedOrgEffectiveBusinessUnitName}
-          orgScopeOptions={selection.orgScopeOptions}
           businessUnitOptions={selection.businessUnitOptions}
-          scopeLabels={selection.scopeLabels}
-          fallbackBusinessUnitId={businessUnits[0]?.id ?? null}
           onMoveParent={(value) =>
             executeCommand({
               kind: 'move_org_unit',
               nodeId: selectedOrg.id,
               newParentId: value || null
-            })
-          }
-          onChangeScope={(scope, businessUnitId) =>
-            executeCommand({
-              kind: 'set_org_unit_scope',
-              orgUnitId: selectedOrg.id,
-              scope,
-              businessUnitId
             })
           }
           onChangeBusinessUnit={(value) =>
@@ -157,10 +134,7 @@ export function OrgChartRightPane(props: OrgChartRightPaneProps) {
               nodeId: selectedOrg.id,
               patch: {
                 name: selection.orgNameDraft,
-                overview: selection.orgOverviewDraft,
-                coreResponsibilities: selection.orgResponsibilitiesDraft,
-                primaryDeliverables: selection.orgDeliverablesDraft,
-                workingModel: selection.orgWorkingModelDraft
+                shortDescription: selection.orgOverviewDraft
               }
             })
           }

@@ -26,15 +26,14 @@ type OrgHierarchyTreeProps = {
   businessUnits: Array<{ id: string; logoDataUrl: string }>;
   businessUnitTree: BusinessUnitTreeNode[];
   orgRootsByBusinessUnit: Map<string, OrgUnitTreeNode[]>;
-  sharedOrgRoots: OrgUnitTreeNode[];
   unassignedOrgRoots: OrgUnitTreeNode[];
   reportCountByManager: Map<string, number>;
   collapsedBusinessUnitIds: Set<string>;
   collapsedOrgUnitIds: Set<string>;
   collapsedActorIds: Set<string>;
-  collapsedScopeBuckets: Set<'shared' | 'unassigned'>;
+  collapsedScopeBuckets: Set<'unassigned'>;
   toggleCollapsedId: (id: string, setCollapsed: React.Dispatch<React.SetStateAction<Set<string>>>) => void;
-  toggleCollapsedScopeBucket: (scope: 'shared' | 'unassigned') => void;
+  toggleCollapsedScopeBucket: (scope: 'unassigned') => void;
   setCollapsedBusinessUnitIds: React.Dispatch<React.SetStateAction<Set<string>>>;
   setCollapsedOrgUnitIds: React.Dispatch<React.SetStateAction<Set<string>>>;
   setCollapsedActorIds: React.Dispatch<React.SetStateAction<Set<string>>>;
@@ -50,7 +49,6 @@ export function OrgHierarchyTree(props: OrgHierarchyTreeProps) {
     businessUnits,
     businessUnitTree,
     orgRootsByBusinessUnit,
-    sharedOrgRoots,
     unassignedOrgRoots,
     reportCountByManager,
     collapsedBusinessUnitIds,
@@ -180,7 +178,7 @@ export function OrgHierarchyTree(props: OrgHierarchyTreeProps) {
   };
 
   const renderBusinessUnitNode = (node: BusinessUnitTreeNode, depth = 0): React.ReactNode => {
-    const assignedCount = orgUnits.filter((unit) => unit.scope === 'business_unit' && unit.businessUnitId === node.id).length;
+    const assignedCount = orgUnits.filter((unit) => unit.businessUnitId === node.id).length;
     const selected = selectedNode?.kind === 'business_unit' && selectedNode.id === node.id;
     const attachedOrgRoots = orgRootsByBusinessUnit.get(node.id) ?? [];
     const hasChildren = attachedOrgRoots.length > 0 || node.children.length > 0;
@@ -229,7 +227,7 @@ export function OrgHierarchyTree(props: OrgHierarchyTreeProps) {
     );
   };
 
-  const renderScopeBucketNode = (scope: 'shared' | 'unassigned', title: string, roots: OrgUnitTreeNode[]) => {
+  const renderScopeBucketNode = (scope: 'unassigned', title: string, roots: OrgUnitTreeNode[]) => {
     const selected = selectedNode?.kind === 'scope_bucket' && selectedNode.scope === scope;
     const hasChildren = roots.length > 0;
     const collapsed = collapsedScopeBuckets.has(scope);
@@ -249,7 +247,7 @@ export function OrgHierarchyTree(props: OrgHierarchyTreeProps) {
             <NodeMedia
               image={undefined}
               className="business-unit scope-bucket"
-              fallback={<NodeMediaIcon kind={scope === 'shared' ? 'shared_bucket' : 'unassigned_bucket'} />}
+              fallback={<NodeMediaIcon kind="unassigned_bucket" />}
             />
             <span className="agent-chart-node-content">
               <span className="agent-chart-node-title">{title}</span>
@@ -287,9 +285,7 @@ export function OrgHierarchyTree(props: OrgHierarchyTreeProps) {
       ) : (
         businessUnitTree.map((node) => renderBusinessUnitNode(node))
       )}
-      {renderScopeBucketNode('shared', 'Shared', sharedOrgRoots)}
       {unassignedOrgRoots.length > 0 ? renderScopeBucketNode('unassigned', 'Unassigned', unassignedOrgRoots) : null}
     </div>
   );
 }
-

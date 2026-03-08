@@ -158,7 +158,6 @@ export function AgentChartSurface() {
             businessUnits={businessUnits}
             businessUnitTree={treeProjection.businessUnitTree}
             orgRootsByBusinessUnit={treeProjection.orgRootsByBusinessUnit}
-            sharedOrgRoots={treeProjection.sharedOrgRoots}
             unassignedOrgRoots={treeProjection.unassignedOrgRoots}
             reportCountByManager={treeProjection.reportCountByManager}
             collapsedBusinessUnitIds={collapse.collapsedBusinessUnitIds}
@@ -179,7 +178,6 @@ export function AgentChartSurface() {
             selectedBusinessUnit={selectedBusinessUnit}
             selectedOrg={selectedOrg}
             selectedOperator={selectedOperator}
-            businessUnits={businessUnits}
             executeCommand={actions.executeCommand}
             setPendingDelete={actions.setPendingDelete}
             onOpenBusinessUnitMedia={openBusinessUnitMedia}

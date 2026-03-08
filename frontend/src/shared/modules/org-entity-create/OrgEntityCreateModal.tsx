@@ -20,17 +20,14 @@ type ActorDraft = {
 
 type BusinessUnitDraft = {
   name: string;
-  overview: string;
+  shortDescription: string;
   logoSourceDataUrl: string;
   logoDataUrl: string;
 };
 
 type OrgUnitDraft = {
   name: string;
-  overview: string;
-  coreResponsibilities: string;
-  primaryDeliverables: string;
-  workingModel: 'human' | 'agent' | 'hybrid';
+  shortDescription: string;
   iconSourceDataUrl: string;
   iconDataUrl: string;
 };
@@ -80,16 +77,13 @@ export function OrgEntityCreateModal(props: OrgEntityCreateModalProps) {
   });
   const [businessUnit, setBusinessUnit] = useState<BusinessUnitDraft>({
     name: '',
-    overview: '',
+    shortDescription: '',
     logoSourceDataUrl: '',
     logoDataUrl: ''
   });
   const [orgUnit, setOrgUnit] = useState<OrgUnitDraft>({
     name: '',
-    overview: '',
-    coreResponsibilities: '',
-    primaryDeliverables: '',
-    workingModel: 'hybrid',
+    shortDescription: '',
     iconSourceDataUrl: '',
     iconDataUrl: ''
   });
@@ -102,12 +96,6 @@ export function OrgEntityCreateModal(props: OrgEntityCreateModalProps) {
     { value: 'agent', label: 'Agent' },
     { value: 'human', label: 'Human' }
   ];
-  const workingModelOptions: DropdownOption[] = [
-    { value: 'human', label: 'Human' },
-    { value: 'agent', label: 'Agent' },
-    { value: 'hybrid', label: 'Hybrid' }
-  ];
-
   useEffect(() => {
     if (!open) {
       return;
@@ -125,16 +113,13 @@ export function OrgEntityCreateModal(props: OrgEntityCreateModalProps) {
     });
     setBusinessUnit({
       name: '',
-      overview: '',
+      shortDescription: '',
       logoSourceDataUrl: '',
       logoDataUrl: ''
     });
     setOrgUnit({
       name: '',
-      overview: '',
-      coreResponsibilities: '',
-      primaryDeliverables: '',
-      workingModel: 'hybrid',
+      shortDescription: '',
       iconSourceDataUrl: '',
       iconDataUrl: ''
     });
@@ -162,12 +147,10 @@ export function OrgEntityCreateModal(props: OrgEntityCreateModalProps) {
     (operator.kind === 'agent' ? !operator.systemDirective.trim() : !operator.roleBrief.trim());
   const businessUnitMissingRequired =
     !businessUnit.name.trim() ||
-    !businessUnit.overview.trim();
+    !businessUnit.shortDescription.trim();
   const orgUnitMissingRequired =
     !orgUnit.name.trim() ||
-    !orgUnit.overview.trim() ||
-    !orgUnit.coreResponsibilities.trim() ||
-    !orgUnit.primaryDeliverables.trim();
+    !orgUnit.shortDescription.trim();
 
   const entityMissingRequired =
     entityKind === 'operator'
@@ -313,8 +296,8 @@ export function OrgEntityCreateModal(props: OrgEntityCreateModalProps) {
             <TextField value={businessUnit.name} ariaLabel="Business unit name" invalid={submitAttempted && !businessUnit.name.trim()} onValueChange={(next) => setBusinessUnit((current) => ({ ...current, name: next }))} />
           </label>
           <label className="org-entity-modal-field span-2">
-            <FieldLabel label="Overview" info="What this business unit does." />
-            <TextAreaField value={businessUnit.overview} ariaLabel="Business unit overview" invalid={submitAttempted && !businessUnit.overview.trim()} onValueChange={(next) => setBusinessUnit((current) => ({ ...current, overview: next }))} />
+            <FieldLabel label="Short Description" info="What this business unit does." />
+            <TextAreaField value={businessUnit.shortDescription} ariaLabel="Business unit short description" invalid={submitAttempted && !businessUnit.shortDescription.trim()} onValueChange={(next) => setBusinessUnit((current) => ({ ...current, shortDescription: next }))} />
           </label>
         </div>
       ) : null}
@@ -326,20 +309,8 @@ export function OrgEntityCreateModal(props: OrgEntityCreateModalProps) {
             <TextField value={orgUnit.name} ariaLabel="Org unit name" invalid={submitAttempted && !orgUnit.name.trim()} onValueChange={(next) => setOrgUnit((current) => ({ ...current, name: next }))} />
           </label>
           <label className="org-entity-modal-field">
-            <FieldLabel label="Working Model" info="How this unit operates." />
-            <DropdownSelector value={orgUnit.workingModel} ariaLabel="Org unit working model" options={workingModelOptions} onValueChange={(next) => setOrgUnit((current) => ({ ...current, workingModel: next as OrgUnitDraft['workingModel'] }))} />
-          </label>
-          <label className="org-entity-modal-field span-2">
-            <FieldLabel label="Overview" info="What this team is responsible for." />
-            <TextAreaField value={orgUnit.overview} ariaLabel="Org unit overview" invalid={submitAttempted && !orgUnit.overview.trim()} onValueChange={(next) => setOrgUnit((current) => ({ ...current, overview: next }))} />
-          </label>
-          <label className="org-entity-modal-field span-2">
-            <FieldLabel label="Core Responsibilities" info="Key responsibilities of this org unit." />
-            <TextAreaField value={orgUnit.coreResponsibilities} ariaLabel="Org unit core responsibilities" invalid={submitAttempted && !orgUnit.coreResponsibilities.trim()} onValueChange={(next) => setOrgUnit((current) => ({ ...current, coreResponsibilities: next }))} />
-          </label>
-          <label className="org-entity-modal-field span-2">
-            <FieldLabel label="Primary Deliverables" info="Primary outputs this unit ships." />
-            <TextAreaField value={orgUnit.primaryDeliverables} ariaLabel="Org unit primary deliverables" invalid={submitAttempted && !orgUnit.primaryDeliverables.trim()} onValueChange={(next) => setOrgUnit((current) => ({ ...current, primaryDeliverables: next }))} />
+            <FieldLabel label="Short Description" info="What this team is responsible for." />
+            <TextAreaField value={orgUnit.shortDescription} ariaLabel="Org unit short description" invalid={submitAttempted && !orgUnit.shortDescription.trim()} onValueChange={(next) => setOrgUnit((current) => ({ ...current, shortDescription: next }))} />
           </label>
         </div>
       ) : null}
