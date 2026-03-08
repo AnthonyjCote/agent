@@ -1,6 +1,7 @@
 use adapter::{list_seed_agents, server_capabilities, AgentSummary, RuntimeCapabilities};
 use agent_persistence::{
     bootstrap_workspace, OrgChartStateRecord, PersistenceHealthReport, PersistenceStateStore,
+    ThreadMessageRecord, ThreadRecord,
 };
 use agent_core::models::{
     channels::{ChannelEnvelope, ChannelKind},
@@ -11,6 +12,7 @@ use axum::{
     extract::{Path, State},
     routing::post,
     routing::get,
+    routing::patch,
     Json, Router,
 };
 use serde::{Deserialize, Serialize};
@@ -225,6 +227,145 @@ fn internal_error(error: agent_persistence::PersistenceError) -> (axum::http::St
     (axum::http::StatusCode::INTERNAL_SERVER_ERROR, error.to_string())
 }
 
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ListThreadsQuery {
+    operator_id: Option<String>,
+    status: Option<String>,
+    search: Option<String>,
+    limit: Option<i64>,
+    offset: Option<i64>,
+}
+
+async fn list_threads(
+    State(state): State<AppState>,
+    axum::extract::Query(query): axum::extract::Query<ListThreadsQuery>,
+) -> Result<Json<Vec<ThreadRecord>>, (axum::http::StatusCode, String)> {
+    let threads = state
+        .state_store
+        .list_threads(
+            &state.workspace_id,
+            query.operator_id.as_deref(),
+            query.status.as_deref(),
+            query.search.as_deref(),
+            query.limit.unwrap_or(100),
+            query.offset.unwrap_or(0),
+        )
+        .map_err(internal_error)?;
+    Ok(Json(threads))
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct CreateThreadPayload {
+    operator_id: String,
+    title: Option<String>,
+}
+
+async fn create_thread(
+    State(state): State<AppState>,
+    Json(payload): Json<CreateThreadPayload>,
+) -> Result<Json<ThreadRecord>, (axum::http::StatusCode, String)> {
+    let thread = state
+        .state_store
+        .create_thread(
+            &state.workspace_id,
+            payload.operator_id.trim(),
+            payload.title.as_deref(),
+        )
+        .map_err(internal_error)?;
+    Ok(Json(thread))
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct UpdateThreadPayload {
+    title: Option<String>,
+    summary: Option<String>,
+    status: Option<String>,
+}
+
+async fn update_thread(
+    State(state): State<AppState>,
+    Path(thread_id): Path<String>,
+    Json(payload): Json<UpdateThreadPayload>,
+) -> Result<Json<ThreadRecord>, (axum::http::StatusCode, String)> {
+    let updated = state
+        .state_store
+        .update_thread(
+            &state.workspace_id,
+            &thread_id,
+            payload.title.as_deref(),
+            payload.summary.as_deref(),
+            payload.status.as_deref(),
+        )
+        .map_err(internal_error)?
+        .ok_or((
+            axum::http::StatusCode::NOT_FOUND,
+            "Thread not found.".to_string(),
+        ))?;
+    Ok(Json(updated))
+}
+
+async fn delete_thread(
+    State(state): State<AppState>,
+    Path(thread_id): Path<String>,
+) -> Result<axum::http::StatusCode, (axum::http::StatusCode, String)> {
+    state
+        .state_store
+        .delete_thread(&state.workspace_id, &thread_id)
+        .map_err(internal_error)?;
+    Ok(axum::http::StatusCode::NO_CONTENT)
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ListThreadMessagesQuery {
+    limit: Option<i64>,
+    offset: Option<i64>,
+}
+
+async fn list_thread_messages(
+    State(state): State<AppState>,
+    Path(thread_id): Path<String>,
+    axum::extract::Query(query): axum::extract::Query<ListThreadMessagesQuery>,
+) -> Result<Json<Vec<ThreadMessageRecord>>, (axum::http::StatusCode, String)> {
+    let messages = state
+        .state_store
+        .list_thread_messages(
+            &state.workspace_id,
+            &thread_id,
+            query.limit.unwrap_or(200),
+            query.offset.unwrap_or(0),
+        )
+        .map_err(internal_error)?;
+    Ok(Json(messages))
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct AppendThreadMessagePayload {
+    role: String,
+    content: String,
+}
+
+async fn append_thread_message(
+    State(state): State<AppState>,
+    Path(thread_id): Path<String>,
+    Json(payload): Json<AppendThreadMessagePayload>,
+) -> Result<Json<ThreadMessageRecord>, (axum::http::StatusCode, String)> {
+    let message = state
+        .state_store
+        .append_thread_message(
+            &state.workspace_id,
+            &thread_id,
+            payload.role.trim(),
+            &payload.content,
+        )
+        .map_err(internal_error)?;
+    Ok(Json(message))
+}
+
 #[tokio::main]
 async fn main() {
     let _ = agent_server::server_ready();
@@ -256,6 +397,15 @@ async fn main() {
         .route(
             "/state/org-chart",
             get(get_org_chart_state).put(save_org_chart_state),
+        )
+        .route("/threads", get(list_threads).post(create_thread))
+        .route(
+            "/threads/{thread_id}",
+            patch(update_thread).delete(delete_thread),
+        )
+        .route(
+            "/threads/{thread_id}/messages",
+            get(list_thread_messages).post(append_thread_message),
         )
         .route("/runs", post(start_run))
         .route("/runs/{run_id}/events", get(run_events))

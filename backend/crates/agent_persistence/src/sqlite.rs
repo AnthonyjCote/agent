@@ -173,6 +173,32 @@ fn ensure_schema_compatibility(
     connection: &mut Connection,
     db_path: &Path,
 ) -> Result<(), PersistenceError> {
+    if matches!(kind, DatabaseKind::Runtime) {
+        connection
+            .execute_batch(
+                "
+                CREATE TABLE IF NOT EXISTS threads (
+                    workspace_id TEXT NOT NULL,
+                    thread_id TEXT NOT NULL,
+                    operator_id TEXT NOT NULL,
+                    title TEXT NOT NULL,
+                    summary TEXT NOT NULL DEFAULT '',
+                    message_count INTEGER NOT NULL DEFAULT 0,
+                    status TEXT NOT NULL DEFAULT 'active',
+                    created_at_ms INTEGER NOT NULL,
+                    updated_at_ms INTEGER NOT NULL,
+                    PRIMARY KEY (workspace_id, thread_id)
+                );
+                ",
+            )
+            .map_err(|error| PersistenceError::Sql {
+                context: "Failed to ensure runtime threads schema compatibility",
+                source: error,
+                path: Some(db_path.to_path_buf()),
+            })?;
+        return Ok(());
+    }
+
     if !matches!(kind, DatabaseKind::Core) {
         return Ok(());
     }
@@ -262,6 +288,19 @@ fn apply_migration(
         (DatabaseKind::Runtime, 1) => transaction
             .execute_batch(
                 "
+                CREATE TABLE IF NOT EXISTS threads (
+                    workspace_id TEXT NOT NULL,
+                    thread_id TEXT NOT NULL,
+                    operator_id TEXT NOT NULL,
+                    title TEXT NOT NULL,
+                    summary TEXT NOT NULL DEFAULT '',
+                    message_count INTEGER NOT NULL DEFAULT 0,
+                    status TEXT NOT NULL DEFAULT 'active',
+                    created_at_ms INTEGER NOT NULL,
+                    updated_at_ms INTEGER NOT NULL,
+                    PRIMARY KEY (workspace_id, thread_id)
+                );
+
                 CREATE TABLE IF NOT EXISTS thread_messages (
                     workspace_id TEXT NOT NULL,
                     thread_id TEXT NOT NULL,

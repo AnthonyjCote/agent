@@ -1,11 +1,17 @@
 import type { AgentSummary, RuntimeCapabilities } from '@agent-deck/schemas';
 import type {
+  AppendThreadMessageInput,
   AgentRuntimeClient,
+  ChatThreadMessageRecord,
+  ChatThreadSummary,
+  CreateThreadInput,
+  ListThreadsInput,
   LocalStorageMigrationStatus,
   OrgChartStatePayload,
   RuntimeRunEvent,
   StartRunInput,
-  StartRunResponse
+  StartRunResponse,
+  UpdateThreadInput
 } from '../types';
 
 export class HttpTransport implements AgentRuntimeClient {
@@ -81,6 +87,78 @@ export class HttpTransport implements AgentRuntimeClient {
     if (!response.ok) {
       throw new Error(`Failed to persist org chart state: ${response.status}`);
     }
+  }
+
+  async listThreads(input: ListThreadsInput = {}): Promise<ChatThreadSummary[]> {
+    const params = new URLSearchParams();
+    if (input.operatorId) params.set('operatorId', input.operatorId);
+    if (input.status) params.set('status', input.status);
+    if (input.search) params.set('search', input.search);
+    if (typeof input.limit === 'number') params.set('limit', String(input.limit));
+    if (typeof input.offset === 'number') params.set('offset', String(input.offset));
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+    const response = await fetch(`${this.baseUrl}/threads${suffix}`);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch threads: ${response.status}`);
+    }
+    return (await response.json()) as ChatThreadSummary[];
+  }
+
+  async createThread(input: CreateThreadInput): Promise<ChatThreadSummary> {
+    const response = await fetch(`${this.baseUrl}/threads`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(input)
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to create thread: ${response.status}`);
+    }
+    return (await response.json()) as ChatThreadSummary;
+  }
+
+  async updateThread(threadId: string, input: UpdateThreadInput): Promise<ChatThreadSummary> {
+    const response = await fetch(`${this.baseUrl}/threads/${encodeURIComponent(threadId)}`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(input)
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to update thread: ${response.status}`);
+    }
+    return (await response.json()) as ChatThreadSummary;
+  }
+
+  async deleteThread(threadId: string): Promise<void> {
+    const response = await fetch(`${this.baseUrl}/threads/${encodeURIComponent(threadId)}`, {
+      method: 'DELETE'
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to delete thread: ${response.status}`);
+    }
+  }
+
+  async listThreadMessages(threadId: string, limit?: number, offset?: number): Promise<ChatThreadMessageRecord[]> {
+    const params = new URLSearchParams();
+    if (typeof limit === 'number') params.set('limit', String(limit));
+    if (typeof offset === 'number') params.set('offset', String(offset));
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+    const response = await fetch(`${this.baseUrl}/threads/${encodeURIComponent(threadId)}/messages${suffix}`);
+    if (!response.ok) {
+      throw new Error(`Failed to list thread messages: ${response.status}`);
+    }
+    return (await response.json()) as ChatThreadMessageRecord[];
+  }
+
+  async appendThreadMessage(input: AppendThreadMessageInput): Promise<ChatThreadMessageRecord> {
+    const response = await fetch(`${this.baseUrl}/threads/${encodeURIComponent(input.threadId)}/messages`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ role: input.role, content: input.content })
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to append thread message: ${response.status}`);
+    }
+    return (await response.json()) as ChatThreadMessageRecord;
   }
 
   async startRun(input: StartRunInput): Promise<StartRunResponse> {

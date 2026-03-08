@@ -3,6 +3,7 @@
 use adapter::{desktop_capabilities, list_seed_agents, AgentSummary, RuntimeCapabilities};
 use agent_persistence::{
     bootstrap_workspace, OrgChartStateRecord, PersistenceHealthReport, PersistenceStateStore,
+    ThreadMessageRecord, ThreadRecord,
 };
 use agent_desktop::runtime_service::{RuntimeService, StartRunInput};
 use serde::{Deserialize, Serialize};
@@ -80,6 +81,39 @@ struct OrgChartStatePayload {
     history_cursor: i64,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ListThreadsInput {
+    operator_id: Option<String>,
+    status: Option<String>,
+    search: Option<String>,
+    limit: Option<i64>,
+    offset: Option<i64>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct CreateThreadInput {
+    operator_id: String,
+    title: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct UpdateThreadInput {
+    title: Option<String>,
+    summary: Option<String>,
+    status: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct AppendThreadMessageInput {
+    thread_id: String,
+    role: String,
+    content: String,
+}
+
 impl From<OrgChartStateRecord> for OrgChartStatePayload {
     fn from(value: OrgChartStateRecord) -> Self {
         Self {
@@ -122,6 +156,106 @@ fn save_org_chart_state(
     let workspace_id = state_store.workspace_id().map_err(|error| error.to_string())?;
     state_store
         .save_org_chart_state(&workspace_id, &payload.into())
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn list_threads(
+    state_store: State<'_, Arc<PersistenceStateStore>>,
+    input: Option<ListThreadsInput>,
+) -> Result<Vec<ThreadRecord>, String> {
+    let workspace_id = state_store.workspace_id().map_err(|error| error.to_string())?;
+    let input = input.unwrap_or(ListThreadsInput {
+        operator_id: None,
+        status: None,
+        search: None,
+        limit: None,
+        offset: None,
+    });
+    state_store
+        .list_threads(
+            &workspace_id,
+            input.operator_id.as_deref(),
+            input.status.as_deref(),
+            input.search.as_deref(),
+            input.limit.unwrap_or(100),
+            input.offset.unwrap_or(0),
+        )
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn create_thread(
+    state_store: State<'_, Arc<PersistenceStateStore>>,
+    input: CreateThreadInput,
+) -> Result<ThreadRecord, String> {
+    let workspace_id = state_store.workspace_id().map_err(|error| error.to_string())?;
+    state_store
+        .create_thread(&workspace_id, input.operator_id.trim(), input.title.as_deref())
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn update_thread(
+    state_store: State<'_, Arc<PersistenceStateStore>>,
+    thread_id: String,
+    input: UpdateThreadInput,
+) -> Result<ThreadRecord, String> {
+    let workspace_id = state_store.workspace_id().map_err(|error| error.to_string())?;
+    state_store
+        .update_thread(
+            &workspace_id,
+            &thread_id,
+            input.title.as_deref(),
+            input.summary.as_deref(),
+            input.status.as_deref(),
+        )
+        .map_err(|error| error.to_string())?
+        .ok_or_else(|| "Thread not found.".to_string())
+}
+
+#[tauri::command]
+fn delete_thread(
+    state_store: State<'_, Arc<PersistenceStateStore>>,
+    thread_id: String,
+) -> Result<(), String> {
+    let workspace_id = state_store.workspace_id().map_err(|error| error.to_string())?;
+    state_store
+        .delete_thread(&workspace_id, &thread_id)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn list_thread_messages(
+    state_store: State<'_, Arc<PersistenceStateStore>>,
+    thread_id: String,
+    limit: Option<i64>,
+    offset: Option<i64>,
+) -> Result<Vec<ThreadMessageRecord>, String> {
+    let workspace_id = state_store.workspace_id().map_err(|error| error.to_string())?;
+    state_store
+        .list_thread_messages(
+            &workspace_id,
+            &thread_id,
+            limit.unwrap_or(200),
+            offset.unwrap_or(0),
+        )
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn append_thread_message(
+    state_store: State<'_, Arc<PersistenceStateStore>>,
+    input: AppendThreadMessageInput,
+) -> Result<ThreadMessageRecord, String> {
+    let workspace_id = state_store.workspace_id().map_err(|error| error.to_string())?;
+    state_store
+        .append_thread_message(
+            &workspace_id,
+            input.thread_id.trim(),
+            input.role.trim(),
+            &input.content,
+        )
         .map_err(|error| error.to_string())
 }
 
@@ -210,6 +344,12 @@ fn main() {
             replace_agent_manifests,
             get_org_chart_state,
             save_org_chart_state,
+            list_threads,
+            create_thread,
+            update_thread,
+            delete_thread,
+            list_thread_messages,
+            append_thread_message,
             start_run,
             list_run_events,
             open_external_url

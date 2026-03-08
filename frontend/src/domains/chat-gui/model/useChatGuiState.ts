@@ -11,8 +11,13 @@
 // @domain: chat-gui
 // @adr: none
 
-import { useState } from 'react';
-import type { AgentRuntimeClient, RuntimeRunEvent } from '@agent-deck/runtime-client';
+import { useRef, useState } from 'react';
+import type {
+  AgentRuntimeClient,
+  ChatThreadMessageRecord,
+  ChatThreadSummary,
+  RuntimeRunEvent
+} from '@agent-deck/runtime-client';
 import { type ActiveAgent, type ChatMessage, type SearchQueryLink } from '../lib';
 
 const WORKSPACE_ID = 'ws_local_v1';
@@ -385,6 +390,10 @@ function resolvePendingAssistantState(events: RuntimeRunEvent[]): {
 
 export function useChatGuiState(runtimeClient: AgentRuntimeClient) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [threads, setThreads] = useState<ChatThreadSummary[]>([]);
+  const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
+  const [threadsLoading, setThreadsLoading] = useState(false);
+  const selectedThreadByOperatorRef = useRef<Record<string, string>>({});
   const [draft, setDraft] = useState('');
   const [isRunning, setIsRunning] = useState(false);
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
@@ -394,6 +403,91 @@ export function useChatGuiState(runtimeClient: AgentRuntimeClient) {
   const [selectedDebugRunId, setSelectedDebugRunId] = useState<string | null>(null);
 
   const wait = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
+  const toChatMessage = (
+    record: ChatThreadMessageRecord,
+    activeAgent: ActiveAgent
+  ): ChatMessage => ({
+    id: record.messageId,
+    role: record.role === 'assistant' ? 'assistant' : 'user',
+    content: record.content,
+    createdAt: record.createdAtMs,
+    agentName: record.role === 'assistant' ? activeAgent.name : undefined,
+    agentRole: record.role === 'assistant' ? activeAgent.role : undefined,
+    avatarUrl: record.role === 'assistant' ? activeAgent.avatarUrl : undefined
+  });
+
+  const refreshThreads = async (activeAgent?: ActiveAgent, search?: string) => {
+    setThreadsLoading(true);
+    try {
+      const listed = await runtimeClient.listThreads({
+        operatorId: activeAgent?.id,
+        status: 'active',
+        search: search?.trim() || undefined,
+        limit: 200,
+        offset: 0
+      });
+      setThreads(listed);
+      return listed;
+    } finally {
+      setThreadsLoading(false);
+    }
+  };
+
+  const loadThreadMessages = async (threadId: string, activeAgent: ActiveAgent) => {
+    const rows = await runtimeClient.listThreadMessages(threadId, 500, 0);
+    setMessages(rows.map((row) => toChatMessage(row, activeAgent)));
+  };
+
+  const activateAgent = async (activeAgent: ActiveAgent) => {
+    const listed = await refreshThreads();
+    const agentThreads = listed.filter((thread) => thread.operatorId === activeAgent.id);
+    let threadId = selectedThreadByOperatorRef.current[activeAgent.id] ?? null;
+    if (!threadId || !agentThreads.some((thread) => thread.threadId === threadId)) {
+      threadId = agentThreads[0]?.threadId ?? null;
+    }
+    setActiveThreadId(threadId);
+    if (!threadId) {
+      setMessages([]);
+      return;
+    }
+    selectedThreadByOperatorRef.current[activeAgent.id] = threadId;
+    await loadThreadMessages(threadId, activeAgent);
+  };
+
+  const openThread = async (threadId: string, activeAgent: ActiveAgent) => {
+    selectedThreadByOperatorRef.current[activeAgent.id] = threadId;
+    setActiveThreadId(threadId);
+    await loadThreadMessages(threadId, activeAgent);
+  };
+
+  const createThread = async (activeAgent: ActiveAgent, title?: string) => {
+    const created = await runtimeClient.createThread({
+      operatorId: activeAgent.id,
+      title: title?.trim() || undefined
+    });
+    const listed = await refreshThreads();
+    selectedThreadByOperatorRef.current[activeAgent.id] = created.threadId;
+    setActiveThreadId(created.threadId);
+    setThreads(listed);
+    setMessages([]);
+    return created;
+  };
+
+  const deleteThread = async (threadId: string, activeAgent: ActiveAgent) => {
+    await runtimeClient.deleteThread(threadId);
+    const listed = await refreshThreads();
+    const agentThreads = listed.filter((thread) => thread.operatorId === activeAgent.id);
+    const nextThreadId = agentThreads[0]?.threadId ?? null;
+    if (nextThreadId) {
+      selectedThreadByOperatorRef.current[activeAgent.id] = nextThreadId;
+      setActiveThreadId(nextThreadId);
+      await loadThreadMessages(nextThreadId, activeAgent);
+    } else {
+      delete selectedThreadByOperatorRef.current[activeAgent.id];
+      setActiveThreadId(null);
+      setMessages([]);
+    }
+  };
   const resolveAllowedToolIds = (toolsPolicyRef?: string): string[] => {
     if (toolsPolicyRef === 'policy_default') {
       return ['weather_open_meteo'];
@@ -498,6 +592,15 @@ export function useChatGuiState(runtimeClient: AgentRuntimeClient) {
       return;
     }
 
+    let threadId = activeThreadId;
+    if (!threadId) {
+      const created = await createThread(activeAgent);
+      threadId = created.threadId;
+    }
+    if (!threadId) {
+      return;
+    }
+
     const now = Date.now();
     const userMessage: ChatMessage = {
       id: `user-${now}`,
@@ -508,7 +611,6 @@ export function useChatGuiState(runtimeClient: AgentRuntimeClient) {
 
     const runId = `run_${now}`;
     const pendingAssistantId = `assistant-pending-${runId}`;
-    const threadId = `thread_${activeAgent.id}`;
     const startPayloadEvent: RuntimeRunEvent = {
       event: 'client_start_run_payload',
       workspaceId: WORKSPACE_ID,
@@ -559,6 +661,11 @@ export function useChatGuiState(runtimeClient: AgentRuntimeClient) {
     ]);
 
     try {
+      await runtimeClient.appendThreadMessage({
+        threadId,
+        role: 'user',
+        content
+      });
       const started = await runtimeClient.startRun({
         workspaceId: WORKSPACE_ID,
         runId,
@@ -589,7 +696,14 @@ export function useChatGuiState(runtimeClient: AgentRuntimeClient) {
         status: resolveRunStatus(events, record.status)
       }));
 
-      updatePendingAssistantMessage(runId, buildAssistantContent(events), false, '', buildSearchQueryLinks(events), '');
+      const finalContent = buildAssistantContent(events);
+      await runtimeClient.appendThreadMessage({
+        threadId,
+        role: 'assistant',
+        content: finalContent
+      });
+      updatePendingAssistantMessage(runId, finalContent, false, '', buildSearchQueryLinks(events), '');
+      void refreshThreads();
     } catch (error) {
       const runtimeErrorEvent: RuntimeRunEvent = {
         event: 'client_runtime_error',
@@ -626,6 +740,9 @@ export function useChatGuiState(runtimeClient: AgentRuntimeClient) {
 
   return {
     messages,
+    threads,
+    activeThreadId,
+    threadsLoading,
     draft,
     isRunning,
     activeRunId,
@@ -635,6 +752,11 @@ export function useChatGuiState(runtimeClient: AgentRuntimeClient) {
     selectedDebugRunId,
     setSelectedDebugRunId,
     setDraft,
-    submitDraft
+    submitDraft,
+    activateAgent,
+    openThread,
+    createThread,
+    deleteThread,
+    refreshThreads
   };
 }

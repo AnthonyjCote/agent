@@ -1,11 +1,17 @@
 import type { AgentSummary, RuntimeCapabilities } from '@agent-deck/schemas';
 import type {
+  AppendThreadMessageInput,
   AgentRuntimeClient,
+  ChatThreadMessageRecord,
+  ChatThreadSummary,
+  CreateThreadInput,
+  ListThreadsInput,
   LocalStorageMigrationStatus,
   OrgChartStatePayload,
   RuntimeRunEvent,
   StartRunInput,
-  StartRunResponse
+  StartRunResponse,
+  UpdateThreadInput
 } from '../types';
 
 type TauriInvoke = <T>(command: string, args?: Record<string, unknown>) => Promise<T>;
@@ -51,6 +57,36 @@ export class TauriTransport implements AgentRuntimeClient {
   async saveOrgChartState(payload: OrgChartStatePayload): Promise<void> {
     const invoke = await this.getInvoke();
     await invoke<void>('save_org_chart_state', { payload });
+  }
+
+  async listThreads(input: ListThreadsInput = {}): Promise<ChatThreadSummary[]> {
+    const invoke = await this.getInvoke();
+    return invoke<ChatThreadSummary[]>('list_threads', { input });
+  }
+
+  async createThread(input: CreateThreadInput): Promise<ChatThreadSummary> {
+    const invoke = await this.getInvoke();
+    return invoke<ChatThreadSummary>('create_thread', { input });
+  }
+
+  async updateThread(threadId: string, input: UpdateThreadInput): Promise<ChatThreadSummary> {
+    const invoke = await this.getInvoke();
+    return invoke<ChatThreadSummary>('update_thread', { threadId, input });
+  }
+
+  async deleteThread(threadId: string): Promise<void> {
+    const invoke = await this.getInvoke();
+    await invoke<void>('delete_thread', { threadId });
+  }
+
+  async listThreadMessages(threadId: string, limit?: number, offset?: number): Promise<ChatThreadMessageRecord[]> {
+    const invoke = await this.getInvoke();
+    return invoke<ChatThreadMessageRecord[]>('list_thread_messages', { threadId, limit, offset });
+  }
+
+  async appendThreadMessage(input: AppendThreadMessageInput): Promise<ChatThreadMessageRecord> {
+    const invoke = await this.getInvoke();
+    return invoke<ChatThreadMessageRecord>('append_thread_message', { input });
   }
 
   async startRun(input: StartRunInput): Promise<StartRunResponse> {
