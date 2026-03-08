@@ -24,7 +24,8 @@
 .modal-shell-frame {
   width: min(100%, 760px);
   max-height: calc(100vh - 40px);
-  border-radius: 18px;
+  border-radius: 12px;
+  overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--border-strong) 82%, transparent);
   background: linear-gradient(180deg, #171d27 0%, #121822 100%);
   box-shadow:
@@ -50,7 +51,6 @@
 .modal-shell-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   padding: 16px 18px;
   border-bottom: 1px solid color-mix(in srgb, var(--border-subtle) 92%, transparent);
 }
@@ -60,23 +60,6 @@
   font-size: 16px;
   font-weight: 650;
   color: var(--text-primary);
-}
-
-.modal-shell-close {
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
-  border: 1px solid color-mix(in srgb, var(--border-subtle) 90%, transparent);
-  background: transparent;
-  color: var(--text-muted);
-  cursor: pointer;
-  font-size: 18px;
-  line-height: 1;
-}
-
-.modal-shell-close:hover {
-  color: var(--text-primary);
-  border-color: color-mix(in srgb, var(--border-strong) 90%, transparent);
 }
 
 .modal-shell-body {

@@ -22,6 +22,7 @@ type TextFieldProps = {
   placeholder?: string;
   disabled?: boolean;
   invalid?: boolean;
+  size?: 'default' | 'compact';
 };
 
 export function TextField({
@@ -31,11 +32,12 @@ export function TextField({
   type = 'text',
   placeholder,
   disabled = false,
-  invalid = false
+  invalid = false,
+  size = 'default'
 }: TextFieldProps) {
   return (
     <input
-      className={`text-field-control${invalid ? ' is-invalid' : ''}`}
+      className={`text-field-control text-field-${size}${invalid ? ' is-invalid' : ''}`}
       type={type}
       value={value}
       aria-label={ariaLabel}

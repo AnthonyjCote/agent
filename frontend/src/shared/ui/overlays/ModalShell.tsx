@@ -17,13 +17,14 @@ export type ModalSize = 'small' | 'medium' | 'large';
 
 type ModalShellProps = PropsWithChildren<{
   open: boolean;
-  title: string;
+  title?: string;
   size?: ModalSize;
   onClose: () => void;
   footer?: ReactNode;
+  ariaLabel?: string;
 }>;
 
-export function ModalShell({ open, title, size = 'medium', onClose, footer, children }: ModalShellProps) {
+export function ModalShell({ open, title, size = 'medium', onClose, footer, children, ariaLabel }: ModalShellProps) {
   if (!open) {
     return null;
   }
@@ -34,15 +35,14 @@ export function ModalShell({ open, title, size = 'medium', onClose, footer, chil
         className={`modal-shell-frame size-${size}`}
         role="dialog"
         aria-modal="true"
-        aria-label={title}
+        aria-label={ariaLabel || title || 'Modal'}
         onClick={(event) => event.stopPropagation()}
       >
-        <header className="modal-shell-header">
-          <h2>{title}</h2>
-          <button type="button" className="modal-shell-close" onClick={onClose} aria-label="Close modal">
-            ×
-          </button>
-        </header>
+        {title ? (
+          <header className="modal-shell-header">
+            <h2>{title}</h2>
+          </header>
+        ) : null}
         <div className="modal-shell-body">{children}</div>
         {footer ? <footer className="modal-shell-footer">{footer}</footer> : null}
       </section>

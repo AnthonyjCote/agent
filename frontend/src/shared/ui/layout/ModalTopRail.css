@@ -1,0 +1,47 @@
+/*
+ * Purpose: Style reusable full-bleed top rail for modal bodies.
+ * Responsibilities:
+ * - Stretch to modal body edges while preserving compact control spacing.
+ * - Provide raised/default variants aligned with app top rail language.
+ */
+/* @tags: shared-ui,layout,styles */
+/* @status: active */
+/* @owner: founder */
+/* @domain: shared */
+/* @adr: none */
+
+.modal-top-rail {
+  width: auto;
+  min-height: 50px;
+  margin-top: -16px;
+  margin-left: -18px;
+  margin-right: -18px;
+  margin-bottom: 14px;
+  padding: 9px 12px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.modal-top-rail-default {
+  border-bottom: 1px solid var(--border-strong);
+}
+
+.modal-top-rail-raised {
+  background: linear-gradient(180deg, #151f2e 0%, #111a27 100%);
+  border-bottom: 1px solid var(--border-strong);
+  box-shadow: inset 0 -1px 0 color-mix(in srgb, #a9bad7 14%, transparent);
+}
+
+.modal-top-rail-left,
+.modal-top-rail-right {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.modal-top-rail-right {
+  justify-content: flex-end;
+}

@@ -27,6 +27,12 @@
     box-shadow 0.16s ease;
 }
 
+.text-field-control.text-field-compact {
+  height: 36px;
+  font-size: 12px;
+  padding: 0 9px;
+}
+
 .text-field-control::placeholder {
   color: var(--control-field-placeholder);
 }

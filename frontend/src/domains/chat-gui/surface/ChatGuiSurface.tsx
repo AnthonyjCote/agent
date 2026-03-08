@@ -15,7 +15,18 @@ import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } fro
 import { type AgentManifest, useAgentManifestStore } from '../../../shared/config/agents';
 import { useOrgChartStore } from '../../../shared/config/org-chart';
 import { AgentManifestModal } from '../../../shared/modules';
-import { AgentAvatar, AgentGrid, CenteredEmptyState, ChatComposerShell, MessageThreadShell, ModalShell, TextButton } from '../../../shared/ui';
+import {
+  AgentAvatar,
+  AgentGrid,
+  CenteredEmptyState,
+  ChatComposerShell,
+  MessageThreadShell,
+  ModalTopRail,
+  ModalShell,
+  TextButton,
+  TextField,
+  DropdownSelector
+} from '../../../shared/ui';
 import type { SearchQueryLink } from '../lib';
 import { useChatGuiStore } from '../model/ChatGuiStoreProvider';
 import './ChatGuiSurface.css';
@@ -429,8 +440,13 @@ function renderAssistantMarkdown(
 
 export function ChatGuiSurface() {
   const { agents, updateAgent, deleteAgent } = useAgentManifestStore();
-  const { orgUnits, operators, execute: executeOrgCommand } = useOrgChartStore();
+  const { businessUnits, orgUnits, operators, execute: executeOrgCommand } = useOrgChartStore();
   const [agentPickerOpen, setAgentPickerOpen] = useState(false);
+  const [conversationsOpen, setConversationsOpen] = useState(false);
+  const [threadSearch, setThreadSearch] = useState('');
+  const [threadFilterBusinessUnitId, setThreadFilterBusinessUnitId] = useState<string>('all');
+  const [threadFilterOrgUnitId, setThreadFilterOrgUnitId] = useState<string>('all');
+  const [threadFilterAgentId, setThreadFilterAgentId] = useState<string>('all');
   const [debugOpen, setDebugOpen] = useState(false);
   const [editingAgent, setEditingAgent] = useState<AgentManifest | undefined>(undefined);
   const [activeAgentId, setActiveAgentId] = useState<string>(() => localStorage.getItem(ACTIVE_AGENT_STORAGE_KEY) ?? '');
@@ -458,6 +474,9 @@ export function ChatGuiSurface() {
   );
   const {
     messages,
+    threads,
+    activeThreadId,
+    threadsLoading,
     draft,
     isRunning,
     activeRunId,
@@ -465,14 +484,20 @@ export function ChatGuiSurface() {
     selectedDebugRunId,
     setSelectedDebugRunId,
     setDraft,
-    submitDraft
+    submitDraft,
+    activateAgent,
+    openThread,
+    deleteThread
   } = useChatGuiStore();
   const submitActiveDraft = useCallback(() => submitDraft(activeAgent), [submitDraft, activeAgent]);
   const composerPlaceholder = isRunning ? 'Agent is responding...' : `Message ${activeAgent.name}`;
   const isEmpty = messages.length === 0;
-  const currentThreadId = `thread_${activeAgent.id}`;
+  const currentThreadId = activeThreadId;
   const threadDebugRuns = useMemo(
-    () => debugRuns.filter((record) => record.threadId === currentThreadId),
+    () =>
+      currentThreadId
+        ? debugRuns.filter((record) => record.threadId === currentThreadId)
+        : [],
     [debugRuns, currentThreadId]
   );
   const selectedDebugRun = useMemo(() => {
@@ -525,6 +550,19 @@ export function ChatGuiSurface() {
     },
     [openExternalUrl]
   );
+  const formatThreadTimestamp = useCallback((value: number): string => {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return 'Unknown';
+    }
+    return date.toLocaleString(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit'
+    });
+  }, []);
 
   useEffect(() => {
     const node = historyScrollRef.current;
@@ -541,6 +579,12 @@ export function ChatGuiSurface() {
     }
     localStorage.setItem(ACTIVE_AGENT_STORAGE_KEY, activeManifest.agentId);
   }, [activeManifest]);
+  useEffect(() => {
+    if (!activeManifest) {
+      return;
+    }
+    void activateAgent(activeAgent);
+  }, [activeManifest, activeAgent.id]);
 
   useEffect(() => {
     if (!threadDebugRuns.length) {
@@ -553,6 +597,28 @@ export function ChatGuiSurface() {
 
   const handleSelectAgent = (agentId: string) => {
     setActiveAgentId(agentId);
+  };
+  const handleOpenConversation = async (threadId: string, operatorId: string) => {
+    let targetAgent = activeAgent;
+    if (operatorId !== activeAgent.id) {
+      const manifest = agents.find((agent) => agent.agentId === operatorId);
+      if (manifest) {
+        targetAgent = {
+          id: manifest.agentId,
+          name: manifest.name || 'Coordinator',
+          role: manifest.role || 'General Assistant',
+          systemDirectiveShort: manifest.systemDirectiveShort || 'Be concise, clear, and helpful.',
+          toolsPolicyRef: manifest.toolsPolicyRef || 'policy_default',
+          avatarUrl: manifest.avatarDataUrl || undefined
+        };
+        setActiveAgentId(manifest.agentId);
+      }
+    }
+    await openThread(threadId, targetAgent);
+    setConversationsOpen(false);
+  };
+  const handleDeleteConversation = async (threadId: string) => {
+    await deleteThread(threadId, activeAgent);
   };
 
   const handleEditAgent = (agentId: string) => {
@@ -580,6 +646,95 @@ export function ChatGuiSurface() {
     ],
     [editingOperator?.id, operators]
   );
+  const orgUnitById = useMemo(() => new Map(orgUnits.map((unit) => [unit.id, unit])), [orgUnits]);
+  const operatorByAgentId = useMemo(
+    () => new Map(operators.filter((operator) => operator.sourceAgentId).map((operator) => [operator.sourceAgentId as string, operator])),
+    [operators]
+  );
+  const threadFilterBusinessUnitOptions = useMemo(
+    () => [{ value: 'all', label: 'All business units' }, ...businessUnits.map((unit) => ({ value: unit.id, label: unit.name }))],
+    [businessUnits]
+  );
+  const allowedOrgUnits = useMemo(
+    () =>
+      threadFilterBusinessUnitId === 'all'
+        ? orgUnits
+        : orgUnits.filter((unit) => (unit.businessUnitId ?? 'unassigned') === threadFilterBusinessUnitId),
+    [orgUnits, threadFilterBusinessUnitId]
+  );
+  const threadFilterOrgUnitOptions = useMemo(
+    () => [{ value: 'all', label: 'All org units' }, ...allowedOrgUnits.map((unit) => ({ value: unit.id, label: unit.name }))],
+    [allowedOrgUnits]
+  );
+  const allowedOperators = useMemo(() => {
+    return operators.filter((operator) => {
+      const orgUnit = orgUnitById.get(operator.orgUnitId);
+      if (threadFilterBusinessUnitId !== 'all') {
+        if (!orgUnit || (orgUnit.businessUnitId ?? 'unassigned') !== threadFilterBusinessUnitId) {
+          return false;
+        }
+      }
+      if (threadFilterOrgUnitId !== 'all' && operator.orgUnitId !== threadFilterOrgUnitId) {
+        return false;
+      }
+      return true;
+    });
+  }, [operators, orgUnitById, threadFilterBusinessUnitId, threadFilterOrgUnitId]);
+  const threadFilterAgentOptions = useMemo(
+    () => [
+      { value: 'all', label: 'All operators' },
+      ...agents
+        .filter((agent) =>
+          allowedOperators.some((operator) => operator.sourceAgentId && operator.sourceAgentId === agent.agentId)
+        )
+        .map((agent) => ({ value: agent.agentId, label: agent.name }))
+    ],
+    [agents, allowedOperators]
+  );
+  const filteredThreads = useMemo(() => {
+    return threads.filter((thread) => {
+      if (threadFilterAgentId !== 'all' && thread.operatorId !== threadFilterAgentId) {
+        return false;
+      }
+      if (threadFilterOrgUnitId !== 'all') {
+        const operator = operatorByAgentId.get(thread.operatorId);
+        if (!operator || operator.orgUnitId !== threadFilterOrgUnitId) {
+          return false;
+        }
+      }
+      if (threadFilterBusinessUnitId !== 'all') {
+        const operator = operatorByAgentId.get(thread.operatorId);
+        const orgUnit = operator ? orgUnitById.get(operator.orgUnitId) : undefined;
+        if (!orgUnit || (orgUnit.businessUnitId ?? 'unassigned') !== threadFilterBusinessUnitId) {
+          return false;
+        }
+      }
+      if (!threadSearch.trim()) {
+        return true;
+      }
+      const query = threadSearch.trim().toLowerCase();
+      return (
+        (thread.title || '').toLowerCase().includes(query) ||
+        (thread.summary || '').toLowerCase().includes(query)
+      );
+    });
+  }, [threads, threadFilterAgentId, threadFilterOrgUnitId, threadFilterBusinessUnitId, threadSearch, operatorByAgentId, orgUnitById]);
+  useEffect(() => {
+    if (threadFilterOrgUnitId === 'all') {
+      return;
+    }
+    if (!allowedOrgUnits.some((unit) => unit.id === threadFilterOrgUnitId)) {
+      setThreadFilterOrgUnitId('all');
+    }
+  }, [allowedOrgUnits, threadFilterOrgUnitId]);
+  useEffect(() => {
+    if (threadFilterAgentId === 'all') {
+      return;
+    }
+    if (!threadFilterAgentOptions.some((option) => option.value === threadFilterAgentId)) {
+      setThreadFilterAgentId('all');
+    }
+  }, [threadFilterAgentId, threadFilterAgentOptions]);
 
   const agentPickerModal = (
     <ModalShell
@@ -698,6 +853,96 @@ export function ChatGuiSurface() {
       </div>
     </ModalShell>
   );
+  const conversationsModal = (
+    <ModalShell
+      open={conversationsOpen}
+      onClose={() => setConversationsOpen(false)}
+      size="large"
+      ariaLabel="Conversations"
+    >
+      <ModalTopRail
+        left={
+          <div className="chat-gui-conversations-top-left">
+            <TextField
+              value={threadSearch}
+              onValueChange={setThreadSearch}
+              placeholder="Search conversations"
+              ariaLabel="Search conversations"
+              size="compact"
+            />
+            <DropdownSelector
+              value={threadFilterBusinessUnitId}
+              options={threadFilterBusinessUnitOptions}
+              onValueChange={setThreadFilterBusinessUnitId}
+              ariaLabel="Filter by business unit"
+              size="compact"
+            />
+            <DropdownSelector
+              value={threadFilterOrgUnitId}
+              options={threadFilterOrgUnitOptions}
+              onValueChange={setThreadFilterOrgUnitId}
+              ariaLabel="Filter by org unit"
+              size="compact"
+            />
+            <DropdownSelector
+              value={threadFilterAgentId}
+              options={threadFilterAgentOptions}
+              onValueChange={setThreadFilterAgentId}
+              ariaLabel="Filter by operator"
+              size="compact"
+            />
+          </div>
+        }
+      />
+      <div className="chat-gui-conversations-grid">
+        {threadsLoading ? <div className="chat-gui-conversations-empty">Loading conversations...</div> : null}
+        {!threadsLoading && filteredThreads.length === 0 ? (
+          <div className="chat-gui-conversations-empty">No conversations found for this filter.</div>
+        ) : null}
+        {!threadsLoading
+          ? filteredThreads.map((thread) => {
+              const operator = operatorByAgentId.get(thread.operatorId);
+              const orgUnitName = operator ? orgUnitById.get(operator.orgUnitId)?.name : undefined;
+              return (
+                <article
+                  key={thread.threadId}
+                  className={`chat-gui-conversation-card${activeThreadId === thread.threadId ? ' is-active' : ''}`}
+                >
+                  <button
+                    type="button"
+                    className="chat-gui-conversation-open"
+                    onClick={() => void handleOpenConversation(thread.threadId, thread.operatorId)}
+                  >
+                    <span className="chat-gui-conversation-title">{thread.title || 'Untitled conversation'}</span>
+                    <span className="chat-gui-conversation-summary">{thread.summary || 'No summary yet.'}</span>
+                    <span className="chat-gui-conversation-meta">
+                      <span>{agents.find((agent) => agent.agentId === thread.operatorId)?.name || 'Unknown operator'}</span>
+                      {orgUnitName ? <span>{orgUnitName}</span> : null}
+                      <span>{thread.messageCount} messages</span>
+                      <span>{formatThreadTimestamp(thread.updatedAtMs)}</span>
+                    </span>
+                  </button>
+                  <div className="chat-gui-conversation-actions">
+                    <TextButton
+                      label="Open"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => void handleOpenConversation(thread.threadId, thread.operatorId)}
+                    />
+                    <TextButton
+                      label="Delete"
+                      variant="danger"
+                      size="sm"
+                      onClick={() => void handleDeleteConversation(thread.threadId)}
+                    />
+                  </div>
+                </article>
+              );
+            })
+          : null}
+      </div>
+    </ModalShell>
+  );
 
   if (isEmpty) {
     return (
@@ -705,6 +950,7 @@ export function ChatGuiSurface() {
         <header className="chat-gui-header">
           <div className="chat-gui-header-actions">
             <TextButton label="Debug" variant="ghost" onClick={() => setDebugOpen(true)} />
+            <TextButton label="Conversations" variant="ghost" onClick={() => setConversationsOpen(true)} />
             <TextButton label="Agents" variant="secondary" onClick={() => setAgentPickerOpen(true)} />
           </div>
         </header>
@@ -726,6 +972,7 @@ export function ChatGuiSurface() {
 
         {agentPickerModal}
         {agentEditModal}
+        {conversationsModal}
 
         {debugModal}
       </div>
@@ -737,6 +984,7 @@ export function ChatGuiSurface() {
       <header className="chat-gui-header">
         <div className="chat-gui-header-actions">
           <TextButton label="Debug" variant="ghost" onClick={() => setDebugOpen(true)} />
+          <TextButton label="Conversations" variant="ghost" onClick={() => setConversationsOpen(true)} />
           <TextButton label="Agents" variant="secondary" onClick={() => setAgentPickerOpen(true)} />
         </div>
       </header>
@@ -807,6 +1055,7 @@ export function ChatGuiSurface() {
 
       {agentPickerModal}
       {agentEditModal}
+      {conversationsModal}
 
       {debugModal}
     </div>

@@ -24,6 +24,7 @@ type DropdownSelectorProps = {
   onValueChange: (value: string) => void;
   ariaLabel: string;
   disabled?: boolean;
+  size?: 'default' | 'compact';
 };
 
 export function DropdownSelector({
@@ -31,7 +32,8 @@ export function DropdownSelector({
   options,
   onValueChange,
   ariaLabel,
-  disabled = false
+  disabled = false,
+  size = 'default'
 }: DropdownSelectorProps) {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -84,7 +86,7 @@ export function DropdownSelector({
     <div className="dropdown-selector" ref={rootRef}>
       <button
         type="button"
-        className="dropdown-selector-trigger"
+        className={`dropdown-selector-trigger dropdown-selector-trigger-${size}`}
         aria-label={ariaLabel}
         aria-haspopup="listbox"
         aria-expanded={open}
@@ -94,20 +96,20 @@ export function DropdownSelector({
       >
         <span>{selected?.label ?? ''}</span>
       </button>
-      <span className="dropdown-selector-chevron" aria-hidden="true">
+      <span className={`dropdown-selector-chevron dropdown-selector-chevron-${size}`} aria-hidden="true">
         <svg viewBox="0 0 20 20">
           <path d="m5 7 5 6 5-6" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
         </svg>
       </span>
       {open ? (
-        <ul className="dropdown-selector-options" role="listbox" aria-label={ariaLabel}>
+        <ul className={`dropdown-selector-options dropdown-selector-options-${size}`} role="listbox" aria-label={ariaLabel}>
           {options.map((option) => {
             const active = option.value === value;
             return (
               <li key={option.value} role="option" aria-selected={active}>
                 <button
                   type="button"
-                  className={`dropdown-selector-option${active ? ' active' : ''}`}
+                  className={`dropdown-selector-option dropdown-selector-option-${size}${active ? ' active' : ''}`}
                   onClick={() => handleOptionSelect(option.value)}
                 >
                   {option.label}
