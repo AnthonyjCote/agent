@@ -1,12 +1,13 @@
 use std::collections::HashSet;
 
 use super::{
+    org_manage_entities_v1::manifest::manifest as org_manage_entities_tool_manifest,
     shared::definition::ToolDefinition,
     weather_open_meteo::manifest::manifest as weather_tool_manifest,
 };
 
 fn registered_tool_definitions() -> Vec<ToolDefinition> {
-    vec![weather_tool_manifest()]
+    vec![weather_tool_manifest(), org_manage_entities_tool_manifest()]
 }
 
 fn find_tool_definition<'a>(tool_id: &str, definitions: &'a [ToolDefinition]) -> Option<&'a ToolDefinition> {

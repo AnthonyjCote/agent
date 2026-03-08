@@ -138,13 +138,19 @@ export function AgentChartSurface() {
       return;
     }
 
+    const existingManifest = agents.find((agent) => agent.agentId === operator.sourceAgentId);
     const merged = {
       ...operator,
       ...(patch ?? {}),
-      avatarSourceDataUrl: avatar?.sourceDataUrl ?? operator.avatarSourceDataUrl,
-      avatarDataUrl: avatar?.croppedDataUrl ?? operator.avatarDataUrl
+      avatarSourceDataUrl:
+        avatar?.sourceDataUrl ??
+        existingManifest?.avatarSourceDataUrl ??
+        operator.avatarSourceDataUrl,
+      avatarDataUrl:
+        avatar?.croppedDataUrl ??
+        existingManifest?.avatarDataUrl ??
+        operator.avatarDataUrl
     };
-    const existingManifest = agents.find((agent) => agent.agentId === operator.sourceAgentId);
     updateAgent(operator.sourceAgentId, {
       avatarSourceDataUrl: merged.avatarSourceDataUrl,
       avatarDataUrl: merged.avatarDataUrl,
@@ -247,6 +253,7 @@ export function AgentChartSurface() {
         right={
           <OrgChartRightPane
             selection={selection}
+            operators={displayOperators}
             selectedBusinessUnit={selectedBusinessUnit}
             selectedOrg={selectedOrg}
             selectedOperator={selectedOperator}

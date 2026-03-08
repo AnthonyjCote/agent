@@ -1,13 +1,19 @@
+import { useEffect, useMemo, useState } from 'react';
 import type { Operator, BusinessUnit, OrgCommand, OrgUnit } from '../../../../shared/config';
 import { TopRailShell } from '../../../../shared/ui';
+import { canEditOrgNode } from '../../lib/permissions';
 import type { PendingDelete } from '../types';
 import type { OrgChartSelectionState } from '../hooks';
 import { ActorDetailsCard } from './ActorDetailsCard';
 import { BusinessUnitDetailsCard } from './BusinessUnitDetailsCard';
+import { BusinessUnitDetailsViewCard } from './BusinessUnitDetailsViewCard';
+import { OperatorDetailsViewCard } from './OperatorDetailsViewCard';
+import { OrgUnitDetailsViewCard } from './OrgUnitDetailsViewCard';
 import { OrgUnitDetailsCard } from './OrgUnitDetailsCard';
 
 type OrgChartRightPaneProps = {
   selection: OrgChartSelectionState;
+  operators: Operator[];
   selectedBusinessUnit: BusinessUnit | undefined;
   selectedOrg: OrgUnit | undefined;
   selectedOperator: Operator | undefined;
@@ -25,6 +31,7 @@ type OrgChartRightPaneProps = {
 export function OrgChartRightPane(props: OrgChartRightPaneProps) {
   const {
     selection,
+    operators,
     selectedBusinessUnit,
     selectedOrg,
     selectedOperator,
@@ -35,6 +42,55 @@ export function OrgChartRightPane(props: OrgChartRightPaneProps) {
     onOpenOrgUnitMedia,
     onOpenActorMedia
   } = props;
+  const [detailsMode, setDetailsMode] = useState<'view' | 'edit'>('view');
+  const selectedNodeKey = selection.selectedNode
+    ? selection.selectedNode.kind === 'scope_bucket'
+      ? `${selection.selectedNode.kind}:${selection.selectedNode.scope}`
+      : `${selection.selectedNode.kind}:${selection.selectedNode.id}`
+    : 'none';
+  useEffect(() => {
+    setDetailsMode('view');
+  }, [selectedNodeKey, selection.workspaceView]);
+  const canEdit = useMemo(
+    () =>
+      canEditOrgNode(
+        {
+          sessionRole: 'owner',
+          readOnlyMode: false,
+        },
+        selection.selectedNode
+      ),
+    [selection.selectedNode]
+  );
+  const isViewMode = detailsMode === 'view';
+  const selectedBusinessUnitLabel = useMemo(
+    () =>
+      selection.businessUnitOptions.find(
+        (option) => option.value === (selection.selectedOrgEffectiveBusinessUnitId ?? '')
+      )?.label ?? 'Unassigned',
+    [selection.businessUnitOptions, selection.selectedOrgEffectiveBusinessUnitId]
+  );
+  const selectedOperatorOrgLabel = useMemo(
+    () =>
+      selection.orgOptions.find(
+        (option) => option.value === (selectedOperator?.orgUnitId ?? '')
+      )?.label ?? 'Unassigned',
+    [selection.orgOptions, selectedOperator?.orgUnitId]
+  );
+  const selectedOperatorManager = useMemo(
+    () =>
+      selectedOperator?.managerOperatorId
+        ? operators.find((operator) => operator.id === selectedOperator.managerOperatorId)
+        : undefined,
+    [operators, selectedOperator?.managerOperatorId]
+  );
+  const selectedOperatorDirectReports = useMemo(
+    () =>
+      selectedOperator
+        ? operators.filter((operator) => operator.managerOperatorId === selectedOperator.id)
+        : [],
+    [operators, selectedOperator]
+  );
 
   return (
     <section className="agent-chart-right-pane" aria-label="Org item details">
@@ -50,7 +106,8 @@ export function OrgChartRightPane(props: OrgChartRightPaneProps) {
           </div>
         }
         right={
-          <div className="agent-chart-view-toggle">
+          <div className="agent-chart-view-toggle-row">
+            <div className="agent-chart-view-toggle">
             <button
               type="button"
               className={`agent-chart-view-toggle-button${selection.workspaceView === 'list' ? ' active' : ''}`}
@@ -67,12 +124,21 @@ export function OrgChartRightPane(props: OrgChartRightPaneProps) {
             >
               Canvas
             </button>
+            </div>
           </div>
         }
       />
       <div className="agent-chart-right-pane-body">
 
-      {selection.workspaceView === 'list' && selectedBusinessUnit ? (
+      {selection.workspaceView === 'list' && selectedBusinessUnit && isViewMode ? (
+        <BusinessUnitDetailsViewCard
+          businessUnit={selectedBusinessUnit}
+          canEdit={canEdit}
+          onEdit={() => setDetailsMode('edit')}
+        />
+      ) : null}
+
+      {selection.workspaceView === 'list' && selectedBusinessUnit && !isViewMode ? (
         <BusinessUnitDetailsCard
           businessUnit={selectedBusinessUnit}
           businessUnitNameDraft={selection.businessUnitNameDraft}
@@ -88,14 +154,17 @@ export function OrgChartRightPane(props: OrgChartRightPaneProps) {
             })
           }
           onSave={() =>
-            executeCommand({
-              kind: 'update_business_unit',
-              nodeId: selectedBusinessUnit.id,
-              patch: {
-                name: selection.businessUnitNameDraft,
-                shortDescription: selection.businessUnitOverviewDraft
-              }
-            })
+            {
+              executeCommand({
+                kind: 'update_business_unit',
+                nodeId: selectedBusinessUnit.id,
+                patch: {
+                  name: selection.businessUnitNameDraft,
+                  shortDescription: selection.businessUnitOverviewDraft
+                }
+              });
+              setDetailsMode('view');
+            }
           }
           onDelete={() =>
             setPendingDelete({
@@ -108,7 +177,17 @@ export function OrgChartRightPane(props: OrgChartRightPaneProps) {
         />
       ) : null}
 
-      {selection.workspaceView === 'list' && selectedOrg ? (
+      {selection.workspaceView === 'list' && selectedOrg && isViewMode ? (
+        <OrgUnitDetailsViewCard
+          orgUnit={selectedOrg}
+          subUnitCount={selection.selectedOrgChildren.length}
+          effectiveBusinessUnitLabel={selectedBusinessUnitLabel}
+          canEdit={canEdit}
+          onEdit={() => setDetailsMode('edit')}
+        />
+      ) : null}
+
+      {selection.workspaceView === 'list' && selectedOrg && !isViewMode ? (
         <OrgUnitDetailsCard
           orgUnit={selectedOrg}
           orgNameDraft={selection.orgNameDraft}
@@ -134,14 +213,17 @@ export function OrgChartRightPane(props: OrgChartRightPaneProps) {
             })
           }
           onSave={() =>
-            executeCommand({
-              kind: 'update_org_unit',
-              nodeId: selectedOrg.id,
-              patch: {
-                name: selection.orgNameDraft,
-                shortDescription: selection.orgOverviewDraft
-              }
-            })
+            {
+              executeCommand({
+                kind: 'update_org_unit',
+                nodeId: selectedOrg.id,
+                patch: {
+                  name: selection.orgNameDraft,
+                  shortDescription: selection.orgOverviewDraft
+                }
+              });
+              setDetailsMode('view');
+            }
           }
           onDelete={() =>
             setPendingDelete({
@@ -154,7 +236,21 @@ export function OrgChartRightPane(props: OrgChartRightPaneProps) {
         />
       ) : null}
 
-      {selection.workspaceView === 'list' && selectedOperator ? (
+      {selection.workspaceView === 'list' && selectedOperator && isViewMode ? (
+        <OperatorDetailsViewCard
+          operator={selectedOperator}
+          orgLabel={selectedOperatorOrgLabel}
+          orgUnitId={selectedOperator.orgUnitId}
+          reportsToOperator={selectedOperatorManager}
+          directReports={selectedOperatorDirectReports}
+          onOpenOperator={(operatorId) => selection.setSelectedNode({ kind: 'operator', id: operatorId })}
+          onOpenOrgUnit={(orgUnitId) => selection.setSelectedNode({ kind: 'org_unit', id: orgUnitId })}
+          canEdit={canEdit}
+          onEdit={() => setDetailsMode('edit')}
+        />
+      ) : null}
+
+      {selection.workspaceView === 'list' && selectedOperator && !isViewMode ? (
         <ActorDetailsCard
           operator={selectedOperator}
           actorNameDraft={selection.actorNameDraft}
@@ -180,13 +276,16 @@ export function OrgChartRightPane(props: OrgChartRightPaneProps) {
             executeCommand({ kind: 'set_operator_manager', operatorId: selectedOperator.id, managerOperatorId: value || null })
           }
           onSave={() =>
-            onSaveOperatorPatch(selectedOperator, {
-              name: selection.actorNameDraft,
-              title: selection.actorTitleDraft,
-              primaryObjective: selection.actorPrimaryObjectiveDraft,
-              systemDirective: selection.actorSystemDirectiveDraft,
-              roleBrief: selection.actorRoleBriefDraft
-            })
+            {
+              onSaveOperatorPatch(selectedOperator, {
+                name: selection.actorNameDraft,
+                title: selection.actorTitleDraft,
+                primaryObjective: selection.actorPrimaryObjectiveDraft,
+                systemDirective: selection.actorSystemDirectiveDraft,
+                roleBrief: selection.actorRoleBriefDraft
+              });
+              setDetailsMode('view');
+            }
           }
           onDelete={() =>
             setPendingDelete({
