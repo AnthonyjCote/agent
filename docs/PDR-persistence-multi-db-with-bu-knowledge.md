@@ -14,6 +14,11 @@ Define a persistence architecture for Agent Deck that:
 4. Org chart, manifests, and config remain centralized in core DB.
 5. Conversation/runtime history is isolated in runtime DB.
 6. Persistence access is DB-agnostic at the repository boundary (engine adapters behind stable interfaces).
+7. Frontend persistence ownership moves to backend bridge APIs; frontend localStorage becomes migration source only.
+8. Media storage moves from data URLs to file assets with relative paths during migration.
+9. Cross-DB writes use explicit application orchestration with compensating behavior (no fake global transactions).
+10. Startup runs migration + health checks before UI persistence operations are enabled.
+11. Runtime query APIs are paginated/limited by default; no unbounded list endpoints.
 
 ## Scope
 This PDR covers desktop and server storage internals only.
@@ -49,6 +54,9 @@ Workspace root (per workspace):
 - `data/knowledge/kb-core.sqlite`
 - `data/knowledge/kb-<business_unit_id>.sqlite`
 - `backups/`
+
+Workspace metadata file:
+- `workspace/workspace.json` (workspace id, schema versions, migration flags, created/updated timestamps)
 
 ### `core.sqlite`
 Source of truth for structural and governance entities:
@@ -99,6 +107,34 @@ Use canonical IDs in all DBs:
 
 Cross-DB joins are resolved in application/repository layer, not SQL cross-file joins.
 
+## Bridge Contract Decision (Locked)
+Persistence APIs are backend-owned and shared across desktop/server targets with identical DTO shapes.
+
+Transport bindings:
+1. Desktop: Tauri commands.
+2. Server: HTTP endpoints.
+
+Required contract groups in V1:
+1. Agent Manifest
+  - `list_agent_manifests(workspace_id)`
+  - `create_agent_manifest(workspace_id, payload)`
+  - `update_agent_manifest(workspace_id, agent_id, payload)`
+  - `delete_agent_manifest(workspace_id, agent_id)`
+2. Org Chart
+  - `get_org_chart_state(workspace_id)`
+  - `execute_org_chart_command(workspace_id, command)`
+  - `undo_org_chart_command(workspace_id)`
+  - `redo_org_chart_command(workspace_id)`
+3. Runtime
+  - `append_run_events(workspace_id, run_id, events)` (backend runtime internal path first)
+  - `list_run_events(workspace_id, run_id, page)`
+  - `list_thread_messages(workspace_id, thread_id, page)`
+4. Workspace / Persistence Health
+  - `bootstrap_workspace(workspace_id)`
+  - `get_persistence_health(workspace_id)`
+
+Rule: frontend must not write localStorage for manifests/org chart after cutover.
+
 ## Agent Runtime Workspace Isolation
 Each operator has a dedicated runtime folder:
 - `operators/<operator_id>/runtime/`
@@ -107,6 +143,11 @@ Each operator has a dedicated runtime folder:
 
 CLI agents launch from operator runtime folder only.
 DB files are outside runtime folders and never exposed as tool working directories.
+
+Hard guardrails:
+1. Tool execution path allowlist is restricted to operator runtime/artifacts/logs only.
+2. Any path resolving into `data/` or `backups/` is rejected.
+3. Symlink traversal into DB folders is rejected.
 
 ## Media Storage Rule (Explicit)
 Profile images, logos, and other UI media are file-based assets under workspace storage, not SQLite BLOB payloads.
@@ -129,6 +170,11 @@ Suggested metadata fields:
 - `size_bytes`
 - `sha256`
 
+Locked V1 implementation:
+1. Use `media/` file storage only; no image/blob storage in SQLite.
+2. `avatarDataUrl`/`logoDataUrl` fields are temporary migration inputs and not persisted post-migration.
+3. Core DB stores canonical relative media paths and metadata.
+
 ## Knowledge Routing Rules
 1. Each knowledge write is tagged with `business_unit_id` (nullable).
 2. If `business_unit_id` is set, write to `kb-<business_unit_id>.sqlite`.
@@ -149,6 +195,10 @@ For a BU handoff:
 - backup/export package always includes media folder content referenced by relative paths,
 - restore supports full workspace or per-DB restoration.
 
+Operational defaults:
+1. Keep last 14 daily snapshots and last 8 hourly snapshots per DB.
+2. Snapshot operation is copy-on-stable-point (SQLite backup API), never raw file copy while writes are active.
+
 ## Security and Secrets
 - secrets are not stored as plaintext in these DBs,
 - DB stores secret references/keys IDs only,
@@ -168,24 +218,86 @@ For a BU handoff:
 
 Accepted due to clear operational and portability benefits.
 
+## Migration Decision: LocalStorage -> SQLite (Locked)
+One-time migration runs during workspace bootstrap.
+
+Sources:
+1. `agent-deck.agent-manifests`
+2. `agent-deck.org-chart.v1`
+3. `agent-deck.org-chart.v1.compact`
+
+Rules:
+1. Migration is idempotent; safe to re-run.
+2. Migration writes a completion marker in `workspace/workspace.json`.
+3. On successful migration, frontend localStorage keys are no longer used as source of truth.
+4. Legacy image data URLs are converted to media files; DB rows store relative media paths.
+5. If migration fails, persistence health is `degraded` and UI is blocked from mutating persistent state.
+
+## Transaction Boundary Decision (Locked)
+1. Per-DB transaction atomicity only.
+2. Cross-DB workflows use orchestrator pattern:
+  - step sequence,
+  - durable operation log entry,
+  - compensating actions on downstream failure.
+3. V1 critical compensations:
+  - create agent manifest + create operator link,
+  - delete agent manifest + delete linked operator (if source link exists),
+  - media write + metadata update.
+
+## Startup and Health Decision (Locked)
+Startup order:
+1. Resolve workspace paths.
+2. Ensure folders exist.
+3. Run migrations per DB.
+4. Run integrity checks.
+5. Expose readiness flag.
+
+Integrity checks:
+1. All required DB files exist and are openable.
+2. Migration versions match expected app schema versions.
+3. Media root exists and is writable.
+4. Knowledge DB resolver can open `kb-core.sqlite`.
+
+Health states:
+1. `healthy`: all checks pass.
+2. `degraded`: read-only allowed, writes blocked for failing domains.
+3. `failed`: persistence unavailable; runtime start blocked.
+
+## Runtime Query Limits Decision (Locked)
+Default API limits:
+1. `list_run_events`: max 200 events per page.
+2. `list_thread_messages`: max 100 messages per page.
+3. `list_runs_for_thread` (if added): max 50 runs per page.
+4. Requests without explicit pagination use defaults; no unbounded fetch behavior.
+
 ## Implementation Checklist
+### Phase 0: Contracts and Cutover Plan
+- [ ] Freeze DTO contracts for manifest/org-chart/runtime/workspace health APIs (desktop + server parity).
+- [ ] Define transport mapping table (Tauri command name <-> HTTP path).
+- [ ] Define frontend cutover flag and remove-write path for localStorage once backend persistence is enabled.
+- [ ] Add migration marker schema to `workspace/workspace.json`.
+
 ### Phase 1: Persistence Foundation
 - [ ] Create Rust crate: `backend/crates/agent_persistence`.
 - [ ] Define DB-agnostic repository interfaces for core/runtime/knowledge domains.
 - [ ] Define DB registry/resolver for workspace paths.
 - [ ] Implement SQLite adapter for repository interfaces (`core`, `runtime`, `kb-core`, `kb-<business_unit_id>`).
 - [ ] Add migration runner per DB type.
-- [ ] Add workspace bootstrap routine to create required DB files/folders.
+- [ ] Add workspace bootstrap routine to create required DB files/folders + workspace metadata file.
+- [ ] Add startup persistence health checks and readiness gate.
 
 ### Phase 2: Core Schema + Repositories
 - [ ] Add core schema migrations for org, operator, agent manifest, config entities.
 - [ ] Implement repository interfaces for core entities.
-- [ ] Replace local-storage adapters in frontend bridge paths with backend calls (desktop target first).
+- [ ] Implement desktop/server bridge APIs for core entities with identical DTOs.
+- [ ] Replace frontend local-storage adapters with backend calls (desktop target first, then server).
 
 ### Phase 3: Runtime Schema + Repositories
 - [ ] Add runtime schema migrations for threads/messages/runs/events/tool calls.
 - [ ] Implement runtime repositories with append/query APIs.
+- [ ] Enforce pagination defaults and max limits in runtime query APIs.
 - [ ] Wire chat runtime persistence paths to runtime repository.
+- [ ] Add backpressure-safe append path for run events.
 
 ### Phase 4: Knowledge Split by BU
 - [ ] Add knowledge schema migrations (core + BU DBs).
@@ -194,22 +306,28 @@ Accepted due to clear operational and portability benefits.
 - [ ] Wire KB writes and retrieval lookups through router.
 
 ### Phase 5: Export/Backup
-- [ ] Implement DB snapshot utility per DB file.
+- [ ] Implement DB snapshot utility per DB file using SQLite backup API.
 - [ ] Add BU export command packaging core/runtime subset + BU knowledge DB.
 - [ ] Add checksum manifest generation.
 - [ ] Add restore paths for full workspace and per-BU package.
+- [ ] Add media folder inclusion in backup/export/restore flows.
 
 ### Phase 6: Guardrails
 - [ ] Enforce runtime working-directory restrictions for CLI launches.
 - [ ] Add path guards blocking DB paths from tool workspace exposure.
+- [ ] Add symlink traversal guards for runtime tool paths.
 - [ ] Add structured logging around DB routing decisions.
+- [ ] Add compensating action handlers for cross-DB workflows.
 
 ### Phase 7: Tests
 - [ ] Unit tests for DB resolver/routing.
 - [ ] Migration tests per DB type.
+- [ ] Migration tests from localStorage payload fixtures (manifest + org chart + legacy image fields).
 - [ ] Integration tests for BU knowledge write/read routing.
 - [ ] Integration tests for BU export package integrity.
 - [ ] Regression test: deleting/moving BU does not orphan routing metadata.
+- [ ] Health-check regression tests for healthy/degraded/failed states.
+- [ ] Runtime pagination limit tests (reject/clip oversize page requests).
 
 ## Open Follow-Ups
 - Server deployment strategy for SQLite file locking and backups.
