@@ -12,16 +12,16 @@
 // @adr: none
 
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
-import type { Actor, BusinessUnit, OrgCommand, OrgUnit } from '../../../shared/config';
+import type { Operator, BusinessUnit, OrgCommand, OrgUnit } from '../../../shared/config';
 
 type DragPayload =
   | { kind: 'org_unit'; id: string }
   | {
-      kind: 'actor';
+      kind: 'operator';
       id: string;
     };
 
-type RowKind = 'org_unit' | 'actor';
+type RowKind = 'org_unit' | 'operator';
 type ScopeBucketId = 'shared' | 'unassigned';
 type ExtendedRowKind = RowKind | 'business_unit' | 'scope_bucket';
 
@@ -57,7 +57,7 @@ type UseOrgChartPointerDndInput = {
   enabled: boolean;
   orgUnits: OrgUnit[];
   businessUnits: BusinessUnit[];
-  actors: Actor[];
+  operators: Operator[];
   onCommand: (command: OrgCommand) => void;
 };
 
@@ -109,12 +109,12 @@ function resolveHitRow(rows: RowEntry[], clientX: number, clientY: number): RowE
 }
 
 function isDropAllowed(payload: DragPayload, target: DropTarget): boolean {
-  if (payload.kind === 'actor') {
+  if (payload.kind === 'operator') {
     if (target.kind === 'org_unit') {
       return target.placement === 'inside';
     }
 
-    if (target.kind === 'actor') {
+    if (target.kind === 'operator') {
       return target.placement === 'inside' && payload.id !== target.id;
     }
 
@@ -173,19 +173,19 @@ function buildMoveOrgUnitCommandFromPlacement(
 }
 
 function buildCommand(payload: DragPayload, target: DropTarget, orgUnits: OrgUnit[]): OrgCommand | null {
-  if (payload.kind === 'actor' && target.kind === 'org_unit' && target.placement === 'inside') {
+  if (payload.kind === 'operator' && target.kind === 'org_unit' && target.placement === 'inside') {
     return {
-      kind: 'move_actor',
-      actorId: payload.id,
+      kind: 'move_operator',
+      operatorId: payload.id,
       targetOrgUnitId: target.id
     };
   }
 
-  if (payload.kind === 'actor' && target.kind === 'actor' && target.placement === 'inside') {
+  if (payload.kind === 'operator' && target.kind === 'operator' && target.placement === 'inside') {
     return {
-      kind: 'set_actor_manager',
-      actorId: payload.id,
-      managerActorId: target.id
+      kind: 'set_operator_manager',
+      operatorId: payload.id,
+      managerOperatorId: target.id
     };
   }
 
@@ -219,7 +219,7 @@ function buildCommand(payload: DragPayload, target: DropTarget, orgUnits: OrgUni
 }
 
 export function useOrgChartPointerDnd(input: UseOrgChartPointerDndInput) {
-  const { enabled, orgUnits, businessUnits, actors, onCommand } = input;
+  const { enabled, orgUnits, businessUnits, operators, onCommand } = input;
   const [activeDrag, setActiveDrag] = useState<ActiveDrag | null>(null);
   const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
 
@@ -357,7 +357,7 @@ export function useOrgChartPointerDnd(input: UseOrgChartPointerDndInput) {
 
   const dragSourceKey = activeDrag ? `${activeDrag.payload.kind}:${activeDrag.payload.id}` : null;
 
-  const actorById = useMemo(() => new Map(actors.map((actor) => [actor.id, actor])), [actors]);
+  const actorById = useMemo(() => new Map(operators.map((operator) => [operator.id, operator])), [operators]);
   const orgUnitById = useMemo(() => new Map(orgUnits.map((unit) => [unit.id, unit])), [orgUnits]);
   const businessUnitById = useMemo(() => new Map(businessUnits.map((unit) => [unit.id, unit])), [businessUnits]);
 
@@ -366,12 +366,12 @@ export function useOrgChartPointerDnd(input: UseOrgChartPointerDndInput) {
       return '';
     }
 
-    if (activeDrag.payload.kind === 'actor') {
-      const actor = actorById.get(activeDrag.payload.id);
-      if (!actor) {
+    if (activeDrag.payload.kind === 'operator') {
+      const operator = actorById.get(activeDrag.payload.id);
+      if (!operator) {
         return 'Operator';
       }
-      return actor.title ? `${actor.name} — ${actor.title}` : actor.name;
+      return operator.title ? `${operator.name} — ${operator.title}` : operator.name;
     }
 
     const unit = orgUnitById.get(activeDrag.payload.id);
@@ -384,15 +384,15 @@ export function useOrgChartPointerDnd(input: UseOrgChartPointerDndInput) {
     }
 
     if (!dropTarget) {
-      return activeDrag.payload.kind === 'actor' ? 'Drag to reassign team or reports-to' : 'Drag to reparent or reorder org unit';
+      return activeDrag.payload.kind === 'operator' ? 'Drag to reassign team or reports-to' : 'Drag to reparent or reorder org unit';
     }
 
-    if (activeDrag.payload.kind === 'actor' && dropTarget.kind === 'org_unit' && dropTarget.placement === 'inside') {
+    if (activeDrag.payload.kind === 'operator' && dropTarget.kind === 'org_unit' && dropTarget.placement === 'inside') {
       const unitName = orgUnitById.get(dropTarget.id)?.name ?? 'org unit';
       return `Re-assigning team to ${unitName}`;
     }
 
-    if (activeDrag.payload.kind === 'actor' && dropTarget.kind === 'actor' && dropTarget.placement === 'inside') {
+    if (activeDrag.payload.kind === 'operator' && dropTarget.kind === 'operator' && dropTarget.placement === 'inside') {
       const managerName = actorById.get(dropTarget.id)?.name ?? 'selected operator';
       return `Re-assigning reports-to ${managerName}`;
     }
@@ -459,11 +459,11 @@ export function useOrgChartPointerDnd(input: UseOrgChartPointerDndInput) {
         return null;
       }
 
-      if (activeDrag.payload.kind === 'actor' && kind === 'org_unit' && dropTarget.placement === 'inside') {
+      if (activeDrag.payload.kind === 'operator' && kind === 'org_unit' && dropTarget.placement === 'inside') {
         return 'Re-assign team';
       }
 
-      if (activeDrag.payload.kind === 'actor' && kind === 'actor' && dropTarget.placement === 'inside') {
+      if (activeDrag.payload.kind === 'operator' && kind === 'operator' && dropTarget.placement === 'inside') {
         return 'Set reports-to';
       }
 

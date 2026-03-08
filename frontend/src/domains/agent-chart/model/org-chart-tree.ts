@@ -1,8 +1,8 @@
 /**
- * Purpose: Build tree projections for org-unit and actor hierarchy rendering.
+ * Purpose: Build tree projections for org-unit and operator hierarchy rendering.
  * Responsibilities:
  * - Project org unit parent-child relationships into a nested tree.
- * - Project actor reporting relationships for per-unit rendering.
+ * - Project operator reporting relationships for per-unit rendering.
  */
 // @tags: domain,agent-chart,model,tree
 // @status: active
@@ -10,16 +10,16 @@
 // @domain: agent-chart
 // @adr: none
 
-import type { Actor, OrgUnit } from '../../../shared/config';
+import type { Operator, OrgUnit } from '../../../shared/config';
 
 export type OrgUnitTreeNode = {
   unit: OrgUnit;
   children: OrgUnitTreeNode[];
 };
 
-export type ActorTreeNode = {
-  actor: Actor;
-  children: ActorTreeNode[];
+export type OperatorTreeNode = {
+  operator: Operator;
+  children: OperatorTreeNode[];
 };
 
 export function buildOrgUnitTree(units: OrgUnit[]): OrgUnitTreeNode[] {
@@ -43,15 +43,15 @@ export function buildOrgUnitTree(units: OrgUnit[]): OrgUnitTreeNode[] {
   return (byParent.get(null) ?? []).map(buildNode);
 }
 
-export function buildActorTree(actors: Actor[], orgUnitId: string): ActorTreeNode[] {
-  const inUnit = actors.filter((actor) => actor.orgUnitId === orgUnitId);
-  const actorById = new Map(inUnit.map((actor) => [actor.id, actor]));
-  const byManager = new Map<string | null, Actor[]>();
+export function buildOperatorTree(operators: Operator[], orgUnitId: string): OperatorTreeNode[] {
+  const inUnit = operators.filter((operator) => operator.orgUnitId === orgUnitId);
+  const actorById = new Map(inUnit.map((operator) => [operator.id, operator]));
+  const byManager = new Map<string | null, Operator[]>();
 
-  inUnit.forEach((actor) => {
-    const managerInUnit = actor.managerActorId && actorById.has(actor.managerActorId) ? actor.managerActorId : null;
+  inUnit.forEach((operator) => {
+    const managerInUnit = operator.managerOperatorId && actorById.has(operator.managerOperatorId) ? operator.managerOperatorId : null;
     const bucket = byManager.get(managerInUnit) ?? [];
-    bucket.push(actor);
+    bucket.push(operator);
     byManager.set(managerInUnit, bucket);
   });
 
@@ -59,9 +59,9 @@ export function buildActorTree(actors: Actor[], orgUnitId: string): ActorTreeNod
     bucket.sort((a, b) => a.name.localeCompare(b.name));
   });
 
-  const buildNode = (actor: Actor): ActorTreeNode => ({
-    actor,
-    children: (byManager.get(actor.id) ?? []).map(buildNode)
+  const buildNode = (operator: Operator): OperatorTreeNode => ({
+    operator,
+    children: (byManager.get(operator.id) ?? []).map(buildNode)
   });
 
   return (byManager.get(null) ?? []).map(buildNode);

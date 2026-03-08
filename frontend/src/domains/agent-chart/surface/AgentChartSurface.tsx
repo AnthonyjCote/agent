@@ -1,5 +1,5 @@
 /**
- * Purpose: Render the org-chart hierarchy editor for org units and actors.
+ * Purpose: Render the org-chart hierarchy editor for org units and operators.
  * Responsibilities:
  * - Provide file-system-style tree editing with drag and drop.
  * - Route all mutations through command-backed shared org-chart store.
@@ -31,27 +31,27 @@ import './AgentChartSurface.css';
 
 
 export function AgentChartSurface() {
-  const { businessUnits, orgUnits, actors, execute, canUndo, canRedo, undo, redo, getOrgUnitById, getActorById } =
+  const { businessUnits, orgUnits, operators, execute, canUndo, canRedo, undo, redo, getOrgUnitById, getOperatorById } =
     useOrgChartStore();
   const { createAgent } = useAgentManifestStore();
-  const [createEntityKind, setCreateEntityKind] = useState<'business_unit' | 'org_unit' | 'actor' | null>(null);
+  const [createEntityKind, setCreateEntityKind] = useState<'business_unit' | 'org_unit' | 'operator' | null>(null);
   const [createActorDefaultOrgUnitId, setCreateActorDefaultOrgUnitId] = useState('');
 
   const selection = useOrgChartSelectionState({
     businessUnits,
     orgUnits,
-    actors,
+    operators,
     getOrgUnitById,
-    getActorById
+    getOperatorById
   });
   const collapse = useOrgChartCollapseState();
-  const treeProjection = useOrgChartTreeProjection({ actors, orgUnits, businessUnits });
+  const treeProjection = useOrgChartTreeProjection({ operators, orgUnits, businessUnits });
   const actions = useOrgChartSurfaceActions({
     execute,
     selectedNode: selection.selectedNode,
     setSelectedNode: selection.setSelectedNode,
     orgUnits,
-    getActorById
+    getOperatorById
   });
 
   const mediaEditor = useOrgChartMediaEditor({
@@ -75,8 +75,8 @@ export function AgentChartSurface() {
         return;
       }
       actions.executeCommand({
-        kind: 'set_actor_avatar',
-        actorId: target.id,
+        kind: 'set_operator_avatar',
+        operatorId: target.id,
         sourceDataUrl,
         croppedDataUrl
       });
@@ -87,12 +87,12 @@ export function AgentChartSurface() {
     enabled: selection.hierarchyMode,
     orgUnits,
     businessUnits,
-    actors,
+    operators,
     onCommand: actions.executeCommand
   });
   const selectedBusinessUnit = selection.selectedBusinessUnit;
   const selectedOrg = selection.selectedOrg;
-  const selectedActor = selection.selectedActor;
+  const selectedOperator = selection.selectedOperator;
   const openBusinessUnitMedia = (businessUnit: NonNullable<typeof selectedBusinessUnit>) => {
     mediaEditor.openMediaEditor(
       { kind: 'business_unit', id: businessUnit.id },
@@ -103,8 +103,8 @@ export function AgentChartSurface() {
   const openOrgUnitMedia = (orgUnit: NonNullable<typeof selectedOrg>) => {
     mediaEditor.openMediaEditor({ kind: 'org_unit', id: orgUnit.id }, orgUnit.iconSourceDataUrl, orgUnit.iconDataUrl);
   };
-  const openActorMedia = (actor: NonNullable<typeof selectedActor>) => {
-    mediaEditor.openMediaEditor({ kind: 'actor', id: actor.id }, actor.avatarSourceDataUrl, actor.avatarDataUrl);
+  const openActorMedia = (operator: NonNullable<typeof selectedOperator>) => {
+    mediaEditor.openMediaEditor({ kind: 'operator', id: operator.id }, operator.avatarSourceDataUrl, operator.avatarDataUrl);
   };
   const closeCreateModal = () => {
     setCreateEntityKind(null);
@@ -113,7 +113,7 @@ export function AgentChartSurface() {
   const openCreateActorModal = () => {
     const suggestedOrgUnitId = actions.getSuggestedActorOrgUnitId() ?? '';
     setCreateActorDefaultOrgUnitId(suggestedOrgUnitId);
-    setCreateEntityKind('actor');
+    setCreateEntityKind('operator');
   };
 
   const buildAgentInput = (input: {
@@ -144,7 +144,7 @@ export function AgentChartSurface() {
             errorMessage={actions.errorMessage}
             onAddOrgUnit={() => setCreateEntityKind('org_unit')}
             onAddBusinessUnit={() => setCreateEntityKind('business_unit')}
-            onAddActor={openCreateActorModal}
+            onAddOperator={openCreateActorModal}
             hierarchyMode={selection.hierarchyMode}
             onToggleHierarchyMode={() => selection.setHierarchyMode((current) => !current)}
             canUndo={canUndo}
@@ -153,7 +153,7 @@ export function AgentChartSurface() {
             onRedo={redo}
             selectedNode={selection.selectedNode}
             setSelectedNode={selection.setSelectedNode}
-            actors={actors}
+            operators={operators}
             orgUnits={orgUnits}
             businessUnits={businessUnits}
             businessUnitTree={treeProjection.businessUnitTree}
@@ -178,7 +178,7 @@ export function AgentChartSurface() {
             selection={selection}
             selectedBusinessUnit={selectedBusinessUnit}
             selectedOrg={selectedOrg}
-            selectedActor={selectedActor}
+            selectedOperator={selectedOperator}
             businessUnits={businessUnits}
             executeCommand={actions.executeCommand}
             setPendingDelete={actions.setPendingDelete}
@@ -201,13 +201,8 @@ export function AgentChartSurface() {
           actions.createOrgUnit(input);
         }}
         onCreateActor={(input) => {
-          const created = actions.createActor(input);
-          if (!created) {
-            return false;
-          }
-
           if (input.kind === 'agent') {
-            createAgent(
+            const createdAgent = createAgent(
               buildAgentInput({
                 name: input.name,
                 role: input.title,
@@ -216,20 +211,17 @@ export function AgentChartSurface() {
                 avatarDataUrl: input.avatarDataUrl
               })
             );
+            const created = actions.createActor({
+              ...input,
+              sourceAgentId: createdAgent.agentId
+            });
+            if (!created) {
+              return false;
+            }
             return true;
           }
 
-          const assistantName = `${input.name.trim()}'s Assistant`;
-          createAgent(
-            buildAgentInput({
-              name: assistantName,
-              role: `${input.title.trim()} Assistant`,
-              primaryObjective: `Assist ${input.name.trim()} in daily work, continuity, and coverage.`,
-              directive: input.roleBrief,
-              avatarDataUrl: input.avatarDataUrl
-            })
-          );
-          return true;
+          return actions.createActor(input);
         }}
       />
       <OrgChartDragChip chip={dnd.dragChipMeta} />

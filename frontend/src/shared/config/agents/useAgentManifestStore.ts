@@ -32,7 +32,9 @@ export function useAgentManifestStore() {
   );
 
   const createAgent = (input: AgentManifestInput) => {
-    setAgents((current) => [...current, createAgentManifestFromInput(input)]);
+    const created = createAgentManifestFromInput(input);
+    setAgents((current) => [...current, created]);
+    return created;
   };
 
   const updateAgent = (agentId: string, input: AgentManifestInput) => {

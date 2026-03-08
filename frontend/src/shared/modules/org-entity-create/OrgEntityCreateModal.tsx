@@ -1,15 +1,15 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
-import type { ActorKind } from '../../config/org-chart';
+import type { OperatorKind } from '../../config/org-chart';
 import { AgentAvatar, DropdownSelector, InfoTooltip, ModalShell, TextAreaField, TextButton, TextField, type DropdownOption } from '../../ui';
 import { AgentAvatarCropModal } from '../agent-manifest';
 import './OrgEntityCreateModal.css';
 
-type EntityKind = 'business_unit' | 'org_unit' | 'actor';
+type EntityKind = 'business_unit' | 'org_unit' | 'operator';
 
 type ActorDraft = {
   name: string;
   title: string;
-  kind: ActorKind;
+  kind: OperatorKind;
   targetOrgUnitId: string;
   primaryObjective: string;
   systemDirective: string;
@@ -70,7 +70,7 @@ export function OrgEntityCreateModal(props: OrgEntityCreateModalProps) {
     onCreateActor
   } = props;
 
-  const [actor, setActor] = useState<ActorDraft>({
+  const [operator, setActor] = useState<ActorDraft>({
     name: '',
     title: '',
     kind: 'agent',
@@ -164,11 +164,11 @@ export function OrgEntityCreateModal(props: OrgEntityCreateModalProps) {
 
   const actorHasOrgOptions = orgUnitOptions.length > 0;
   const actorMissingRequired =
-    !actor.name.trim() ||
-    !actor.title.trim() ||
-    !actor.targetOrgUnitId.trim() ||
-    !actor.primaryObjective.trim() ||
-    (actor.kind === 'agent' ? !actor.systemDirective.trim() : !actor.roleBrief.trim());
+    !operator.name.trim() ||
+    !operator.title.trim() ||
+    !operator.targetOrgUnitId.trim() ||
+    !operator.primaryObjective.trim() ||
+    (operator.kind === 'agent' ? !operator.systemDirective.trim() : !operator.roleBrief.trim());
   const businessUnitMissingRequired =
     !businessUnit.name.trim() ||
     !businessUnit.overview.trim() ||
@@ -182,15 +182,15 @@ export function OrgEntityCreateModal(props: OrgEntityCreateModalProps) {
     !orgUnit.primaryDeliverables.trim();
 
   const entityMissingRequired =
-    entityKind === 'actor'
+    entityKind === 'operator'
       ? actorMissingRequired
       : entityKind === 'business_unit'
         ? businessUnitMissingRequired
         : orgUnitMissingRequired;
 
   const pickImage = () => {
-    if (entityKind === 'actor' && (actor.avatarSourceDataUrl || actor.avatarDataUrl)) {
-      setPendingImageSource(actor.avatarSourceDataUrl || actor.avatarDataUrl);
+    if (entityKind === 'operator' && (operator.avatarSourceDataUrl || operator.avatarDataUrl)) {
+      setPendingImageSource(operator.avatarSourceDataUrl || operator.avatarDataUrl);
       setCropOpen(true);
       return;
     }
@@ -227,7 +227,7 @@ export function OrgEntityCreateModal(props: OrgEntityCreateModalProps) {
 
   const handleCropConfirm = (croppedDataUrl: string) => {
     const sourceDataUrl = pendingImageSource || croppedDataUrl;
-    if (entityKind === 'actor') {
+    if (entityKind === 'operator') {
       setActor((current) => ({ ...current, avatarSourceDataUrl: sourceDataUrl, avatarDataUrl: croppedDataUrl }));
     } else if (entityKind === 'business_unit') {
       setBusinessUnit((current) => ({ ...current, logoSourceDataUrl: sourceDataUrl, logoDataUrl: croppedDataUrl }));
@@ -239,14 +239,14 @@ export function OrgEntityCreateModal(props: OrgEntityCreateModalProps) {
   };
 
   const imageName =
-    entityKind === 'actor'
-      ? actor.name.trim() || 'Operator'
+    entityKind === 'operator'
+      ? operator.name.trim() || 'Operator'
       : entityKind === 'business_unit'
         ? businessUnit.name.trim() || 'Business Unit'
         : orgUnit.name.trim() || 'Org Unit';
   const imageSrc =
-    entityKind === 'actor'
-      ? actor.avatarDataUrl
+    entityKind === 'operator'
+      ? operator.avatarDataUrl
       : entityKind === 'business_unit'
         ? businessUnit.logoDataUrl
         : orgUnit.iconDataUrl;
@@ -269,7 +269,7 @@ export function OrgEntityCreateModal(props: OrgEntityCreateModalProps) {
       return;
     }
 
-    const result = onCreateActor(actor);
+    const result = onCreateActor(operator);
     if (result !== false) {
       onClose();
     }
@@ -288,7 +288,7 @@ export function OrgEntityCreateModal(props: OrgEntityCreateModalProps) {
           </p>
           <div className="org-entity-modal-footer-actions">
             <TextButton label="Cancel" variant="ghost" onClick={onClose} />
-            <TextButton label="Create" variant="primary" onClick={handleCreate} disabled={entityKind === 'actor' && !actorHasOrgOptions} />
+            <TextButton label="Create" variant="primary" onClick={handleCreate} disabled={entityKind === 'operator' && !actorHasOrgOptions} />
           </div>
         </div>
       }
@@ -368,48 +368,48 @@ export function OrgEntityCreateModal(props: OrgEntityCreateModalProps) {
         </div>
       ) : null}
 
-      {entityKind === 'actor' ? (
+      {entityKind === 'operator' ? (
         <div className="org-entity-modal-grid">
           <label className="org-entity-modal-field">
             <FieldLabel label="Name" info="Operator display name in the org chart." />
-            <TextField value={actor.name} ariaLabel="Operator name" invalid={submitAttempted && !actor.name.trim()} onValueChange={(next) => setActor((current) => ({ ...current, name: next }))} />
+            <TextField value={operator.name} ariaLabel="Operator name" invalid={submitAttempted && !operator.name.trim()} onValueChange={(next) => setActor((current) => ({ ...current, name: next }))} />
           </label>
 
           <label className="org-entity-modal-field">
             <FieldLabel label="Title" info="Role title for this operator." />
-            <TextField value={actor.title} ariaLabel="Operator title" invalid={submitAttempted && !actor.title.trim()} onValueChange={(next) => setActor((current) => ({ ...current, title: next }))} />
+            <TextField value={operator.title} ariaLabel="Operator title" invalid={submitAttempted && !operator.title.trim()} onValueChange={(next) => setActor((current) => ({ ...current, title: next }))} />
           </label>
 
           <label className="org-entity-modal-field">
             <FieldLabel label="Type" info="Current occupant type for this role." />
-            <DropdownSelector value={actor.kind} ariaLabel="Operator type" options={actorKindOptions} onValueChange={(next) => setActor((current) => ({ ...current, kind: next as ActorKind }))} />
+            <DropdownSelector value={operator.kind} ariaLabel="Operator type" options={actorKindOptions} onValueChange={(next) => setActor((current) => ({ ...current, kind: next as OperatorKind }))} />
           </label>
 
           <label className="org-entity-modal-field">
             <FieldLabel label="Org Unit" info="Team this operator belongs to." />
-            <DropdownSelector value={actor.targetOrgUnitId} ariaLabel="Target org unit" options={orgUnitOptions} disabled={!actorHasOrgOptions} onValueChange={(next) => setActor((current) => ({ ...current, targetOrgUnitId: next }))} />
+            <DropdownSelector value={operator.targetOrgUnitId} ariaLabel="Target org unit" options={orgUnitOptions} disabled={!actorHasOrgOptions} onValueChange={(next) => setActor((current) => ({ ...current, targetOrgUnitId: next }))} />
           </label>
 
           <label className="org-entity-modal-field span-2">
             <FieldLabel label="Primary Objective" info="Top outcome this role is accountable for." />
-            <TextField value={actor.primaryObjective} ariaLabel="Primary objective" invalid={submitAttempted && !actor.primaryObjective.trim()} onValueChange={(next) => setActor((current) => ({ ...current, primaryObjective: next }))} />
+            <TextField value={operator.primaryObjective} ariaLabel="Primary objective" invalid={submitAttempted && !operator.primaryObjective.trim()} onValueChange={(next) => setActor((current) => ({ ...current, primaryObjective: next }))} />
           </label>
 
-          {actor.kind === 'agent' ? (
+          {operator.kind === 'agent' ? (
             <label className="org-entity-modal-field span-2">
               <FieldLabel label="System Directive" info="Behavior rules for this AI operator." />
-              <TextAreaField value={actor.systemDirective} ariaLabel="System directive" invalid={submitAttempted && !actor.systemDirective.trim()} onValueChange={(next) => setActor((current) => ({ ...current, systemDirective: next }))} />
+              <TextAreaField value={operator.systemDirective} ariaLabel="System directive" invalid={submitAttempted && !operator.systemDirective.trim()} onValueChange={(next) => setActor((current) => ({ ...current, systemDirective: next }))} />
             </label>
           ) : (
             <label className="org-entity-modal-field span-2">
               <FieldLabel label="Role Brief" info="How this human role operates and collaborates with AI support." />
-              <TextAreaField value={actor.roleBrief} ariaLabel="Role brief" invalid={submitAttempted && !actor.roleBrief.trim()} onValueChange={(next) => setActor((current) => ({ ...current, roleBrief: next }))} />
+              <TextAreaField value={operator.roleBrief} ariaLabel="Role brief" invalid={submitAttempted && !operator.roleBrief.trim()} onValueChange={(next) => setActor((current) => ({ ...current, roleBrief: next }))} />
             </label>
           )}
         </div>
       ) : null}
 
-      {entityKind === 'actor' && !actorHasOrgOptions ? <p className="org-entity-modal-hint">Create an org unit before adding operators.</p> : null}
+      {entityKind === 'operator' && !actorHasOrgOptions ? <p className="org-entity-modal-hint">Create an org unit before adding operators.</p> : null}
     </ModalShell>
   );
 }

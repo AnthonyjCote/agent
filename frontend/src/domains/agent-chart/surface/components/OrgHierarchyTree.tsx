@@ -1,27 +1,27 @@
-import { buildActorTree, type ActorTreeNode, type OrgUnitTreeNode } from '../../model';
-import type { Actor, OrgUnit } from '../../../../shared/config';
+import { buildOperatorTree, type OperatorTreeNode, type OrgUnitTreeNode } from '../../model';
+import type { Operator, OrgUnit } from '../../../../shared/config';
 import type { BusinessUnitTreeNode, SelectedNode } from '../types';
 import { NodeMedia, NodeMediaIcon } from './NodeMedia';
 import { CollapseToggleIcon } from './CollapseToggleIcon';
 
 type DndFacade = {
-  setRowRef: (kind: 'actor' | 'org_unit' | 'business_unit' | 'scope_bucket', id: string, nodeRef: HTMLButtonElement | null) => void;
+  setRowRef: (kind: 'operator' | 'org_unit' | 'business_unit' | 'scope_bucket', id: string, nodeRef: HTMLButtonElement | null) => void;
   beginRowDragCandidate: (
     event: React.PointerEvent<HTMLButtonElement>,
-    payload: { kind: 'actor' | 'org_unit'; id: string }
+    payload: { kind: 'operator' | 'org_unit'; id: string }
   ) => void;
-  getRowDragState: (kind: 'actor' | 'org_unit' | 'business_unit' | 'scope_bucket', id: string) => {
+  getRowDragState: (kind: 'operator' | 'org_unit' | 'business_unit' | 'scope_bucket', id: string) => {
     isSource: boolean;
     isTarget: boolean;
     placement: 'inside' | 'before' | 'after' | null;
   };
-  getDropActionLabel: (kind: 'actor' | 'org_unit' | 'business_unit' | 'scope_bucket', id: string) => string | null;
+  getDropActionLabel: (kind: 'operator' | 'org_unit' | 'business_unit' | 'scope_bucket', id: string) => string | null;
 };
 
 type OrgHierarchyTreeProps = {
   selectedNode: SelectedNode;
   setSelectedNode: (next: SelectedNode) => void;
-  actors: Actor[];
+  operators: Operator[];
   orgUnits: OrgUnit[];
   businessUnits: Array<{ id: string; logoDataUrl: string }>;
   businessUnitTree: BusinessUnitTreeNode[];
@@ -45,7 +45,7 @@ export function OrgHierarchyTree(props: OrgHierarchyTreeProps) {
   const {
     selectedNode,
     setSelectedNode,
-    actors,
+    operators,
     orgUnits,
     businessUnits,
     businessUnitTree,
@@ -74,31 +74,31 @@ export function OrgHierarchyTree(props: OrgHierarchyTreeProps) {
     </span>
   );
 
-  const renderActorNode = (node: ActorTreeNode, depth: number): React.ReactNode => {
-    const actor = node.actor;
-    const selected = selectedNode?.kind === 'actor' && selectedNode.id === actor.id;
-    const reportsCount = reportCountByManager.get(actor.id) ?? 0;
+  const renderActorNode = (node: OperatorTreeNode, depth: number): React.ReactNode => {
+    const operator = node.operator;
+    const selected = selectedNode?.kind === 'operator' && selectedNode.id === operator.id;
+    const reportsCount = reportCountByManager.get(operator.id) ?? 0;
     const hasChildren = node.children.length > 0;
-    const collapsed = collapsedActorIds.has(actor.id);
-    const dragState = dnd.getRowDragState('actor', actor.id);
-    const dropActionLabel = dnd.getDropActionLabel('actor', actor.id);
+    const collapsed = collapsedActorIds.has(operator.id);
+    const dragState = dnd.getRowDragState('operator', operator.id);
+    const dropActionLabel = dnd.getDropActionLabel('operator', operator.id);
 
     return (
-      <div key={actor.id} className="agent-chart-tree-node">
+      <div key={operator.id} className="agent-chart-tree-node">
         <button
           type="button"
-          className={`agent-chart-tree-row actor${selected ? ' active' : ''}${dragState.isTarget && dragState.placement === 'inside' ? ' drop-inside' : ''}${dragState.isSource ? ' drag-source-hidden' : ''}`}
-          onClick={() => setSelectedNode({ kind: 'actor', id: actor.id })}
-          ref={(nodeRef) => dnd.setRowRef('actor', actor.id, nodeRef)}
-          onPointerDown={(event) => dnd.beginRowDragCandidate(event, { kind: 'actor', id: actor.id })}
+          className={`agent-chart-tree-row operator${selected ? ' active' : ''}${dragState.isTarget && dragState.placement === 'inside' ? ' drop-inside' : ''}${dragState.isSource ? ' drag-source-hidden' : ''}`}
+          onClick={() => setSelectedNode({ kind: 'operator', id: operator.id })}
+          ref={(nodeRef) => dnd.setRowRef('operator', operator.id, nodeRef)}
+          onPointerDown={(event) => dnd.beginRowDragCandidate(event, { kind: 'operator', id: operator.id })}
         >
           {renderTreeGuides(depth)}
           <span className="agent-chart-row-card">
-            <NodeMedia image={actor.avatarDataUrl} fallback={<NodeMediaIcon kind="actor" actorKind={actor.kind} />} />
+            <NodeMedia image={operator.avatarDataUrl} fallback={<NodeMediaIcon kind="operator" actorKind={operator.kind} />} />
             <span className="agent-chart-node-content">
-              <span className="agent-chart-node-title">{actor.name}</span>
+              <span className="agent-chart-node-title">{operator.name}</span>
               <span className="agent-chart-node-meta">
-                {actor.title}
+                {operator.title}
                 {reportsCount > 0 ? ` · ${reportsCount} report${reportsCount === 1 ? '' : 's'}` : ''}
               </span>
             </span>
@@ -112,7 +112,7 @@ export function OrgHierarchyTree(props: OrgHierarchyTreeProps) {
                   onPointerDown={(event) => event.stopPropagation()}
                   onClick={(event) => {
                     event.stopPropagation();
-                    toggleCollapsedId(actor.id, setCollapsedActorIds);
+                    toggleCollapsedId(operator.id, setCollapsedActorIds);
                   }}
                 >
                   <CollapseToggleIcon collapsed={collapsed} />
@@ -128,7 +128,7 @@ export function OrgHierarchyTree(props: OrgHierarchyTreeProps) {
 
   const renderOrgNode = (node: OrgUnitTreeNode, depth = 0): React.ReactNode => {
     const selected = selectedNode?.kind === 'org_unit' && selectedNode.id === node.unit.id;
-    const actorTree = buildActorTree(actors, node.unit.id);
+    const actorTree = buildOperatorTree(operators, node.unit.id);
     const hasChildren = actorTree.length > 0 || node.children.length > 0;
     const collapsed = collapsedOrgUnitIds.has(node.unit.id);
     const dragState = dnd.getRowDragState('org_unit', node.unit.id);

@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { buildOrgUnitTree, type OrgUnitTreeNode } from '../../model';
-import type { Actor, BusinessUnit, OrgUnit } from '../../../../shared/config';
+import type { Operator, BusinessUnit, OrgUnit } from '../../../../shared/config';
 import type { BusinessUnitTreeNode } from '../types';
 
 export type OrgChartTreeProjection = {
@@ -13,24 +13,24 @@ export type OrgChartTreeProjection = {
 };
 
 export function useOrgChartTreeProjection(input: {
-  actors: Actor[];
+  operators: Operator[];
   orgUnits: OrgUnit[];
   businessUnits: BusinessUnit[];
 }): OrgChartTreeProjection {
-  const { actors, orgUnits, businessUnits } = input;
+  const { operators, orgUnits, businessUnits } = input;
 
   const orgTree = useMemo(() => buildOrgUnitTree(orgUnits), [orgUnits]);
 
   const reportCountByManager = useMemo(() => {
     const map = new Map<string, number>();
-    actors.forEach((actor) => {
-      if (!actor.managerActorId) {
+    operators.forEach((operator) => {
+      if (!operator.managerOperatorId) {
         return;
       }
-      map.set(actor.managerActorId, (map.get(actor.managerActorId) ?? 0) + 1);
+      map.set(operator.managerOperatorId, (map.get(operator.managerOperatorId) ?? 0) + 1);
     });
     return map;
-  }, [actors]);
+  }, [operators]);
 
   const businessUnitTree = useMemo<BusinessUnitTreeNode[]>(() => {
     const byParent = new Map<string | null, BusinessUnit[]>();

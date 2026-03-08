@@ -1,4 +1,4 @@
-import type { Actor, BusinessUnit, OrgCommand, OrgUnit } from '../../../../shared/config';
+import type { Operator, BusinessUnit, OrgCommand, OrgUnit } from '../../../../shared/config';
 import { TopRailShell } from '../../../../shared/ui';
 import type { PendingDelete } from '../types';
 import type { OrgChartSelectionState } from '../hooks';
@@ -10,13 +10,13 @@ type OrgChartRightPaneProps = {
   selection: OrgChartSelectionState;
   selectedBusinessUnit: BusinessUnit | undefined;
   selectedOrg: OrgUnit | undefined;
-  selectedActor: Actor | undefined;
+  selectedOperator: Operator | undefined;
   businessUnits: BusinessUnit[];
   executeCommand: (command: OrgCommand) => void;
   setPendingDelete: (next: PendingDelete) => void;
   onOpenBusinessUnitMedia: (businessUnit: BusinessUnit) => void;
   onOpenOrgUnitMedia: (orgUnit: OrgUnit) => void;
-  onOpenActorMedia: (actor: Actor) => void;
+  onOpenActorMedia: (operator: Operator) => void;
 };
 
 export function OrgChartRightPane(props: OrgChartRightPaneProps) {
@@ -24,7 +24,7 @@ export function OrgChartRightPane(props: OrgChartRightPaneProps) {
     selection,
     selectedBusinessUnit,
     selectedOrg,
-    selectedActor,
+    selectedOperator,
     businessUnits,
     executeCommand,
     setPendingDelete,
@@ -184,9 +184,9 @@ export function OrgChartRightPane(props: OrgChartRightPaneProps) {
         />
       ) : null}
 
-      {selection.workspaceView === 'list' && selectedActor ? (
+      {selection.workspaceView === 'list' && selectedOperator ? (
         <ActorDetailsCard
-          actor={selectedActor}
+          operator={selectedOperator}
           actorNameDraft={selection.actorNameDraft}
           actorTitleDraft={selection.actorTitleDraft}
           actorPrimaryObjectiveDraft={selection.actorPrimaryObjectiveDraft}
@@ -201,18 +201,18 @@ export function OrgChartRightPane(props: OrgChartRightPaneProps) {
           orgOptions={selection.orgOptions}
           managerOptions={selection.managerOptions}
           onChangeKind={(value) =>
-            executeCommand({ kind: 'update_actor', actorId: selectedActor.id, patch: { kind: value as Actor['kind'] } })
+            executeCommand({ kind: 'update_operator', operatorId: selectedOperator.id, patch: { kind: value as Operator['kind'] } })
           }
           onChangeOrgUnit={(value) =>
-            executeCommand({ kind: 'move_actor', actorId: selectedActor.id, targetOrgUnitId: value })
+            executeCommand({ kind: 'move_operator', operatorId: selectedOperator.id, targetOrgUnitId: value })
           }
           onChangeManager={(value) =>
-            executeCommand({ kind: 'set_actor_manager', actorId: selectedActor.id, managerActorId: value || null })
+            executeCommand({ kind: 'set_operator_manager', operatorId: selectedOperator.id, managerOperatorId: value || null })
           }
           onSave={() =>
             executeCommand({
-              kind: 'update_actor',
-              actorId: selectedActor.id,
+              kind: 'update_operator',
+              operatorId: selectedOperator.id,
               patch: {
                 name: selection.actorNameDraft,
                 title: selection.actorTitleDraft,
@@ -224,16 +224,16 @@ export function OrgChartRightPane(props: OrgChartRightPaneProps) {
           }
           onDelete={() =>
             setPendingDelete({
-              kind: 'actor',
-              id: selectedActor.id,
-              label: selectedActor.name
+              kind: 'operator',
+              id: selectedOperator.id,
+              label: selectedOperator.name
             })
           }
-          onPickMedia={() => onOpenActorMedia(selectedActor)}
+          onPickMedia={() => onOpenActorMedia(selectedOperator)}
         />
       ) : null}
 
-      {selection.workspaceView === 'list' && !selectedActor && !selectedOrg && !selectedBusinessUnit ? (
+      {selection.workspaceView === 'list' && !selectedOperator && !selectedOrg && !selectedBusinessUnit ? (
         <div className="agent-chart-empty-details">
           <h2>Org Chart</h2>
           <p>Select an org unit or operator from the tree to edit details.</p>

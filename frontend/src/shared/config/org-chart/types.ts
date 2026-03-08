@@ -1,7 +1,7 @@
 /**
  * Purpose: Define shared contracts for org-chart entities, commands, and history.
  * Responsibilities:
- * - Provide canonical types for org units, actors, links, and mutation commands.
+ * - Provide canonical types for org units, operators, links, and mutation commands.
  * - Keep UI and command engine aligned on stable object contracts.
  */
 // @tags: shared-config,org-chart,types
@@ -11,11 +11,11 @@
 // @adr: none
 
 export type OrgUnitId = string;
-export type ActorId = string;
+export type OperatorId = string;
 export type BusinessUnitId = string;
 export type LinkId = string;
 
-export type ActorKind = 'agent' | 'human';
+export type OperatorKind = 'agent' | 'human';
 export type OrgUnitScope = 'business_unit' | 'shared' | 'unassigned';
 
 export type OrgUnit = {
@@ -50,16 +50,17 @@ export type BusinessUnit = {
   updatedAt: string;
 };
 
-export type Actor = {
-  id: ActorId;
+export type Operator = {
+  id: OperatorId;
+  sourceAgentId: string | null;
   name: string;
   title: string;
   primaryObjective: string;
   systemDirective: string;
   roleBrief: string;
-  kind: ActorKind;
+  kind: OperatorKind;
   orgUnitId: OrgUnitId;
-  managerActorId: ActorId | null;
+  managerOperatorId: OperatorId | null;
   avatarSourceDataUrl: string;
   avatarDataUrl: string;
   createdAt: string;
@@ -70,14 +71,14 @@ export type LinkRelation =
   | 'business_unit_parent_of_business_unit'
   | 'business_unit_contains_org_unit'
   | 'org_unit_parent_of_org_unit'
-  | 'org_unit_contains_actor'
-  | 'actor_reports_to_actor';
+  | 'org_unit_contains_operator'
+  | 'operator_reports_to_operator';
 
 export type Link = {
   id: LinkId;
-  fromType: 'business_unit' | 'org_unit' | 'actor';
+  fromType: 'business_unit' | 'org_unit' | 'operator';
   fromId: string;
-  toType: 'business_unit' | 'org_unit' | 'actor';
+  toType: 'business_unit' | 'org_unit' | 'operator';
   toId: string;
   relation: LinkRelation;
   createdAt: string;
@@ -85,10 +86,10 @@ export type Link = {
 
 export type ActivityEvent = {
   id: string;
-  entityType: 'business_unit' | 'org_unit' | 'actor' | 'org_chart';
+  entityType: 'business_unit' | 'org_unit' | 'operator' | 'org_chart';
   entityId: string;
   eventType: string;
-  actorId: string;
+  operatorId: string;
   timestamp: string;
   data: Record<string, unknown>;
 };
@@ -96,7 +97,7 @@ export type ActivityEvent = {
 export type OrgSnapshot = {
   businessUnits: BusinessUnit[];
   orgUnits: OrgUnit[];
-  actors: Actor[];
+  operators: Operator[];
   links: Link[];
 };
 
@@ -159,12 +160,13 @@ export type OrgCommand =
       businessUnitId?: BusinessUnitId | null;
     }
   | {
-      kind: 'create_actor';
+      kind: 'create_operator';
       targetOrgUnitId: OrgUnitId;
       payload: {
+        sourceAgentId?: string | null;
         name: string;
         title: string;
-        kind: ActorKind;
+        kind: OperatorKind;
         primaryObjective?: string;
         systemDirective?: string;
         roleBrief?: string;
@@ -179,15 +181,15 @@ export type OrgCommand =
       position?: number;
     }
   | {
-      kind: 'move_actor';
-      actorId: ActorId;
+      kind: 'move_operator';
+      operatorId: OperatorId;
       targetOrgUnitId: OrgUnitId;
       position?: number;
     }
   | {
-      kind: 'set_actor_manager';
-      actorId: ActorId;
-      managerActorId: ActorId | null;
+      kind: 'set_operator_manager';
+      operatorId: OperatorId;
+      managerOperatorId: OperatorId | null;
     }
   | {
       kind: 'rename_org_unit';
@@ -202,10 +204,10 @@ export type OrgCommand =
       >;
     }
   | {
-      kind: 'update_actor';
-      actorId: ActorId;
+      kind: 'update_operator';
+      operatorId: OperatorId;
       patch: Partial<
-        Pick<Actor, 'name' | 'title' | 'kind' | 'primaryObjective' | 'systemDirective' | 'roleBrief'>
+        Pick<Operator, 'name' | 'title' | 'kind' | 'primaryObjective' | 'systemDirective' | 'roleBrief'>
       >;
     }
   | {
@@ -217,8 +219,8 @@ export type OrgCommand =
       nodeId: OrgUnitId;
     }
   | {
-      kind: 'delete_actor';
-      actorId: ActorId;
+      kind: 'delete_operator';
+      operatorId: OperatorId;
     }
   | {
       kind: 'set_business_unit_logo';
@@ -233,8 +235,8 @@ export type OrgCommand =
       croppedDataUrl: string;
     }
   | {
-      kind: 'set_actor_avatar';
-      actorId: ActorId;
+      kind: 'set_operator_avatar';
+      operatorId: OperatorId;
       sourceDataUrl: string;
       croppedDataUrl: string;
     };
@@ -242,7 +244,7 @@ export type OrgCommand =
 export type OrgChangeCommand = {
   id: string;
   command: OrgCommand;
-  actorId: string;
+  operatorId: string;
   executedAt: string;
   before: OrgSnapshot;
   after: OrgSnapshot;
@@ -258,11 +260,11 @@ export type OrgChartData = {
 export type OrgValidationErrorCode =
   | 'business_unit_not_found'
   | 'org_unit_not_found'
-  | 'actor_not_found'
+  | 'operator_not_found'
   | 'invalid_move'
   | 'business_unit_cycle_detected'
   | 'org_cycle_detected'
-  | 'actor_cycle_detected'
+  | 'operator_cycle_detected'
   | 'validation_error';
 
 export class OrgValidationError extends Error {

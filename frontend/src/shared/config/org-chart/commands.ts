@@ -1,7 +1,7 @@
 /**
  * Purpose: Execute deterministic org-chart commands with validation and link reconciliation.
  * Responsibilities:
- * - Apply canonical mutations for org units and actors.
+ * - Apply canonical mutations for org units and operators.
  * - Enforce cycle and relationship constraints.
  */
 // @tags: shared-config,org-chart,commands
@@ -11,8 +11,8 @@
 // @adr: none
 
 import {
-  type Actor,
-  type ActorId,
+  type Operator,
+  type OperatorId,
   type ActivityEvent,
   type BusinessUnit,
   type BusinessUnitId,
@@ -40,7 +40,7 @@ function cloneSnapshot(snapshot: OrgSnapshot): OrgSnapshot {
   return {
     businessUnits: (snapshot.businessUnits ?? []).map((unit) => ({ ...unit })),
     orgUnits: (snapshot.orgUnits ?? []).map((unit) => ({ ...unit })),
-    actors: (snapshot.actors ?? []).map((actor) => ({ ...actor })),
+    operators: (snapshot.operators ?? []).map((operator) => ({ ...operator })),
     links: (snapshot.links ?? []).map((link) => ({ ...link }))
   };
 }
@@ -57,9 +57,9 @@ function ensureOrgUnitExists(snapshot: OrgSnapshot, id: OrgUnitId) {
   }
 }
 
-function ensureActorExists(snapshot: OrgSnapshot, id: ActorId) {
-  if (!snapshot.actors.some((actor) => actor.id === id)) {
-    throw new OrgValidationError('actor_not_found', `Actor not found: ${id}`);
+function ensureActorExists(snapshot: OrgSnapshot, id: OperatorId) {
+  if (!snapshot.operators.some((operator) => operator.id === id)) {
+    throw new OrgValidationError('operator_not_found', `Operator not found: ${id}`);
   }
 }
 
@@ -83,14 +83,14 @@ function normalizeOrgUnitOrder(units: OrgUnit[], parentId: OrgUnitId | null) {
   });
 }
 
-function normalizeActorOrder(actors: Actor[], orgUnitId: OrgUnitId) {
-  const siblings = actors
-    .filter((actor) => actor.orgUnitId === orgUnitId)
+function normalizeActorOrder(operators: Operator[], orgUnitId: OrgUnitId) {
+  const siblings = operators
+    .filter((operator) => operator.orgUnitId === orgUnitId)
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 
-  siblings.forEach((actor, index) => {
+  siblings.forEach((operator, index) => {
     // Reuse createdAt order deterministically by writing a stable integer in data bag-equivalent.
-    // We keep dedicated order out of actor schema for V1 and rely on creation chronology.
+    // We keep dedicated order out of operator schema for V1 and rely on creation chronology.
     if (index < 0) {
       throw new Error('Unreachable');
     }
@@ -172,13 +172,13 @@ function hasBusinessUnitCycle(
   return false;
 }
 
-function hasActorCycle(actors: Actor[], actorId: ActorId, managerActorId: ActorId | null): boolean {
-  let cursor = managerActorId;
+function hasActorCycle(operators: Operator[], operatorId: OperatorId, managerOperatorId: OperatorId | null): boolean {
+  let cursor = managerOperatorId;
   while (cursor) {
-    if (cursor === actorId) {
+    if (cursor === operatorId) {
       return true;
     }
-    const next = actors.find((actor) => actor.id === cursor)?.managerActorId ?? null;
+    const next = operators.find((operator) => operator.id === cursor)?.managerOperatorId ?? null;
     cursor = next;
   }
   return false;
@@ -228,25 +228,25 @@ function rebuildLinks(snapshot: OrgSnapshot): Link[] {
     }
   });
 
-  snapshot.actors.forEach((actor) => {
+  snapshot.operators.forEach((operator) => {
     links.push({
       id: createId('lnk'),
       fromType: 'org_unit',
-      fromId: actor.orgUnitId,
-      toType: 'actor',
-      toId: actor.id,
-      relation: 'org_unit_contains_actor',
+      fromId: operator.orgUnitId,
+      toType: 'operator',
+      toId: operator.id,
+      relation: 'org_unit_contains_operator',
       createdAt
     });
 
-    if (actor.managerActorId) {
+    if (operator.managerOperatorId) {
       links.push({
         id: createId('lnk'),
-        fromType: 'actor',
-        fromId: actor.managerActorId,
-        toType: 'actor',
-        toId: actor.id,
-        relation: 'actor_reports_to_actor',
+        fromType: 'operator',
+        fromId: operator.managerOperatorId,
+        toType: 'operator',
+        toId: operator.id,
+        relation: 'operator_reports_to_operator',
         createdAt
       });
     }
@@ -474,20 +474,21 @@ function applySetOrgUnitScope(
   return next;
 }
 
-function applyCreateActor(snapshot: OrgSnapshot, command: Extract<OrgCommand, { kind: 'create_actor' }>): OrgSnapshot {
+function applyCreateActor(snapshot: OrgSnapshot, command: Extract<OrgCommand, { kind: 'create_operator' }>): OrgSnapshot {
   ensureOrgUnitExists(snapshot, command.targetOrgUnitId);
 
   const timestamp = nowIso();
-  const created: Actor = {
+  const created: Operator = {
     id: createId('act'),
-    name: command.payload.name.trim() || 'New Actor',
+    sourceAgentId: command.payload.sourceAgentId ?? null,
+    name: command.payload.name.trim() || 'New Operator',
     title: command.payload.title.trim() || 'Role',
     primaryObjective: command.payload.primaryObjective?.trim() ?? '',
     systemDirective: command.payload.systemDirective?.trim() ?? '',
     roleBrief: command.payload.roleBrief?.trim() ?? '',
     kind: command.payload.kind,
     orgUnitId: command.targetOrgUnitId,
-    managerActorId: null,
+    managerOperatorId: null,
     avatarSourceDataUrl: command.payload.avatarSourceDataUrl ?? '',
     avatarDataUrl: command.payload.avatarDataUrl ?? '',
     createdAt: timestamp,
@@ -495,8 +496,8 @@ function applyCreateActor(snapshot: OrgSnapshot, command: Extract<OrgCommand, { 
   };
 
   const next = cloneSnapshot(snapshot);
-  next.actors.push(created);
-  normalizeActorOrder(next.actors, command.targetOrgUnitId);
+  next.operators.push(created);
+  normalizeActorOrder(next.operators, command.targetOrgUnitId);
   next.links = rebuildLinks(next);
   return next;
 }
@@ -552,48 +553,48 @@ function applyMoveOrgUnit(snapshot: OrgSnapshot, command: Extract<OrgCommand, { 
   return next;
 }
 
-function applyMoveActor(snapshot: OrgSnapshot, command: Extract<OrgCommand, { kind: 'move_actor' }>): OrgSnapshot {
-  ensureActorExists(snapshot, command.actorId);
+function applyMoveActor(snapshot: OrgSnapshot, command: Extract<OrgCommand, { kind: 'move_operator' }>): OrgSnapshot {
+  ensureActorExists(snapshot, command.operatorId);
   ensureOrgUnitExists(snapshot, command.targetOrgUnitId);
 
   const next = cloneSnapshot(snapshot);
-  const actor = next.actors.find((item) => item.id === command.actorId);
-  if (!actor) {
-    throw new OrgValidationError('actor_not_found', `Actor not found: ${command.actorId}`);
+  const operator = next.operators.find((item) => item.id === command.operatorId);
+  if (!operator) {
+    throw new OrgValidationError('operator_not_found', `Operator not found: ${command.operatorId}`);
   }
 
-  const oldOrgUnitId = actor.orgUnitId;
-  actor.orgUnitId = command.targetOrgUnitId;
-  actor.updatedAt = nowIso();
+  const oldOrgUnitId = operator.orgUnitId;
+  operator.orgUnitId = command.targetOrgUnitId;
+  operator.updatedAt = nowIso();
 
-  normalizeActorOrder(next.actors, oldOrgUnitId);
-  normalizeActorOrder(next.actors, command.targetOrgUnitId);
+  normalizeActorOrder(next.operators, oldOrgUnitId);
+  normalizeActorOrder(next.operators, command.targetOrgUnitId);
   next.links = rebuildLinks(next);
   return next;
 }
 
-function applySetActorManager(snapshot: OrgSnapshot, command: Extract<OrgCommand, { kind: 'set_actor_manager' }>): OrgSnapshot {
-  ensureActorExists(snapshot, command.actorId);
-  if (command.managerActorId) {
-    ensureActorExists(snapshot, command.managerActorId);
+function applySetActorManager(snapshot: OrgSnapshot, command: Extract<OrgCommand, { kind: 'set_operator_manager' }>): OrgSnapshot {
+  ensureActorExists(snapshot, command.operatorId);
+  if (command.managerOperatorId) {
+    ensureActorExists(snapshot, command.managerOperatorId);
   }
 
-  if (command.actorId === command.managerActorId) {
-    throw new OrgValidationError('invalid_move', 'Actor cannot report to itself.');
+  if (command.operatorId === command.managerOperatorId) {
+    throw new OrgValidationError('invalid_move', 'Operator cannot report to itself.');
   }
 
-  if (hasActorCycle(snapshot.actors, command.actorId, command.managerActorId)) {
-    throw new OrgValidationError('actor_cycle_detected', 'Manager update rejected: reporting cycle detected.');
+  if (hasActorCycle(snapshot.operators, command.operatorId, command.managerOperatorId)) {
+    throw new OrgValidationError('operator_cycle_detected', 'Manager update rejected: reporting cycle detected.');
   }
 
   const next = cloneSnapshot(snapshot);
-  const actor = next.actors.find((item) => item.id === command.actorId);
-  if (!actor) {
-    throw new OrgValidationError('actor_not_found', `Actor not found: ${command.actorId}`);
+  const operator = next.operators.find((item) => item.id === command.operatorId);
+  if (!operator) {
+    throw new OrgValidationError('operator_not_found', `Operator not found: ${command.operatorId}`);
   }
 
-  actor.managerActorId = command.managerActorId;
-  actor.updatedAt = nowIso();
+  operator.managerOperatorId = command.managerOperatorId;
+  operator.updatedAt = nowIso();
   next.links = rebuildLinks(next);
   return next;
 }
@@ -641,49 +642,49 @@ function applyUpdateOrgUnit(snapshot: OrgSnapshot, command: Extract<OrgCommand, 
   return next;
 }
 
-function applyUpdateActor(snapshot: OrgSnapshot, command: Extract<OrgCommand, { kind: 'update_actor' }>): OrgSnapshot {
-  ensureActorExists(snapshot, command.actorId);
+function applyUpdateActor(snapshot: OrgSnapshot, command: Extract<OrgCommand, { kind: 'update_operator' }>): OrgSnapshot {
+  ensureActorExists(snapshot, command.operatorId);
 
   const next = cloneSnapshot(snapshot);
-  const actor = next.actors.find((item) => item.id === command.actorId);
-  if (!actor) {
-    throw new OrgValidationError('actor_not_found', `Actor not found: ${command.actorId}`);
+  const operator = next.operators.find((item) => item.id === command.operatorId);
+  if (!operator) {
+    throw new OrgValidationError('operator_not_found', `Operator not found: ${command.operatorId}`);
   }
 
   if (command.patch.name != null) {
-    actor.name = command.patch.name.trim() || actor.name;
+    operator.name = command.patch.name.trim() || operator.name;
   }
   if (command.patch.title != null) {
-    actor.title = command.patch.title.trim() || actor.title;
+    operator.title = command.patch.title.trim() || operator.title;
   }
   if (command.patch.kind != null) {
-    actor.kind = command.patch.kind;
+    operator.kind = command.patch.kind;
   }
   if (command.patch.primaryObjective != null) {
-    actor.primaryObjective = command.patch.primaryObjective;
+    operator.primaryObjective = command.patch.primaryObjective;
   }
   if (command.patch.systemDirective != null) {
-    actor.systemDirective = command.patch.systemDirective;
+    operator.systemDirective = command.patch.systemDirective;
   }
   if (command.patch.roleBrief != null) {
-    actor.roleBrief = command.patch.roleBrief;
+    operator.roleBrief = command.patch.roleBrief;
   }
 
-  actor.updatedAt = nowIso();
+  operator.updatedAt = nowIso();
   next.links = rebuildLinks(next);
   return next;
 }
 
-function applyDeleteActor(snapshot: OrgSnapshot, command: Extract<OrgCommand, { kind: 'delete_actor' }>): OrgSnapshot {
-  ensureActorExists(snapshot, command.actorId);
+function applyDeleteActor(snapshot: OrgSnapshot, command: Extract<OrgCommand, { kind: 'delete_operator' }>): OrgSnapshot {
+  ensureActorExists(snapshot, command.operatorId);
   const next = cloneSnapshot(snapshot);
-  const removedIds = new Set([command.actorId]);
+  const removedIds = new Set([command.operatorId]);
 
-  next.actors = next.actors
-    .filter((actor) => actor.id !== command.actorId)
-    .map((actor) => ({
-      ...actor,
-      managerActorId: actor.managerActorId && removedIds.has(actor.managerActorId) ? null : actor.managerActorId
+  next.operators = next.operators
+    .filter((operator) => operator.id !== command.operatorId)
+    .map((operator) => ({
+      ...operator,
+      managerOperatorId: operator.managerOperatorId && removedIds.has(operator.managerOperatorId) ? null : operator.managerOperatorId
     }));
 
   next.links = rebuildLinks(next);
@@ -699,14 +700,14 @@ function applyDeleteOrgUnit(snapshot: OrgSnapshot, command: Extract<OrgCommand, 
   }
 
   const removedOrgIds = new Set(collectOrgUnitSubtreeIds(next.orgUnits, command.nodeId));
-  const removedActorIds = new Set(next.actors.filter((actor) => removedOrgIds.has(actor.orgUnitId)).map((actor) => actor.id));
+  const removedActorIds = new Set(next.operators.filter((operator) => removedOrgIds.has(operator.orgUnitId)).map((operator) => operator.id));
 
   next.orgUnits = next.orgUnits.filter((unit) => !removedOrgIds.has(unit.id));
-  next.actors = next.actors
-    .filter((actor) => !removedActorIds.has(actor.id))
-    .map((actor) => ({
-      ...actor,
-      managerActorId: actor.managerActorId && removedActorIds.has(actor.managerActorId) ? null : actor.managerActorId
+  next.operators = next.operators
+    .filter((operator) => !removedActorIds.has(operator.id))
+    .map((operator) => ({
+      ...operator,
+      managerOperatorId: operator.managerOperatorId && removedActorIds.has(operator.managerOperatorId) ? null : operator.managerOperatorId
     }));
 
   normalizeOrgUnitOrder(next.orgUnits, target.parentOrgUnitId);
@@ -769,16 +770,16 @@ function applySetOrgUnitIcon(snapshot: OrgSnapshot, command: Extract<OrgCommand,
   return next;
 }
 
-function applySetActorAvatar(snapshot: OrgSnapshot, command: Extract<OrgCommand, { kind: 'set_actor_avatar' }>): OrgSnapshot {
-  ensureActorExists(snapshot, command.actorId);
+function applySetActorAvatar(snapshot: OrgSnapshot, command: Extract<OrgCommand, { kind: 'set_operator_avatar' }>): OrgSnapshot {
+  ensureActorExists(snapshot, command.operatorId);
   const next = cloneSnapshot(snapshot);
-  const actor = next.actors.find((item) => item.id === command.actorId);
-  if (!actor) {
-    throw new OrgValidationError('actor_not_found', `Actor not found: ${command.actorId}`);
+  const operator = next.operators.find((item) => item.id === command.operatorId);
+  if (!operator) {
+    throw new OrgValidationError('operator_not_found', `Operator not found: ${command.operatorId}`);
   }
-  actor.avatarSourceDataUrl = command.sourceDataUrl;
-  actor.avatarDataUrl = command.croppedDataUrl;
-  actor.updatedAt = nowIso();
+  operator.avatarSourceDataUrl = command.sourceDataUrl;
+  operator.avatarDataUrl = command.croppedDataUrl;
+  operator.updatedAt = nowIso();
   return next;
 }
 
@@ -798,31 +799,31 @@ function applyCommandToSnapshot(snapshot: OrgSnapshot, command: OrgCommand): Org
       return applyAssignOrgUnitBusinessUnit(snapshot, command);
     case 'set_org_unit_scope':
       return applySetOrgUnitScope(snapshot, command);
-    case 'create_actor':
+    case 'create_operator':
       return applyCreateActor(snapshot, command);
     case 'move_org_unit':
       return applyMoveOrgUnit(snapshot, command);
-    case 'move_actor':
+    case 'move_operator':
       return applyMoveActor(snapshot, command);
-    case 'set_actor_manager':
+    case 'set_operator_manager':
       return applySetActorManager(snapshot, command);
     case 'rename_org_unit':
       return applyRenameOrgUnit(snapshot, command);
     case 'update_org_unit':
       return applyUpdateOrgUnit(snapshot, command);
-    case 'update_actor':
+    case 'update_operator':
       return applyUpdateActor(snapshot, command);
     case 'delete_business_unit':
       return applyDeleteBusinessUnit(snapshot, command);
     case 'delete_org_unit':
       return applyDeleteOrgUnit(snapshot, command);
-    case 'delete_actor':
+    case 'delete_operator':
       return applyDeleteActor(snapshot, command);
     case 'set_business_unit_logo':
       return applySetBusinessUnitLogo(snapshot, command);
     case 'set_org_unit_icon':
       return applySetOrgUnitIcon(snapshot, command);
-    case 'set_actor_avatar':
+    case 'set_operator_avatar':
       return applySetActorAvatar(snapshot, command);
     default:
       throw new OrgValidationError('validation_error', 'Unsupported org command.');
@@ -833,7 +834,7 @@ function pushActivityEvent(
   events: ActivityEvent[],
   eventType: string,
   data: Record<string, unknown>,
-  entityType: 'business_unit' | 'org_unit' | 'actor' | 'org_chart' = 'org_chart',
+  entityType: 'business_unit' | 'org_unit' | 'operator' | 'org_chart' = 'org_chart',
   entityId = 'org_chart_v1'
 ) {
   events.push({
@@ -841,7 +842,7 @@ function pushActivityEvent(
     entityType,
     entityId,
     eventType,
-    actorId: APP_ACTOR_ID,
+    operatorId: APP_ACTOR_ID,
     timestamp: nowIso(),
     data
   });
@@ -873,7 +874,7 @@ export function executeOrgCommand(data: OrgChartData, command: OrgCommand): OrgC
   next.commandHistory.push({
     id: createId('cmd'),
     command,
-    actorId: APP_ACTOR_ID,
+    operatorId: APP_ACTOR_ID,
     executedAt,
     before,
     after

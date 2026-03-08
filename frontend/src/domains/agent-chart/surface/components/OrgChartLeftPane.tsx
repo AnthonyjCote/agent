@@ -1,6 +1,6 @@
 import type { Dispatch, SetStateAction } from 'react';
 import { LeftColumnTopBar, NavTooltipPopover } from '../../../../shared/ui';
-import type { Actor, BusinessUnit, OrgUnit } from '../../../../shared/config';
+import type { Operator, BusinessUnit, OrgUnit } from '../../../../shared/config';
 import type { BusinessUnitTreeNode, SelectedNode } from '../types';
 import { useOrgChartPointerDnd, type OrgUnitTreeNode } from '../../model';
 import { OrgHierarchyTree } from './OrgHierarchyTree';
@@ -11,7 +11,7 @@ type OrgChartLeftPaneProps = {
   errorMessage: string;
   onAddOrgUnit: () => void;
   onAddBusinessUnit: () => void;
-  onAddActor: () => void;
+  onAddOperator: () => void;
   hierarchyMode: boolean;
   onToggleHierarchyMode: () => void;
   canUndo: boolean;
@@ -20,7 +20,7 @@ type OrgChartLeftPaneProps = {
   onRedo: () => void;
   selectedNode: SelectedNode;
   setSelectedNode: Dispatch<SetStateAction<SelectedNode>>;
-  actors: Actor[];
+  operators: Operator[];
   orgUnits: OrgUnit[];
   businessUnits: BusinessUnit[];
   businessUnitTree: BusinessUnitTreeNode[];
@@ -45,7 +45,7 @@ export function OrgChartLeftPane(props: OrgChartLeftPaneProps) {
     errorMessage,
     onAddOrgUnit,
     onAddBusinessUnit,
-    onAddActor,
+    onAddOperator,
     hierarchyMode,
     onToggleHierarchyMode,
     canUndo,
@@ -54,7 +54,7 @@ export function OrgChartLeftPane(props: OrgChartLeftPaneProps) {
     onRedo,
     selectedNode,
     setSelectedNode,
-    actors,
+    operators,
     orgUnits,
     businessUnits,
     businessUnitTree,
@@ -100,7 +100,7 @@ export function OrgChartLeftPane(props: OrgChartLeftPaneProps) {
               </svg>
               <NavTooltipPopover label="Add Business Unit" orientation="horizontal" side="bottom" align="start" />
             </button>
-            <button type="button" className="agent-chart-icon-button nav-tooltip-host" onClick={onAddActor} aria-label="Add operator">
+            <button type="button" className="agent-chart-icon-button nav-tooltip-host" onClick={onAddOperator} aria-label="Add operator">
               <svg viewBox="0 0 20 20" aria-hidden="true">
                 <circle cx="8" cy="7" r="2.6" fill="none" stroke="currentColor" strokeWidth="1.4" />
                 <path d="M3.9 14.8c.6-2 2-3.1 4.1-3.1s3.5 1.1 4.1 3.1" fill="none" stroke="currentColor" strokeWidth="1.4" />
@@ -157,7 +157,7 @@ export function OrgChartLeftPane(props: OrgChartLeftPaneProps) {
       <OrgHierarchyTree
         selectedNode={selectedNode}
         setSelectedNode={setSelectedNode}
-        actors={actors}
+        operators={operators}
         orgUnits={orgUnits}
         businessUnits={businessUnits}
         businessUnitTree={businessUnitTree}

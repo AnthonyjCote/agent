@@ -7,7 +7,7 @@ type UseOrgChartSurfaceActionsInput = {
   selectedNode: SelectedNode;
   setSelectedNode: Dispatch<SetStateAction<SelectedNode>>;
   orgUnits: Array<{ id: string }>;
-  getActorById: (id: string) => { orgUnitId: string } | undefined;
+  getOperatorById: (id: string) => { orgUnitId: string } | undefined;
 };
 
 type OrgChartSurfaceActions = {
@@ -39,6 +39,7 @@ type OrgChartSurfaceActions = {
     title: string;
     kind: 'agent' | 'human';
     targetOrgUnitId: string;
+    sourceAgentId?: string | null;
     primaryObjective: string;
     systemDirective: string;
     roleBrief: string;
@@ -50,7 +51,7 @@ type OrgChartSurfaceActions = {
 };
 
 export function useOrgChartSurfaceActions(input: UseOrgChartSurfaceActionsInput): OrgChartSurfaceActions {
-  const { execute, selectedNode, setSelectedNode, orgUnits, getActorById } = input;
+  const { execute, selectedNode, setSelectedNode, orgUnits, getOperatorById } = input;
   const [errorMessage, setErrorMessage] = useState('');
   const [pendingDelete, setPendingDelete] = useState<PendingDelete>(null);
 
@@ -173,8 +174,8 @@ export function useOrgChartSurfaceActions(input: UseOrgChartSurfaceActionsInput)
     return (
       selectedNode?.kind === 'org_unit'
         ? selectedNode.id
-        : selectedNode?.kind === 'actor'
-          ? getActorById(selectedNode.id)?.orgUnitId
+        : selectedNode?.kind === 'operator'
+          ? getOperatorById(selectedNode.id)?.orgUnitId
           : firstOrgUnit?.id
     ) ?? null;
   };
@@ -184,6 +185,7 @@ export function useOrgChartSurfaceActions(input: UseOrgChartSurfaceActionsInput)
     title: string;
     kind: 'agent' | 'human';
     targetOrgUnitId: string;
+    sourceAgentId?: string | null;
     primaryObjective: string;
     systemDirective: string;
     roleBrief: string;
@@ -202,9 +204,10 @@ export function useOrgChartSurfaceActions(input: UseOrgChartSurfaceActionsInput)
     }
 
     return executeCommand({
-      kind: 'create_actor',
+      kind: 'create_operator',
       targetOrgUnitId: input.targetOrgUnitId,
       payload: {
+        sourceAgentId: input.sourceAgentId ?? null,
         name: input.name.trim() || 'New Operator',
         title: input.title.trim() || 'Role',
         kind: input.kind,
@@ -226,8 +229,8 @@ export function useOrgChartSurfaceActions(input: UseOrgChartSurfaceActionsInput)
       executeCommand({ kind: 'delete_business_unit', nodeId: pendingDelete.id });
     } else if (pendingDelete.kind === 'org_unit') {
       executeCommand({ kind: 'delete_org_unit', nodeId: pendingDelete.id });
-    } else if (pendingDelete.kind === 'actor') {
-      executeCommand({ kind: 'delete_actor', actorId: pendingDelete.id });
+    } else if (pendingDelete.kind === 'operator') {
+      executeCommand({ kind: 'delete_operator', operatorId: pendingDelete.id });
     }
 
     setPendingDelete(null);

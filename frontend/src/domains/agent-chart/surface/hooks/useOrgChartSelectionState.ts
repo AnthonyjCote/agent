@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
-import type { Actor, BusinessUnit, OrgUnit, OrgUnitScope } from '../../../../shared/config';
+import type { Operator, BusinessUnit, OrgUnit, OrgUnitScope } from '../../../../shared/config';
 import type { DropdownOption } from '../../../../shared/ui';
 import type { SelectedNode } from '../types';
 
@@ -26,7 +26,7 @@ export type OrgChartSelectionState = {
   setHierarchyMode: Dispatch<SetStateAction<boolean>>;
   selectedBusinessUnit: BusinessUnit | undefined;
   selectedOrg: OrgUnit | undefined;
-  selectedActor: Actor | undefined;
+  selectedOperator: Operator | undefined;
   selectedOrgTopLevel: OrgUnit | undefined;
   selectedOrgChildren: OrgUnit[];
   selectedOrgIsTopLevel: boolean;
@@ -76,11 +76,11 @@ export type OrgChartSelectionState = {
 export function useOrgChartSelectionState(input: {
   businessUnits: BusinessUnit[];
   orgUnits: OrgUnit[];
-  actors: Actor[];
+  operators: Operator[];
   getOrgUnitById: (id: string) => OrgUnit | undefined;
-  getActorById: (id: string) => Actor | undefined;
+  getOperatorById: (id: string) => Operator | undefined;
 }): OrgChartSelectionState {
-  const { businessUnits, orgUnits, actors, getOrgUnitById, getActorById } = input;
+  const { businessUnits, orgUnits, operators, getOrgUnitById, getOperatorById } = input;
 
   const [hierarchyMode, setHierarchyMode] = useState(false);
   const [workspaceView, setWorkspaceView] = useState<'list' | 'canvas'>('list');
@@ -106,7 +106,7 @@ export function useOrgChartSelectionState(input: {
   const selectedBusinessUnit =
     selectedNode?.kind === 'business_unit' ? businessUnits.find((unit) => unit.id === selectedNode.id) : undefined;
   const selectedOrg = selectedNode?.kind === 'org_unit' ? getOrgUnitById(selectedNode.id) : undefined;
-  const selectedActor = selectedNode?.kind === 'actor' ? getActorById(selectedNode.id) : undefined;
+  const selectedOperator = selectedNode?.kind === 'operator' ? getOperatorById(selectedNode.id) : undefined;
 
   const selectedOrgTopLevel = useMemo(
     () => (selectedOrg ? findTopLevelOrgUnit(orgUnits, selectedOrg.id) : undefined),
@@ -175,12 +175,12 @@ export function useOrgChartSelectionState(input: {
       return;
     }
 
-    if (selectedActor) {
-      setActorNameDraft(selectedActor.name);
-      setActorTitleDraft(selectedActor.title);
-      setActorPrimaryObjectiveDraft(selectedActor.primaryObjective);
-      setActorSystemDirectiveDraft(selectedActor.systemDirective);
-      setActorRoleBriefDraft(selectedActor.roleBrief);
+    if (selectedOperator) {
+      setActorNameDraft(selectedOperator.name);
+      setActorTitleDraft(selectedOperator.title);
+      setActorPrimaryObjectiveDraft(selectedOperator.primaryObjective);
+      setActorSystemDirectiveDraft(selectedOperator.systemDirective);
+      setActorRoleBriefDraft(selectedOperator.roleBrief);
       setBusinessUnitNameDraft('');
       setBusinessUnitOverviewDraft('');
       setBusinessUnitObjectivesDraft('');
@@ -209,7 +209,7 @@ export function useOrgChartSelectionState(input: {
     setActorPrimaryObjectiveDraft('');
     setActorSystemDirectiveDraft('');
     setActorRoleBriefDraft('');
-  }, [selectedNode, selectedBusinessUnit, selectedOrg, selectedActor]);
+  }, [selectedNode, selectedBusinessUnit, selectedOrg, selectedOperator]);
 
   const orgOptions = useMemo<DropdownOption[]>(
     () => orgUnits.map((unit) => ({ value: unit.id, label: unit.name })),
@@ -251,17 +251,17 @@ export function useOrgChartSelectionState(input: {
   }, [businessUnits, selectedBusinessUnit]);
 
   const managerOptions = useMemo<DropdownOption[]>(() => {
-    if (!selectedActor) {
+    if (!selectedOperator) {
       return [{ value: '', label: 'No manager' }];
     }
 
     return [
       { value: '', label: 'No manager' },
-      ...actors
-        .filter((actor) => actor.id !== selectedActor.id)
-        .map((actor) => ({ value: actor.id, label: `${actor.name} (${actor.title})` }))
+      ...operators
+        .filter((operator) => operator.id !== selectedOperator.id)
+        .map((operator) => ({ value: operator.id, label: `${operator.name} (${operator.title})` }))
     ];
-  }, [actors, selectedActor]);
+  }, [operators, selectedOperator]);
 
   const actorTypeOptions: DropdownOption[] = [
     { value: 'agent', label: 'Agent' },
@@ -277,7 +277,7 @@ export function useOrgChartSelectionState(input: {
     setHierarchyMode,
     selectedBusinessUnit,
     selectedOrg,
-    selectedActor,
+    selectedOperator,
     selectedOrgTopLevel,
     selectedOrgChildren,
     selectedOrgIsTopLevel,

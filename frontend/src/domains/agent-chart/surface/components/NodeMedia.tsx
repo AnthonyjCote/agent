@@ -1,12 +1,12 @@
-import type { Actor } from '../../../../shared/config';
+import type { Operator } from '../../../../shared/config';
 import type { ReactNode } from 'react';
 
 export function NodeMediaIcon({
   kind,
   actorKind
 }: {
-  kind: 'business_unit' | 'org_unit' | 'shared_bucket' | 'unassigned_bucket' | 'actor';
-  actorKind?: Actor['kind'];
+  kind: 'business_unit' | 'org_unit' | 'shared_bucket' | 'unassigned_bucket' | 'operator';
+  actorKind?: Operator['kind'];
 }) {
   if (kind === 'business_unit') {
     return (

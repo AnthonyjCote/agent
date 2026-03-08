@@ -66,13 +66,13 @@ Department/team hierarchy entity.
 - Core fields: `id`, `name`, `kind` (`department|team|squad|unit`), `parent_org_unit_id`, `owner_actor_id`, `status`.
 - `org_unit` is the only organizational hierarchy object in V1 and supports deep nesting.
 
-### 3.12 `actor`
+### 3.12 `operator`
 Unified participant model for humans and agents.
 - Core fields: `id`, `kind` (`human|agent`), `name`, `status`, `primary_contact_id`.
-- Actors belong to one or more `org_unit` nodes via typed `link` records.
+- Operators belong to one or more `org_unit` nodes via typed `link` records.
 
 ### 3.13 `actor_channel`
-External communication routing for actors.
+External communication routing for operators.
 - Core fields: `id`, `actor_id`, `channel_type` (`email|sms|mms|other`), `address`, `is_primary`, `status`.
 
 ## 4. Architecture Boundaries
@@ -81,7 +81,7 @@ External communication routing for actors.
 - Owns object schemas, validation, transitions, and write rules.
 - Exposes services for create/update/link/transition actions.
 - Emits `activity_event` on all meaningful mutations.
-- Owns assignment/approval rules for mixed human+agent actors and org units.
+- Owns assignment/approval rules for mixed human+agent operators and org units.
 
 ### 4.2 Micro-App Layers (workflow/view)
 - Each micro-app is query/projection + UX + allowed actions.
@@ -104,17 +104,17 @@ External communication routing for actors.
 4. Relationships must be typed via `link`.
 5. Every meaningful mutation emits `activity_event`.
 6. Micro-apps are workflow layers, not isolated databases.
-7. Assignment targets must support both individual actors and org units.
-8. Human-in-the-loop is first-class: approvals, assignments, scheduling, and comms must work for human actors.
+7. Assignment targets must support both individual operators and org units.
+8. Human-in-the-loop is first-class: approvals, assignments, scheduling, and comms must work for human operators.
 
 ## 6. V1 Sequencing
 
 ### 6.1 First micro-app to ship
 - **Task List / To-Do List** domain page.
-- Powered by canonical `work_item` + `project` + `org_unit` + `actor` + `link` + `activity_event`.
+- Powered by canonical `work_item` + `project` + `org_unit` + `operator` + `link` + `activity_event`.
 - Task list must support:
   - department/team-scoped views via `org_unit`,
-  - personal queues per actor,
+  - personal queues per operator,
   - hierarchy via `parent_id` (task/subtask),
   - org-unit assignment for coordinated execution.
 
@@ -126,7 +126,7 @@ External communication routing for actors.
 - `work_item.list`
 - `project.list` (read-only in first pass)
 - `org_unit.list`
-- `actor.list`
+- `operator.list`
 - `link.create` (minimal relation set in first pass)
 
 ### 6.3 UI-human parity goals
@@ -149,14 +149,14 @@ External communication routing for actors.
   - mutation summary,
   - affected entity IDs.
 - Runtime/tool contract must allow targeting:
-  - individual actor assignment,
+  - individual operator assignment,
   - org-unit assignment,
-  - approval requests for human actors.
+  - approval requests for human operators.
 
 ## 9. Granular Implementation Checklist
 
 ### Phase 1 — Contracts
-- [ ] Define Rust model structs for `work_item`, `project`, `org_unit`, `actor`, `actor_channel`, `link`, `activity_event`.
+- [ ] Define Rust model structs for `work_item`, `project`, `org_unit`, `operator`, `actor_channel`, `link`, `activity_event`.
 - [ ] Define schema validation and status transition rules for `work_item`.
 - [ ] Define typed relation enum for `link.relation` (minimal V1 set).
 - [ ] Define assignment target contract (`assignee_id` and/or `org_unit_id`) and org-unit scoping rules.
@@ -178,7 +178,7 @@ External communication routing for actors.
 - [ ] Add agent tools for work-item operations over shared services.
 - [ ] Return deterministic structured payloads with canonical IDs.
 - [ ] Add tool tests for validation errors and transition rules.
-- [ ] Add agent tools for mixed assignment and approval targeting (`actor`/`org_unit`).
+- [ ] Add agent tools for mixed assignment and approval targeting (`operator`/`org_unit`).
 
 ### Phase 4 — Task List Micro-App
 - [ ] Create domain page for Task List (`domains/task-list`).
@@ -193,7 +193,7 @@ External communication routing for actors.
 - [ ] Show recent activity timeline per work item.
 - [ ] Surface agent-created vs human-created changes in activity feed.
 - [ ] Add run debug links to affected entity IDs where applicable.
-- [ ] Show assignment target context (actor/org-unit/human/agent) in activity timeline.
+- [ ] Show assignment target context (operator/org-unit/human/agent) in activity timeline.
 
 ### Phase 6 — Hardening
 - [ ] Add concurrency-safe update strategy for work-item edits.

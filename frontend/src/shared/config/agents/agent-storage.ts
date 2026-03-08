@@ -13,6 +13,14 @@
 import type { AgentManifest } from './agent-manifest';
 
 const STORAGE_KEY = 'agent-deck.agent-manifests';
+export const AGENT_MANIFESTS_CHANGED_EVENT = 'agent-deck:agent-manifests-changed';
+
+function emitAgentManifestsChanged() {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  window.dispatchEvent(new CustomEvent(AGENT_MANIFESTS_CHANGED_EVENT));
+}
 
 export function loadAgentManifests(): AgentManifest[] {
   if (typeof window === 'undefined') {
@@ -46,6 +54,7 @@ export function saveAgentManifests(manifests: AgentManifest[]) {
   };
 
   if (tryWrite(manifests)) {
+    emitAgentManifestsChanged();
     return;
   }
 
@@ -56,6 +65,7 @@ export function saveAgentManifests(manifests: AgentManifest[]) {
   }));
 
   if (tryWrite(withoutSource)) {
+    emitAgentManifestsChanged();
     return;
   }
 
@@ -66,7 +76,12 @@ export function saveAgentManifests(manifests: AgentManifest[]) {
     avatarDataUrl: ''
   }));
 
-  if (!tryWrite(withoutAvatars)) {
+  if (tryWrite(withoutAvatars)) {
+    emitAgentManifestsChanged();
+    return;
+  }
+
+  {
     console.warn('Unable to persist agent manifests: local storage quota exceeded.');
   }
 }

@@ -20,7 +20,7 @@ type StoredOrgChart = OrgChartData & {
   snapshot?: {
     businessUnits?: unknown;
     orgUnits?: Array<Record<string, unknown>>;
-    actors?: unknown;
+    operators?: unknown;
     links?: unknown;
   };
   activityEvents?: unknown;
@@ -35,7 +35,7 @@ function normalizeStoredData(parsed: StoredOrgChart): OrgChartData {
 
   const normalized = parsed as OrgChartData;
   normalized.snapshot.businessUnits = Array.isArray(parsed.snapshot.businessUnits)
-      ? (parsed.snapshot.businessUnits as OrgChartData['snapshot']['businessUnits']).map((businessUnit) => ({
+    ? (parsed.snapshot.businessUnits as OrgChartData['snapshot']['businessUnits']).map((businessUnit) => ({
         ...businessUnit,
         overview: typeof businessUnit.overview === 'string' ? businessUnit.overview : '',
         objectives: typeof businessUnit.objectives === 'string' ? businessUnit.objectives : '',
@@ -50,8 +50,9 @@ function normalizeStoredData(parsed: StoredOrgChart): OrgChartData {
             : null
       }))
     : [];
+
   normalized.snapshot.orgUnits = Array.isArray(parsed.snapshot.orgUnits)
-      ? parsed.snapshot.orgUnits.map((orgUnit) => ({
+    ? parsed.snapshot.orgUnits.map((orgUnit) => ({
         ...(orgUnit as OrgChartData['snapshot']['orgUnits'][number]),
         overview: typeof orgUnit.overview === 'string' ? orgUnit.overview : '',
         coreResponsibilities: typeof orgUnit.coreResponsibilities === 'string' ? orgUnit.coreResponsibilities : '',
@@ -74,25 +75,39 @@ function normalizeStoredData(parsed: StoredOrgChart): OrgChartData {
             : null
       }))
     : [];
-  normalized.snapshot.actors = Array.isArray(parsed.snapshot.actors)
-    ? (parsed.snapshot.actors as OrgChartData['snapshot']['actors']).map((actor) => ({
-        ...actor,
-        primaryObjective: typeof actor.primaryObjective === 'string' ? actor.primaryObjective : '',
-        systemDirective: typeof actor.systemDirective === 'string' ? actor.systemDirective : '',
-        roleBrief: typeof actor.roleBrief === 'string' ? actor.roleBrief : '',
-        avatarSourceDataUrl: typeof actor.avatarSourceDataUrl === 'string' ? actor.avatarSourceDataUrl : '',
-        avatarDataUrl: typeof actor.avatarDataUrl === 'string' ? actor.avatarDataUrl : ''
+
+  normalized.snapshot.operators = Array.isArray(parsed.snapshot.operators)
+    ? (parsed.snapshot.operators as OrgChartData['snapshot']['operators']).map((operator) => ({
+        ...operator,
+        sourceAgentId:
+          typeof operator.sourceAgentId === 'string' || operator.sourceAgentId === null
+            ? operator.sourceAgentId
+            : null,
+        primaryObjective: typeof operator.primaryObjective === 'string' ? operator.primaryObjective : '',
+        systemDirective: typeof operator.systemDirective === 'string' ? operator.systemDirective : '',
+        roleBrief: typeof operator.roleBrief === 'string' ? operator.roleBrief : '',
+        avatarSourceDataUrl: typeof operator.avatarSourceDataUrl === 'string' ? operator.avatarSourceDataUrl : '',
+        avatarDataUrl: typeof operator.avatarDataUrl === 'string' ? operator.avatarDataUrl : ''
       }))
     : [];
-  normalized.snapshot.links = Array.isArray(parsed.snapshot.links) ? (parsed.snapshot.links as OrgChartData['snapshot']['links']) : [];
-  normalized.activityEvents = Array.isArray(parsed.activityEvents) ? (parsed.activityEvents as OrgChartData['activityEvents']) : [];
-  normalized.commandHistory = Array.isArray(parsed.commandHistory) ? (parsed.commandHistory as OrgChartData['commandHistory']) : [];
+
+  normalized.snapshot.links = Array.isArray(parsed.snapshot.links)
+    ? (parsed.snapshot.links as OrgChartData['snapshot']['links'])
+    : [];
+
+  normalized.activityEvents = Array.isArray(parsed.activityEvents)
+    ? (parsed.activityEvents as OrgChartData['activityEvents'])
+    : [];
+  normalized.commandHistory = Array.isArray(parsed.commandHistory)
+    ? (parsed.commandHistory as OrgChartData['commandHistory'])
+    : [];
   normalized.historyCursor = typeof parsed.historyCursor === 'number' ? parsed.historyCursor : -1;
 
   const businessUnitIds = new Set(normalized.snapshot.businessUnits.map((unit) => unit.id));
   normalized.snapshot.businessUnits = normalized.snapshot.businessUnits.map((unit) => ({
     ...unit,
-    parentBusinessUnitId: unit.parentBusinessUnitId && businessUnitIds.has(unit.parentBusinessUnitId) ? unit.parentBusinessUnitId : null
+    parentBusinessUnitId:
+      unit.parentBusinessUnitId && businessUnitIds.has(unit.parentBusinessUnitId) ? unit.parentBusinessUnitId : null
   }));
   normalized.snapshot.orgUnits = normalized.snapshot.orgUnits.map((orgUnit) => ({
     ...orgUnit,

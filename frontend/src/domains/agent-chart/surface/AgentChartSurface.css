@@ -2,7 +2,7 @@
  * Purpose: Style org-chart hierarchy editor with file-system-like tree interactions.
  * Responsibilities:
  * - Provide clear tree affordances for selection and hierarchy edit mode.
- * - Keep details panel readable for org unit and actor editing.
+ * - Keep details panel readable for org unit and operator editing.
  */
 /* @tags: domain,agent-chart,surface,styles */
 /* @status: active */
@@ -290,7 +290,7 @@
   display: block;
 }
 
-.agent-chart-tree-row.actor .agent-chart-node-media {
+.agent-chart-tree-row.operator .agent-chart-node-media {
   border-radius: 999px;
 }
 
@@ -311,7 +311,7 @@
   border-radius: 10px;
 }
 
-.agent-chart-node-media.details.actor {
+.agent-chart-node-media.details.operator {
   border-radius: 999px;
 }
 

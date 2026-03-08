@@ -4,7 +4,7 @@ export type SelectedNode =
   | { kind: 'business_unit'; id: string }
   | { kind: 'scope_bucket'; scope: Exclude<OrgUnitScope, 'business_unit'> }
   | { kind: 'org_unit'; id: string }
-  | { kind: 'actor'; id: string }
+  | { kind: 'operator'; id: string }
   | null;
 
 export type BusinessUnitTreeNode = {
@@ -16,12 +16,12 @@ export type BusinessUnitTreeNode = {
 export type PendingDelete =
   | { kind: 'business_unit'; id: string; label: string }
   | { kind: 'org_unit'; id: string; label: string }
-  | { kind: 'actor'; id: string; label: string }
+  | { kind: 'operator'; id: string; label: string }
   | null;
 
 export type PendingMediaTarget =
   | { kind: 'business_unit'; id: string }
   | { kind: 'org_unit'; id: string }
-  | { kind: 'actor'; id: string }
+  | { kind: 'operator'; id: string }
   | null;
 

@@ -57,7 +57,7 @@ export function createInitialOrgChartData(): OrgChartData {
           updatedAt: timestamp
         }
       ],
-      actors: [],
+      operators: [],
       links: []
     },
     activityEvents: [
@@ -66,7 +66,7 @@ export function createInitialOrgChartData(): OrgChartData {
         entityType: 'org_chart',
         entityId: 'org_chart_v1',
         eventType: 'seed_initialized',
-        actorId: 'system',
+        operatorId: 'system',
         timestamp,
         data: { rootBusinessUnitId, rootOrgUnitId: rootId }
       }
