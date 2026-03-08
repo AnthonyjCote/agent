@@ -369,7 +369,7 @@ export function useOrgChartPointerDnd(input: UseOrgChartPointerDndInput) {
     if (activeDrag.payload.kind === 'actor') {
       const actor = actorById.get(activeDrag.payload.id);
       if (!actor) {
-        return 'Actor';
+        return 'Operator';
       }
       return actor.title ? `${actor.name} — ${actor.title}` : actor.name;
     }
@@ -393,7 +393,7 @@ export function useOrgChartPointerDnd(input: UseOrgChartPointerDndInput) {
     }
 
     if (activeDrag.payload.kind === 'actor' && dropTarget.kind === 'actor' && dropTarget.placement === 'inside') {
-      const managerName = actorById.get(dropTarget.id)?.name ?? 'selected actor';
+      const managerName = actorById.get(dropTarget.id)?.name ?? 'selected operator';
       return `Re-assigning reports-to ${managerName}`;
     }
 

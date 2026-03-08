@@ -21,6 +21,10 @@ export type OrgUnitScope = 'business_unit' | 'shared' | 'unassigned';
 export type OrgUnit = {
   id: OrgUnitId;
   name: string;
+  overview: string;
+  coreResponsibilities: string;
+  primaryDeliverables: string;
+  workingModel: 'human' | 'agent' | 'hybrid';
   parentOrgUnitId: OrgUnitId | null;
   scope: OrgUnitScope;
   businessUnitId: BusinessUnitId | null;
@@ -34,6 +38,10 @@ export type OrgUnit = {
 export type BusinessUnit = {
   id: BusinessUnitId;
   name: string;
+  overview: string;
+  objectives: string;
+  primaryProductsOrServices: string;
+  successMetrics: string;
   parentBusinessUnitId: BusinessUnitId | null;
   logoSourceDataUrl: string;
   logoDataUrl: string;
@@ -46,6 +54,9 @@ export type Actor = {
   id: ActorId;
   name: string;
   title: string;
+  primaryObjective: string;
+  systemDirective: string;
+  roleBrief: string;
   kind: ActorKind;
   orgUnitId: OrgUnitId;
   managerActorId: ActorId | null;
@@ -93,7 +104,15 @@ export type OrgCommand =
   | {
       kind: 'create_business_unit';
       parentId: BusinessUnitId | null;
-      payload: { name: string };
+      payload: {
+        name: string;
+        overview?: string;
+        objectives?: string;
+        primaryProductsOrServices?: string;
+        successMetrics?: string;
+        logoSourceDataUrl?: string;
+        logoDataUrl?: string;
+      };
     }
   | {
       kind: 'move_business_unit';
@@ -107,9 +126,26 @@ export type OrgCommand =
       name: string;
     }
   | {
+      kind: 'update_business_unit';
+      nodeId: BusinessUnitId;
+      patch: Partial<
+        Pick<BusinessUnit, 'name' | 'overview' | 'objectives' | 'primaryProductsOrServices' | 'successMetrics'>
+      >;
+    }
+  | {
       kind: 'create_org_unit';
       parentId: OrgUnitId | null;
-      payload: { name: string; rootScope?: OrgUnitScope; rootBusinessUnitId?: BusinessUnitId | null };
+      payload: {
+        name: string;
+        overview?: string;
+        coreResponsibilities?: string;
+        primaryDeliverables?: string;
+        workingModel?: OrgUnit['workingModel'];
+        iconSourceDataUrl?: string;
+        iconDataUrl?: string;
+        rootScope?: OrgUnitScope;
+        rootBusinessUnitId?: BusinessUnitId | null;
+      };
     }
   | {
       kind: 'assign_org_unit_business_unit';
@@ -125,7 +161,16 @@ export type OrgCommand =
   | {
       kind: 'create_actor';
       targetOrgUnitId: OrgUnitId;
-      payload: { name: string; title: string; kind: ActorKind };
+      payload: {
+        name: string;
+        title: string;
+        kind: ActorKind;
+        primaryObjective?: string;
+        systemDirective?: string;
+        roleBrief?: string;
+        avatarSourceDataUrl?: string;
+        avatarDataUrl?: string;
+      };
     }
   | {
       kind: 'move_org_unit';
@@ -150,9 +195,18 @@ export type OrgCommand =
       name: string;
     }
   | {
+      kind: 'update_org_unit';
+      nodeId: OrgUnitId;
+      patch: Partial<
+        Pick<OrgUnit, 'name' | 'overview' | 'coreResponsibilities' | 'primaryDeliverables' | 'workingModel'>
+      >;
+    }
+  | {
       kind: 'update_actor';
       actorId: ActorId;
-      patch: Partial<Pick<Actor, 'name' | 'title' | 'kind'>>;
+      patch: Partial<
+        Pick<Actor, 'name' | 'title' | 'kind' | 'primaryObjective' | 'systemDirective' | 'roleBrief'>
+      >;
     }
   | {
       kind: 'delete_business_unit';

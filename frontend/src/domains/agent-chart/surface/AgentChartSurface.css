@@ -21,6 +21,42 @@
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr);
   min-height: 0;
+  height: 100%;
+}
+
+.agent-chart-right-pane {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-height: 0;
+  height: 100%;
+}
+
+.agent-chart-right-pane-body {
+  min-height: 0;
+  overflow: auto;
+  padding: 14px 28px 34px;
+  display: grid;
+  gap: 10px;
+  align-content: start;
+}
+
+.agent-chart-surface .left-column-shell-left,
+.agent-chart-surface .left-column-shell-right {
+  overflow: hidden;
+}
+
+.agent-chart-surface .left-column-shell-right {
+  padding: 0;
+}
+
+.agent-chart-surface .left-column-top-bar,
+.agent-chart-surface .top-rail-shell {
+  min-height: 56px;
+}
+
+.agent-chart-surface .top-rail-shell {
+  margin: 0;
+  padding: 10px 28px;
 }
 
 .agent-chart-icon-actions,
@@ -501,6 +537,29 @@
 .agent-chart-media-picker span {
   font-size: 12px;
   line-height: 1.2;
+}
+
+.agent-chart-avatar-button {
+  border: none;
+  background: transparent;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-muted, #8f99af);
+  justify-self: center;
+  cursor: pointer;
+  padding: 0;
+  margin-bottom: 4px;
+}
+
+.agent-chart-avatar-button:hover {
+  color: var(--text-primary, #e7ecf9);
+}
+
+.agent-chart-avatar-button .agent-avatar {
+  width: 84px;
+  height: 84px;
 }
 
 .agent-chart-media-input {

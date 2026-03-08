@@ -16,9 +16,36 @@ type OrgChartSurfaceActions = {
   pendingDelete: PendingDelete;
   setPendingDelete: Dispatch<SetStateAction<PendingDelete>>;
   executeCommand: (command: OrgCommand) => boolean;
-  addOrgUnit: () => void;
-  addBusinessUnit: () => void;
-  addActor: () => void;
+  createOrgUnit: (input: {
+    name: string;
+    overview: string;
+    coreResponsibilities: string;
+    primaryDeliverables: string;
+    workingModel: 'human' | 'agent' | 'hybrid';
+    iconSourceDataUrl: string;
+    iconDataUrl: string;
+  }) => void;
+  createBusinessUnit: (input: {
+    name: string;
+    overview: string;
+    objectives: string;
+    primaryProductsOrServices: string;
+    successMetrics: string;
+    logoSourceDataUrl: string;
+    logoDataUrl: string;
+  }) => void;
+  createActor: (input: {
+    name: string;
+    title: string;
+    kind: 'agent' | 'human';
+    targetOrgUnitId: string;
+    primaryObjective: string;
+    systemDirective: string;
+    roleBrief: string;
+    avatarSourceDataUrl: string;
+    avatarDataUrl: string;
+  }) => boolean;
+  getSuggestedActorOrgUnitId: () => string | null;
   handleConfirmDelete: () => void;
 };
 
@@ -37,10 +64,30 @@ export function useOrgChartSurfaceActions(input: UseOrgChartSurfaceActionsInput)
     return true;
   };
 
-  const addOrgUnit = () => {
+  const createOrgUnit = (input: {
+    name: string;
+    overview: string;
+    coreResponsibilities: string;
+    primaryDeliverables: string;
+    workingModel: 'human' | 'agent' | 'hybrid';
+    iconSourceDataUrl: string;
+    iconDataUrl: string;
+  }) => {
     const parentId = selectedNode?.kind === 'org_unit' ? selectedNode.id : null;
     if (parentId) {
-      executeCommand({ kind: 'create_org_unit', parentId, payload: { name: 'New Org Unit' } });
+      executeCommand({
+        kind: 'create_org_unit',
+        parentId,
+        payload: {
+          name: input.name.trim() || 'New Org Unit',
+          overview: input.overview,
+          coreResponsibilities: input.coreResponsibilities,
+          primaryDeliverables: input.primaryDeliverables,
+          workingModel: input.workingModel,
+          iconSourceDataUrl: input.iconSourceDataUrl,
+          iconDataUrl: input.iconDataUrl
+        }
+      });
       return;
     }
 
@@ -48,7 +95,17 @@ export function useOrgChartSurfaceActions(input: UseOrgChartSurfaceActionsInput)
       executeCommand({
         kind: 'create_org_unit',
         parentId: null,
-        payload: { name: 'New Org Unit', rootScope: 'business_unit', rootBusinessUnitId: selectedNode.id }
+        payload: {
+          name: input.name.trim() || 'New Org Unit',
+          overview: input.overview,
+          coreResponsibilities: input.coreResponsibilities,
+          primaryDeliverables: input.primaryDeliverables,
+          workingModel: input.workingModel,
+          iconSourceDataUrl: input.iconSourceDataUrl,
+          iconDataUrl: input.iconDataUrl,
+          rootScope: 'business_unit',
+          rootBusinessUnitId: selectedNode.id
+        }
       });
       return;
     }
@@ -57,36 +114,106 @@ export function useOrgChartSurfaceActions(input: UseOrgChartSurfaceActionsInput)
       executeCommand({
         kind: 'create_org_unit',
         parentId: null,
-        payload: { name: 'New Org Unit', rootScope: selectedNode.scope }
+        payload: {
+          name: input.name.trim() || 'New Org Unit',
+          overview: input.overview,
+          coreResponsibilities: input.coreResponsibilities,
+          primaryDeliverables: input.primaryDeliverables,
+          workingModel: input.workingModel,
+          iconSourceDataUrl: input.iconSourceDataUrl,
+          iconDataUrl: input.iconDataUrl,
+          rootScope: selectedNode.scope
+        }
       });
       return;
     }
 
-    executeCommand({ kind: 'create_org_unit', parentId: null, payload: { name: 'New Org Unit', rootScope: 'unassigned' } });
+    executeCommand({
+      kind: 'create_org_unit',
+      parentId: null,
+      payload: {
+        name: input.name.trim() || 'New Org Unit',
+        overview: input.overview,
+        coreResponsibilities: input.coreResponsibilities,
+        primaryDeliverables: input.primaryDeliverables,
+        workingModel: input.workingModel,
+        iconSourceDataUrl: input.iconSourceDataUrl,
+        iconDataUrl: input.iconDataUrl,
+        rootScope: 'unassigned'
+      }
+    });
   };
 
-  const addBusinessUnit = () => {
-    executeCommand({ kind: 'create_business_unit', parentId: null, payload: { name: 'New Business Unit' } });
+  const createBusinessUnit = (input: {
+    name: string;
+    overview: string;
+    objectives: string;
+    primaryProductsOrServices: string;
+    successMetrics: string;
+    logoSourceDataUrl: string;
+    logoDataUrl: string;
+  }) => {
+    executeCommand({
+      kind: 'create_business_unit',
+      parentId: null,
+      payload: {
+        name: input.name.trim() || 'New Business Unit',
+        overview: input.overview,
+        objectives: input.objectives,
+        primaryProductsOrServices: input.primaryProductsOrServices,
+        successMetrics: input.successMetrics,
+        logoSourceDataUrl: input.logoSourceDataUrl,
+        logoDataUrl: input.logoDataUrl
+      }
+    });
   };
 
-  const addActor = () => {
+  const getSuggestedActorOrgUnitId = () => {
     const firstOrgUnit = orgUnits[0];
-    const targetOrgUnitId =
+    return (
       selectedNode?.kind === 'org_unit'
         ? selectedNode.id
         : selectedNode?.kind === 'actor'
           ? getActorById(selectedNode.id)?.orgUnitId
-          : firstOrgUnit?.id;
+          : firstOrgUnit?.id
+    ) ?? null;
+  };
 
-    if (!targetOrgUnitId) {
-      setErrorMessage('Create an org unit before adding an actor.');
-      return;
+  const createActor = (input: {
+    name: string;
+    title: string;
+    kind: 'agent' | 'human';
+    targetOrgUnitId: string;
+    primaryObjective: string;
+    systemDirective: string;
+    roleBrief: string;
+    avatarSourceDataUrl: string;
+    avatarDataUrl: string;
+  }) => {
+    if (!input.targetOrgUnitId) {
+      setErrorMessage('Create an org unit before adding an operator.');
+      return false;
     }
 
-    executeCommand({
+    const targetExists = orgUnits.some((unit) => unit.id === input.targetOrgUnitId);
+    if (!targetExists) {
+      setErrorMessage('Create an org unit before adding an operator.');
+      return false;
+    }
+
+    return executeCommand({
       kind: 'create_actor',
-      targetOrgUnitId,
-      payload: { name: 'New Actor', title: 'Role', kind: 'agent' }
+      targetOrgUnitId: input.targetOrgUnitId,
+      payload: {
+        name: input.name.trim() || 'New Operator',
+        title: input.title.trim() || 'Role',
+        kind: input.kind,
+        primaryObjective: input.primaryObjective,
+        systemDirective: input.systemDirective,
+        roleBrief: input.roleBrief,
+        avatarSourceDataUrl: input.avatarSourceDataUrl,
+        avatarDataUrl: input.avatarDataUrl
+      }
     });
   };
 
@@ -113,9 +240,10 @@ export function useOrgChartSurfaceActions(input: UseOrgChartSurfaceActionsInput)
     pendingDelete,
     setPendingDelete,
     executeCommand,
-    addOrgUnit,
-    addBusinessUnit,
-    addActor,
+    createOrgUnit,
+    createBusinessUnit,
+    createActor,
+    getSuggestedActorOrgUnitId,
     handleConfirmDelete
   };
 }

@@ -67,12 +67,21 @@ export function OrgChartRightPane(props: OrgChartRightPaneProps) {
           </div>
         }
       />
+      <div className="agent-chart-right-pane-body">
 
       {selection.workspaceView === 'list' && selectedBusinessUnit ? (
         <BusinessUnitDetailsCard
           businessUnit={selectedBusinessUnit}
           businessUnitNameDraft={selection.businessUnitNameDraft}
           setBusinessUnitNameDraft={selection.setBusinessUnitNameDraft}
+          businessUnitOverviewDraft={selection.businessUnitOverviewDraft}
+          setBusinessUnitOverviewDraft={selection.setBusinessUnitOverviewDraft}
+          businessUnitObjectivesDraft={selection.businessUnitObjectivesDraft}
+          setBusinessUnitObjectivesDraft={selection.setBusinessUnitObjectivesDraft}
+          businessUnitProductsDraft={selection.businessUnitProductsDraft}
+          setBusinessUnitProductsDraft={selection.setBusinessUnitProductsDraft}
+          businessUnitMetricsDraft={selection.businessUnitMetricsDraft}
+          setBusinessUnitMetricsDraft={selection.setBusinessUnitMetricsDraft}
           businessUnitParentOptions={selection.businessUnitParentOptions}
           onMoveParent={(value) =>
             executeCommand({
@@ -83,9 +92,15 @@ export function OrgChartRightPane(props: OrgChartRightPaneProps) {
           }
           onSave={() =>
             executeCommand({
-              kind: 'rename_business_unit',
+              kind: 'update_business_unit',
               nodeId: selectedBusinessUnit.id,
-              name: selection.businessUnitNameDraft
+              patch: {
+                name: selection.businessUnitNameDraft,
+                overview: selection.businessUnitOverviewDraft,
+                objectives: selection.businessUnitObjectivesDraft,
+                primaryProductsOrServices: selection.businessUnitProductsDraft,
+                successMetrics: selection.businessUnitMetricsDraft
+              }
             })
           }
           onDelete={() =>
@@ -104,6 +119,14 @@ export function OrgChartRightPane(props: OrgChartRightPaneProps) {
           orgUnit={selectedOrg}
           orgNameDraft={selection.orgNameDraft}
           setOrgNameDraft={selection.setOrgNameDraft}
+          orgOverviewDraft={selection.orgOverviewDraft}
+          setOrgOverviewDraft={selection.setOrgOverviewDraft}
+          orgResponsibilitiesDraft={selection.orgResponsibilitiesDraft}
+          setOrgResponsibilitiesDraft={selection.setOrgResponsibilitiesDraft}
+          orgDeliverablesDraft={selection.orgDeliverablesDraft}
+          setOrgDeliverablesDraft={selection.setOrgDeliverablesDraft}
+          orgWorkingModelDraft={selection.orgWorkingModelDraft}
+          setOrgWorkingModelDraft={selection.setOrgWorkingModelDraft}
           orgParentOptions={selection.orgParentOptions}
           selectedOrgChildren={selection.selectedOrgChildren}
           selectedOrgIsTopLevel={selection.selectedOrgIsTopLevel}
@@ -138,7 +161,17 @@ export function OrgChartRightPane(props: OrgChartRightPaneProps) {
             })
           }
           onSave={() =>
-            executeCommand({ kind: 'rename_org_unit', nodeId: selectedOrg.id, name: selection.orgNameDraft })
+            executeCommand({
+              kind: 'update_org_unit',
+              nodeId: selectedOrg.id,
+              patch: {
+                name: selection.orgNameDraft,
+                overview: selection.orgOverviewDraft,
+                coreResponsibilities: selection.orgResponsibilitiesDraft,
+                primaryDeliverables: selection.orgDeliverablesDraft,
+                workingModel: selection.orgWorkingModelDraft
+              }
+            })
           }
           onDelete={() =>
             setPendingDelete({
@@ -156,8 +189,14 @@ export function OrgChartRightPane(props: OrgChartRightPaneProps) {
           actor={selectedActor}
           actorNameDraft={selection.actorNameDraft}
           actorTitleDraft={selection.actorTitleDraft}
+          actorPrimaryObjectiveDraft={selection.actorPrimaryObjectiveDraft}
+          actorSystemDirectiveDraft={selection.actorSystemDirectiveDraft}
+          actorRoleBriefDraft={selection.actorRoleBriefDraft}
           setActorNameDraft={selection.setActorNameDraft}
           setActorTitleDraft={selection.setActorTitleDraft}
+          setActorPrimaryObjectiveDraft={selection.setActorPrimaryObjectiveDraft}
+          setActorSystemDirectiveDraft={selection.setActorSystemDirectiveDraft}
+          setActorRoleBriefDraft={selection.setActorRoleBriefDraft}
           actorTypeOptions={selection.actorTypeOptions}
           orgOptions={selection.orgOptions}
           managerOptions={selection.managerOptions}
@@ -174,7 +213,13 @@ export function OrgChartRightPane(props: OrgChartRightPaneProps) {
             executeCommand({
               kind: 'update_actor',
               actorId: selectedActor.id,
-              patch: { name: selection.actorNameDraft, title: selection.actorTitleDraft }
+              patch: {
+                name: selection.actorNameDraft,
+                title: selection.actorTitleDraft,
+                primaryObjective: selection.actorPrimaryObjectiveDraft,
+                systemDirective: selection.actorSystemDirectiveDraft,
+                roleBrief: selection.actorRoleBriefDraft
+              }
             })
           }
           onDelete={() =>
@@ -191,7 +236,7 @@ export function OrgChartRightPane(props: OrgChartRightPaneProps) {
       {selection.workspaceView === 'list' && !selectedActor && !selectedOrg && !selectedBusinessUnit ? (
         <div className="agent-chart-empty-details">
           <h2>Org Chart</h2>
-          <p>Select an org unit or actor from the tree to edit details.</p>
+          <p>Select an org unit or operator from the tree to edit details.</p>
         </div>
       ) : null}
 
@@ -201,6 +246,7 @@ export function OrgChartRightPane(props: OrgChartRightPaneProps) {
           <p>Infinity canvas org graph view will be added next.</p>
         </div>
       ) : null}
+      </div>
     </section>
   );
 }

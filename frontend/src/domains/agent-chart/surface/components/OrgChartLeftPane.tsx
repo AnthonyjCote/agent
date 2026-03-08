@@ -100,13 +100,13 @@ export function OrgChartLeftPane(props: OrgChartLeftPaneProps) {
               </svg>
               <NavTooltipPopover label="Add Business Unit" orientation="horizontal" side="bottom" align="start" />
             </button>
-            <button type="button" className="agent-chart-icon-button nav-tooltip-host" onClick={onAddActor} aria-label="Add actor">
+            <button type="button" className="agent-chart-icon-button nav-tooltip-host" onClick={onAddActor} aria-label="Add operator">
               <svg viewBox="0 0 20 20" aria-hidden="true">
                 <circle cx="8" cy="7" r="2.6" fill="none" stroke="currentColor" strokeWidth="1.4" />
                 <path d="M3.9 14.8c.6-2 2-3.1 4.1-3.1s3.5 1.1 4.1 3.1" fill="none" stroke="currentColor" strokeWidth="1.4" />
                 <path d="M14.8 10.4v4.4M12.6 12.6H17" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
               </svg>
-              <NavTooltipPopover label="Add Actor" orientation="horizontal" side="bottom" align="start" />
+              <NavTooltipPopover label="Add Operator" orientation="horizontal" side="bottom" align="start" />
             </button>
             <button
               type="button"

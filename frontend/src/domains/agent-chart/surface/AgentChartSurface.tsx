@@ -10,11 +10,12 @@
 // @domain: agent-chart
 // @adr: none
 
-import { useOrgChartStore } from '../../../shared/config';
+import { useState } from 'react';
+import { createDefaultAgentManifestInput, useAgentManifestStore, useOrgChartStore } from '../../../shared/config';
 import { ConfirmDialogModal, LeftColumnShell } from '../../../shared/ui';
 import { useOrgChartPointerDnd } from '../model';
 import { OrgChartDragChip } from './OrgChartDragChip';
-import { AgentAvatarCropModal } from '../../../shared/modules/agent-manifest';
+import { AgentAvatarCropModal, OrgEntityCreateModal } from '../../../shared/modules';
 import {
   OrgChartLeftPane,
   OrgChartRightPane
@@ -32,6 +33,9 @@ import './AgentChartSurface.css';
 export function AgentChartSurface() {
   const { businessUnits, orgUnits, actors, execute, canUndo, canRedo, undo, redo, getOrgUnitById, getActorById } =
     useOrgChartStore();
+  const { createAgent } = useAgentManifestStore();
+  const [createEntityKind, setCreateEntityKind] = useState<'business_unit' | 'org_unit' | 'actor' | null>(null);
+  const [createActorDefaultOrgUnitId, setCreateActorDefaultOrgUnitId] = useState('');
 
   const selection = useOrgChartSelectionState({
     businessUnits,
@@ -102,6 +106,34 @@ export function AgentChartSurface() {
   const openActorMedia = (actor: NonNullable<typeof selectedActor>) => {
     mediaEditor.openMediaEditor({ kind: 'actor', id: actor.id }, actor.avatarSourceDataUrl, actor.avatarDataUrl);
   };
+  const closeCreateModal = () => {
+    setCreateEntityKind(null);
+    setCreateActorDefaultOrgUnitId('');
+  };
+  const openCreateActorModal = () => {
+    const suggestedOrgUnitId = actions.getSuggestedActorOrgUnitId() ?? '';
+    setCreateActorDefaultOrgUnitId(suggestedOrgUnitId);
+    setCreateEntityKind('actor');
+  };
+
+  const buildAgentInput = (input: {
+    name: string;
+    role: string;
+    primaryObjective: string;
+    directive: string;
+    avatarDataUrl?: string;
+  }) => {
+    const base = createDefaultAgentManifestInput();
+    return {
+      ...base,
+      name: input.name.trim(),
+      role: input.role.trim(),
+      primaryObjective: input.primaryObjective.trim(),
+      systemDirectiveShort: input.directive.trim(),
+      avatarDataUrl: input.avatarDataUrl ?? '',
+      avatarSourceDataUrl: ''
+    };
+  };
 
   return (
     <section className="agent-chart-surface">
@@ -110,9 +142,9 @@ export function AgentChartSurface() {
         left={
           <OrgChartLeftPane
             errorMessage={actions.errorMessage}
-            onAddOrgUnit={actions.addOrgUnit}
-            onAddBusinessUnit={actions.addBusinessUnit}
-            onAddActor={actions.addActor}
+            onAddOrgUnit={() => setCreateEntityKind('org_unit')}
+            onAddBusinessUnit={() => setCreateEntityKind('business_unit')}
+            onAddActor={openCreateActorModal}
             hierarchyMode={selection.hierarchyMode}
             onToggleHierarchyMode={() => selection.setHierarchyMode((current) => !current)}
             canUndo={canUndo}
@@ -156,6 +188,50 @@ export function AgentChartSurface() {
           />
         }
       />
+      <OrgEntityCreateModal
+        open={createEntityKind != null}
+        entityKind={createEntityKind ?? 'business_unit'}
+        defaultOrgUnitId={createActorDefaultOrgUnitId}
+        orgUnitOptions={selection.orgOptions}
+        onClose={closeCreateModal}
+        onCreateBusinessUnit={(input) => {
+          actions.createBusinessUnit(input);
+        }}
+        onCreateOrgUnit={(input) => {
+          actions.createOrgUnit(input);
+        }}
+        onCreateActor={(input) => {
+          const created = actions.createActor(input);
+          if (!created) {
+            return false;
+          }
+
+          if (input.kind === 'agent') {
+            createAgent(
+              buildAgentInput({
+                name: input.name,
+                role: input.title,
+                primaryObjective: input.primaryObjective,
+                directive: input.systemDirective,
+                avatarDataUrl: input.avatarDataUrl
+              })
+            );
+            return true;
+          }
+
+          const assistantName = `${input.name.trim()}'s Assistant`;
+          createAgent(
+            buildAgentInput({
+              name: assistantName,
+              role: `${input.title.trim()} Assistant`,
+              primaryObjective: `Assist ${input.name.trim()} in daily work, continuity, and coverage.`,
+              directive: input.roleBrief,
+              avatarDataUrl: input.avatarDataUrl
+            })
+          );
+          return true;
+        }}
+      />
       <OrgChartDragChip chip={dnd.dragChipMeta} />
       <AgentAvatarCropModal
         open={mediaEditor.cropOpen}
@@ -166,7 +242,7 @@ export function AgentChartSurface() {
       />
       <ConfirmDialogModal
         open={actions.pendingDelete != null}
-        title={`Delete ${actions.pendingDelete?.kind === 'business_unit' ? 'Business Unit' : actions.pendingDelete?.kind === 'org_unit' ? 'Org Unit' : 'Actor'}?`}
+        title={`Delete ${actions.pendingDelete?.kind === 'business_unit' ? 'Business Unit' : actions.pendingDelete?.kind === 'org_unit' ? 'Org Unit' : 'Operator'}?`}
         message={`This action cannot be undone. ${actions.pendingDelete?.label ?? 'Selected item'} will be removed.`}
         confirmLabel="Delete"
         confirmVariant="danger"

@@ -268,9 +268,13 @@ function applyCreateBusinessUnit(
   const created: BusinessUnit = {
     id: createId('bu'),
     name: command.payload.name.trim() || 'Untitled Business Unit',
+    overview: command.payload.overview?.trim() ?? '',
+    objectives: command.payload.objectives?.trim() ?? '',
+    primaryProductsOrServices: command.payload.primaryProductsOrServices?.trim() ?? '',
+    successMetrics: command.payload.successMetrics?.trim() ?? '',
     parentBusinessUnitId: command.parentId,
-    logoSourceDataUrl: '',
-    logoDataUrl: '',
+    logoSourceDataUrl: command.payload.logoSourceDataUrl ?? '',
+    logoDataUrl: command.payload.logoDataUrl ?? '',
     sortOrder: siblings.length,
     createdAt: timestamp,
     updatedAt: timestamp
@@ -346,6 +350,37 @@ function applyRenameBusinessUnit(
   return next;
 }
 
+function applyUpdateBusinessUnit(
+  snapshot: OrgSnapshot,
+  command: Extract<OrgCommand, { kind: 'update_business_unit' }>
+): OrgSnapshot {
+  ensureBusinessUnitExists(snapshot, command.nodeId);
+  const next = cloneSnapshot(snapshot);
+  const unit = next.businessUnits.find((item) => item.id === command.nodeId);
+  if (!unit) {
+    throw new OrgValidationError('business_unit_not_found', `Business unit not found: ${command.nodeId}`);
+  }
+
+  if (command.patch.name != null) {
+    unit.name = command.patch.name.trim() || unit.name;
+  }
+  if (command.patch.overview != null) {
+    unit.overview = command.patch.overview;
+  }
+  if (command.patch.objectives != null) {
+    unit.objectives = command.patch.objectives;
+  }
+  if (command.patch.primaryProductsOrServices != null) {
+    unit.primaryProductsOrServices = command.patch.primaryProductsOrServices;
+  }
+  if (command.patch.successMetrics != null) {
+    unit.successMetrics = command.patch.successMetrics;
+  }
+  unit.updatedAt = nowIso();
+  next.links = rebuildLinks(next);
+  return next;
+}
+
 function applyCreateOrgUnit(snapshot: OrgSnapshot, command: Extract<OrgCommand, { kind: 'create_org_unit' }>): OrgSnapshot {
   let inheritedBusinessUnitId: BusinessUnitId | null = null;
   let inheritedScope: OrgUnitScope = command.payload.rootScope ?? 'unassigned';
@@ -366,11 +401,15 @@ function applyCreateOrgUnit(snapshot: OrgSnapshot, command: Extract<OrgCommand, 
   const created: OrgUnit = {
     id: createId('org'),
     name: command.payload.name.trim() || 'Untitled Org Unit',
+    overview: command.payload.overview?.trim() ?? '',
+    coreResponsibilities: command.payload.coreResponsibilities?.trim() ?? '',
+    primaryDeliverables: command.payload.primaryDeliverables?.trim() ?? '',
+    workingModel: command.payload.workingModel ?? 'hybrid',
     parentOrgUnitId: command.parentId,
     scope: inheritedScope,
     businessUnitId: inheritedBusinessUnitId,
-    iconSourceDataUrl: '',
-    iconDataUrl: '',
+    iconSourceDataUrl: command.payload.iconSourceDataUrl ?? '',
+    iconDataUrl: command.payload.iconDataUrl ?? '',
     sortOrder: siblings.length,
     createdAt: timestamp,
     updatedAt: timestamp
@@ -443,11 +482,14 @@ function applyCreateActor(snapshot: OrgSnapshot, command: Extract<OrgCommand, { 
     id: createId('act'),
     name: command.payload.name.trim() || 'New Actor',
     title: command.payload.title.trim() || 'Role',
+    primaryObjective: command.payload.primaryObjective?.trim() ?? '',
+    systemDirective: command.payload.systemDirective?.trim() ?? '',
+    roleBrief: command.payload.roleBrief?.trim() ?? '',
     kind: command.payload.kind,
     orgUnitId: command.targetOrgUnitId,
     managerActorId: null,
-    avatarSourceDataUrl: '',
-    avatarDataUrl: '',
+    avatarSourceDataUrl: command.payload.avatarSourceDataUrl ?? '',
+    avatarDataUrl: command.payload.avatarDataUrl ?? '',
     createdAt: timestamp,
     updatedAt: timestamp
   };
@@ -571,6 +613,34 @@ function applyRenameOrgUnit(snapshot: OrgSnapshot, command: Extract<OrgCommand, 
   return next;
 }
 
+function applyUpdateOrgUnit(snapshot: OrgSnapshot, command: Extract<OrgCommand, { kind: 'update_org_unit' }>): OrgSnapshot {
+  ensureOrgUnitExists(snapshot, command.nodeId);
+  const next = cloneSnapshot(snapshot);
+  const unit = next.orgUnits.find((item) => item.id === command.nodeId);
+  if (!unit) {
+    throw new OrgValidationError('org_unit_not_found', `Org unit not found: ${command.nodeId}`);
+  }
+
+  if (command.patch.name != null) {
+    unit.name = command.patch.name.trim() || unit.name;
+  }
+  if (command.patch.overview != null) {
+    unit.overview = command.patch.overview;
+  }
+  if (command.patch.coreResponsibilities != null) {
+    unit.coreResponsibilities = command.patch.coreResponsibilities;
+  }
+  if (command.patch.primaryDeliverables != null) {
+    unit.primaryDeliverables = command.patch.primaryDeliverables;
+  }
+  if (command.patch.workingModel != null) {
+    unit.workingModel = command.patch.workingModel;
+  }
+  unit.updatedAt = nowIso();
+  next.links = rebuildLinks(next);
+  return next;
+}
+
 function applyUpdateActor(snapshot: OrgSnapshot, command: Extract<OrgCommand, { kind: 'update_actor' }>): OrgSnapshot {
   ensureActorExists(snapshot, command.actorId);
 
@@ -588,6 +658,15 @@ function applyUpdateActor(snapshot: OrgSnapshot, command: Extract<OrgCommand, { 
   }
   if (command.patch.kind != null) {
     actor.kind = command.patch.kind;
+  }
+  if (command.patch.primaryObjective != null) {
+    actor.primaryObjective = command.patch.primaryObjective;
+  }
+  if (command.patch.systemDirective != null) {
+    actor.systemDirective = command.patch.systemDirective;
+  }
+  if (command.patch.roleBrief != null) {
+    actor.roleBrief = command.patch.roleBrief;
   }
 
   actor.updatedAt = nowIso();
@@ -711,6 +790,8 @@ function applyCommandToSnapshot(snapshot: OrgSnapshot, command: OrgCommand): Org
       return applyMoveBusinessUnit(snapshot, command);
     case 'rename_business_unit':
       return applyRenameBusinessUnit(snapshot, command);
+    case 'update_business_unit':
+      return applyUpdateBusinessUnit(snapshot, command);
     case 'create_org_unit':
       return applyCreateOrgUnit(snapshot, command);
     case 'assign_org_unit_business_unit':
@@ -727,6 +808,8 @@ function applyCommandToSnapshot(snapshot: OrgSnapshot, command: OrgCommand): Org
       return applySetActorManager(snapshot, command);
     case 'rename_org_unit':
       return applyRenameOrgUnit(snapshot, command);
+    case 'update_org_unit':
+      return applyUpdateOrgUnit(snapshot, command);
     case 'update_actor':
       return applyUpdateActor(snapshot, command);
     case 'delete_business_unit':

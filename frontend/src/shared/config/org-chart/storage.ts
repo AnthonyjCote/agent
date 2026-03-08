@@ -35,8 +35,13 @@ function normalizeStoredData(parsed: StoredOrgChart): OrgChartData {
 
   const normalized = parsed as OrgChartData;
   normalized.snapshot.businessUnits = Array.isArray(parsed.snapshot.businessUnits)
-    ? (parsed.snapshot.businessUnits as OrgChartData['snapshot']['businessUnits']).map((businessUnit) => ({
+      ? (parsed.snapshot.businessUnits as OrgChartData['snapshot']['businessUnits']).map((businessUnit) => ({
         ...businessUnit,
+        overview: typeof businessUnit.overview === 'string' ? businessUnit.overview : '',
+        objectives: typeof businessUnit.objectives === 'string' ? businessUnit.objectives : '',
+        primaryProductsOrServices:
+          typeof businessUnit.primaryProductsOrServices === 'string' ? businessUnit.primaryProductsOrServices : '',
+        successMetrics: typeof businessUnit.successMetrics === 'string' ? businessUnit.successMetrics : '',
         logoSourceDataUrl: typeof businessUnit.logoSourceDataUrl === 'string' ? businessUnit.logoSourceDataUrl : '',
         logoDataUrl: typeof businessUnit.logoDataUrl === 'string' ? businessUnit.logoDataUrl : '',
         parentBusinessUnitId:
@@ -48,6 +53,13 @@ function normalizeStoredData(parsed: StoredOrgChart): OrgChartData {
   normalized.snapshot.orgUnits = Array.isArray(parsed.snapshot.orgUnits)
       ? parsed.snapshot.orgUnits.map((orgUnit) => ({
         ...(orgUnit as OrgChartData['snapshot']['orgUnits'][number]),
+        overview: typeof orgUnit.overview === 'string' ? orgUnit.overview : '',
+        coreResponsibilities: typeof orgUnit.coreResponsibilities === 'string' ? orgUnit.coreResponsibilities : '',
+        primaryDeliverables: typeof orgUnit.primaryDeliverables === 'string' ? orgUnit.primaryDeliverables : '',
+        workingModel:
+          orgUnit.workingModel === 'human' || orgUnit.workingModel === 'agent' || orgUnit.workingModel === 'hybrid'
+            ? orgUnit.workingModel
+            : 'hybrid',
         iconSourceDataUrl: typeof orgUnit.iconSourceDataUrl === 'string' ? orgUnit.iconSourceDataUrl : '',
         iconDataUrl: typeof orgUnit.iconDataUrl === 'string' ? orgUnit.iconDataUrl : '',
         scope:
@@ -65,6 +77,9 @@ function normalizeStoredData(parsed: StoredOrgChart): OrgChartData {
   normalized.snapshot.actors = Array.isArray(parsed.snapshot.actors)
     ? (parsed.snapshot.actors as OrgChartData['snapshot']['actors']).map((actor) => ({
         ...actor,
+        primaryObjective: typeof actor.primaryObjective === 'string' ? actor.primaryObjective : '',
+        systemDirective: typeof actor.systemDirective === 'string' ? actor.systemDirective : '',
+        roleBrief: typeof actor.roleBrief === 'string' ? actor.roleBrief : '',
         avatarSourceDataUrl: typeof actor.avatarSourceDataUrl === 'string' ? actor.avatarSourceDataUrl : '',
         avatarDataUrl: typeof actor.avatarDataUrl === 'string' ? actor.avatarDataUrl : ''
       }))

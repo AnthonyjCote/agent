@@ -1,5 +1,4 @@
-import { DropdownSelector, TextButton, TextField, type DropdownOption } from '../../../../shared/ui';
-import { NodeMedia, NodeMediaIcon } from './NodeMedia';
+import { AgentAvatar, DropdownSelector, TextAreaField, TextButton, TextField, type DropdownOption } from '../../../../shared/ui';
 
 type BusinessUnit = {
   id: string;
@@ -7,12 +6,24 @@ type BusinessUnit = {
   parentBusinessUnitId: string | null;
   logoSourceDataUrl: string;
   logoDataUrl: string;
+  overview: string;
+  objectives: string;
+  primaryProductsOrServices: string;
+  successMetrics: string;
 };
 
 type BusinessUnitDetailsCardProps = {
   businessUnit: BusinessUnit;
   businessUnitNameDraft: string;
   setBusinessUnitNameDraft: (next: string) => void;
+  businessUnitOverviewDraft: string;
+  setBusinessUnitOverviewDraft: (next: string) => void;
+  businessUnitObjectivesDraft: string;
+  setBusinessUnitObjectivesDraft: (next: string) => void;
+  businessUnitProductsDraft: string;
+  setBusinessUnitProductsDraft: (next: string) => void;
+  businessUnitMetricsDraft: string;
+  setBusinessUnitMetricsDraft: (next: string) => void;
   businessUnitParentOptions: DropdownOption[];
   onMoveParent: (value: string) => void;
   onSave: () => void;
@@ -25,6 +36,14 @@ export function BusinessUnitDetailsCard(props: BusinessUnitDetailsCardProps) {
     businessUnit,
     businessUnitNameDraft,
     setBusinessUnitNameDraft,
+    businessUnitOverviewDraft,
+    setBusinessUnitOverviewDraft,
+    businessUnitObjectivesDraft,
+    setBusinessUnitObjectivesDraft,
+    businessUnitProductsDraft,
+    setBusinessUnitProductsDraft,
+    businessUnitMetricsDraft,
+    setBusinessUnitMetricsDraft,
     businessUnitParentOptions,
     onMoveParent,
     onSave,
@@ -35,9 +54,9 @@ export function BusinessUnitDetailsCard(props: BusinessUnitDetailsCardProps) {
   return (
     <div className="agent-chart-details-card">
       <h2>Business Unit</h2>
-      <button type="button" className="agent-chart-media-picker" onClick={onPickMedia}>
-        <NodeMedia image={businessUnit.logoDataUrl} className="business-unit details" fallback={<NodeMediaIcon kind="business_unit" />} />
-        <span>{businessUnit.logoDataUrl ? 'Edit Logo' : 'Select Logo'}</span>
+      <button type="button" className="agent-chart-avatar-button" onClick={onPickMedia}>
+        <AgentAvatar name={businessUnit.name || 'Business Unit'} src={businessUnit.logoDataUrl || undefined} size="xl" shape="circle" />
+        <span>Select Profile Image</span>
       </button>
       <label className="agent-chart-field-label" htmlFor="business-unit-name">
         Name
@@ -48,6 +67,26 @@ export function BusinessUnitDetailsCard(props: BusinessUnitDetailsCardProps) {
         ariaLabel="Business unit name"
         placeholder="Business unit name"
       />
+      <label className="agent-chart-field-label" htmlFor="business-unit-overview">
+        Overview
+      </label>
+      <TextAreaField value={businessUnitOverviewDraft} onValueChange={setBusinessUnitOverviewDraft} ariaLabel="Business unit overview" />
+      <label className="agent-chart-field-label" htmlFor="business-unit-objectives">
+        Objectives
+      </label>
+      <TextAreaField value={businessUnitObjectivesDraft} onValueChange={setBusinessUnitObjectivesDraft} ariaLabel="Business unit objectives" />
+      <label className="agent-chart-field-label" htmlFor="business-unit-products">
+        Primary Products/Services
+      </label>
+      <TextAreaField
+        value={businessUnitProductsDraft}
+        onValueChange={setBusinessUnitProductsDraft}
+        ariaLabel="Business unit primary products and services"
+      />
+      <label className="agent-chart-field-label" htmlFor="business-unit-success-metrics">
+        Success Metrics
+      </label>
+      <TextAreaField value={businessUnitMetricsDraft} onValueChange={setBusinessUnitMetricsDraft} ariaLabel="Business unit success metrics" />
       <label className="agent-chart-field-label" htmlFor="business-unit-parent">
         Parent Business Unit
       </label>
@@ -64,4 +103,3 @@ export function BusinessUnitDetailsCard(props: BusinessUnitDetailsCardProps) {
     </div>
   );
 }
-

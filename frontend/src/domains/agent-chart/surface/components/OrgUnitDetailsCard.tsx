@@ -1,6 +1,5 @@
-import { DropdownSelector, TextButton, TextField, type DropdownOption } from '../../../../shared/ui';
+import { AgentAvatar, DropdownSelector, TextAreaField, TextButton, TextField, type DropdownOption } from '../../../../shared/ui';
 import type { OrgUnitScope } from '../../../../shared/config';
-import { NodeMedia, NodeMediaIcon } from './NodeMedia';
 
 type OrgUnit = {
   id: string;
@@ -8,12 +7,24 @@ type OrgUnit = {
   parentOrgUnitId: string | null;
   iconSourceDataUrl: string;
   iconDataUrl: string;
+  overview: string;
+  coreResponsibilities: string;
+  primaryDeliverables: string;
+  workingModel: 'human' | 'agent' | 'hybrid';
 };
 
 type OrgUnitDetailsCardProps = {
   orgUnit: OrgUnit;
   orgNameDraft: string;
   setOrgNameDraft: (next: string) => void;
+  orgOverviewDraft: string;
+  setOrgOverviewDraft: (next: string) => void;
+  orgResponsibilitiesDraft: string;
+  setOrgResponsibilitiesDraft: (next: string) => void;
+  orgDeliverablesDraft: string;
+  setOrgDeliverablesDraft: (next: string) => void;
+  orgWorkingModelDraft: OrgUnit['workingModel'];
+  setOrgWorkingModelDraft: (next: OrgUnit['workingModel']) => void;
   orgParentOptions: DropdownOption[];
   selectedOrgChildren: Array<{ id: string; name: string }>;
   selectedOrgIsTopLevel: boolean;
@@ -38,6 +49,14 @@ export function OrgUnitDetailsCard(props: OrgUnitDetailsCardProps) {
     orgUnit,
     orgNameDraft,
     setOrgNameDraft,
+    orgOverviewDraft,
+    setOrgOverviewDraft,
+    orgResponsibilitiesDraft,
+    setOrgResponsibilitiesDraft,
+    orgDeliverablesDraft,
+    setOrgDeliverablesDraft,
+    orgWorkingModelDraft,
+    setOrgWorkingModelDraft,
     orgParentOptions,
     selectedOrgChildren,
     selectedOrgIsTopLevel,
@@ -60,14 +79,39 @@ export function OrgUnitDetailsCard(props: OrgUnitDetailsCardProps) {
   return (
     <div className="agent-chart-details-card">
       <h2>Org Unit</h2>
-      <button type="button" className="agent-chart-media-picker" onClick={onPickMedia}>
-        <NodeMedia image={orgUnit.iconDataUrl} className="details" fallback={<NodeMediaIcon kind="org_unit" />} />
-        <span>{orgUnit.iconDataUrl ? 'Edit Icon' : 'Select Icon'}</span>
+      <button type="button" className="agent-chart-avatar-button" onClick={onPickMedia}>
+        <AgentAvatar name={orgUnit.name || 'Org Unit'} src={orgUnit.iconDataUrl || undefined} size="xl" shape="circle" />
+        <span>Select Profile Image</span>
       </button>
       <label className="agent-chart-field-label" htmlFor="org-unit-name">
         Name
       </label>
       <TextField value={orgNameDraft} onValueChange={setOrgNameDraft} ariaLabel="Org unit name" placeholder="Org unit name" />
+      <label className="agent-chart-field-label" htmlFor="org-unit-overview">
+        Overview
+      </label>
+      <TextAreaField value={orgOverviewDraft} onValueChange={setOrgOverviewDraft} ariaLabel="Org unit overview" />
+      <label className="agent-chart-field-label" htmlFor="org-unit-core-responsibilities">
+        Core Responsibilities
+      </label>
+      <TextAreaField value={orgResponsibilitiesDraft} onValueChange={setOrgResponsibilitiesDraft} ariaLabel="Org unit core responsibilities" />
+      <label className="agent-chart-field-label" htmlFor="org-unit-primary-deliverables">
+        Primary Deliverables
+      </label>
+      <TextAreaField value={orgDeliverablesDraft} onValueChange={setOrgDeliverablesDraft} ariaLabel="Org unit primary deliverables" />
+      <label className="agent-chart-field-label" htmlFor="org-unit-working-model">
+        Working Model
+      </label>
+      <DropdownSelector
+        value={orgWorkingModelDraft}
+        options={[
+          { value: 'human', label: 'Human' },
+          { value: 'agent', label: 'Agent' },
+          { value: 'hybrid', label: 'Hybrid' }
+        ]}
+        onValueChange={(value) => setOrgWorkingModelDraft(value as OrgUnit['workingModel'])}
+        ariaLabel="Org unit working model"
+      />
       <label className="agent-chart-field-label" htmlFor="org-unit-parent">
         Parent Org Unit
       </label>
@@ -123,4 +167,3 @@ export function OrgUnitDetailsCard(props: OrgUnitDetailsCardProps) {
     </div>
   );
 }
-

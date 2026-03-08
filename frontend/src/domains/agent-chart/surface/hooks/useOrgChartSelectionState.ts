@@ -41,6 +41,28 @@ export type OrgChartSelectionState = {
   setActorNameDraft: Dispatch<SetStateAction<string>>;
   actorTitleDraft: string;
   setActorTitleDraft: Dispatch<SetStateAction<string>>;
+  businessUnitOverviewDraft: string;
+  setBusinessUnitOverviewDraft: Dispatch<SetStateAction<string>>;
+  businessUnitObjectivesDraft: string;
+  setBusinessUnitObjectivesDraft: Dispatch<SetStateAction<string>>;
+  businessUnitProductsDraft: string;
+  setBusinessUnitProductsDraft: Dispatch<SetStateAction<string>>;
+  businessUnitMetricsDraft: string;
+  setBusinessUnitMetricsDraft: Dispatch<SetStateAction<string>>;
+  orgOverviewDraft: string;
+  setOrgOverviewDraft: Dispatch<SetStateAction<string>>;
+  orgResponsibilitiesDraft: string;
+  setOrgResponsibilitiesDraft: Dispatch<SetStateAction<string>>;
+  orgDeliverablesDraft: string;
+  setOrgDeliverablesDraft: Dispatch<SetStateAction<string>>;
+  orgWorkingModelDraft: OrgUnit['workingModel'];
+  setOrgWorkingModelDraft: Dispatch<SetStateAction<OrgUnit['workingModel']>>;
+  actorPrimaryObjectiveDraft: string;
+  setActorPrimaryObjectiveDraft: Dispatch<SetStateAction<string>>;
+  actorSystemDirectiveDraft: string;
+  setActorSystemDirectiveDraft: Dispatch<SetStateAction<string>>;
+  actorRoleBriefDraft: string;
+  setActorRoleBriefDraft: Dispatch<SetStateAction<string>>;
   orgOptions: DropdownOption[];
   businessUnitOptions: DropdownOption[];
   orgScopeOptions: DropdownOption[];
@@ -66,8 +88,19 @@ export function useOrgChartSelectionState(input: {
 
   const [orgNameDraft, setOrgNameDraft] = useState('');
   const [businessUnitNameDraft, setBusinessUnitNameDraft] = useState('');
+  const [businessUnitOverviewDraft, setBusinessUnitOverviewDraft] = useState('');
+  const [businessUnitObjectivesDraft, setBusinessUnitObjectivesDraft] = useState('');
+  const [businessUnitProductsDraft, setBusinessUnitProductsDraft] = useState('');
+  const [businessUnitMetricsDraft, setBusinessUnitMetricsDraft] = useState('');
   const [actorNameDraft, setActorNameDraft] = useState('');
   const [actorTitleDraft, setActorTitleDraft] = useState('');
+  const [orgOverviewDraft, setOrgOverviewDraft] = useState('');
+  const [orgResponsibilitiesDraft, setOrgResponsibilitiesDraft] = useState('');
+  const [orgDeliverablesDraft, setOrgDeliverablesDraft] = useState('');
+  const [orgWorkingModelDraft, setOrgWorkingModelDraft] = useState<OrgUnit['workingModel']>('hybrid');
+  const [actorPrimaryObjectiveDraft, setActorPrimaryObjectiveDraft] = useState('');
+  const [actorSystemDirectiveDraft, setActorSystemDirectiveDraft] = useState('');
+  const [actorRoleBriefDraft, setActorRoleBriefDraft] = useState('');
   const lastSelectionKeyRef = useRef<string | null>(null);
 
   const selectedBusinessUnit =
@@ -106,32 +139,76 @@ export function useOrgChartSelectionState(input: {
 
     if (selectedBusinessUnit) {
       setBusinessUnitNameDraft(selectedBusinessUnit.name);
+      setBusinessUnitOverviewDraft(selectedBusinessUnit.overview);
+      setBusinessUnitObjectivesDraft(selectedBusinessUnit.objectives);
+      setBusinessUnitProductsDraft(selectedBusinessUnit.primaryProductsOrServices);
+      setBusinessUnitMetricsDraft(selectedBusinessUnit.successMetrics);
       setOrgNameDraft('');
+      setOrgOverviewDraft('');
+      setOrgResponsibilitiesDraft('');
+      setOrgDeliverablesDraft('');
+      setOrgWorkingModelDraft('hybrid');
       setActorNameDraft('');
       setActorTitleDraft('');
+      setActorPrimaryObjectiveDraft('');
+      setActorSystemDirectiveDraft('');
+      setActorRoleBriefDraft('');
       return;
     }
 
     if (selectedOrg) {
       setOrgNameDraft(selectedOrg.name);
+      setOrgOverviewDraft(selectedOrg.overview);
+      setOrgResponsibilitiesDraft(selectedOrg.coreResponsibilities);
+      setOrgDeliverablesDraft(selectedOrg.primaryDeliverables);
+      setOrgWorkingModelDraft(selectedOrg.workingModel);
       setBusinessUnitNameDraft('');
+      setBusinessUnitOverviewDraft('');
+      setBusinessUnitObjectivesDraft('');
+      setBusinessUnitProductsDraft('');
+      setBusinessUnitMetricsDraft('');
       setActorNameDraft('');
       setActorTitleDraft('');
+      setActorPrimaryObjectiveDraft('');
+      setActorSystemDirectiveDraft('');
+      setActorRoleBriefDraft('');
       return;
     }
 
     if (selectedActor) {
       setActorNameDraft(selectedActor.name);
       setActorTitleDraft(selectedActor.title);
+      setActorPrimaryObjectiveDraft(selectedActor.primaryObjective);
+      setActorSystemDirectiveDraft(selectedActor.systemDirective);
+      setActorRoleBriefDraft(selectedActor.roleBrief);
       setBusinessUnitNameDraft('');
+      setBusinessUnitOverviewDraft('');
+      setBusinessUnitObjectivesDraft('');
+      setBusinessUnitProductsDraft('');
+      setBusinessUnitMetricsDraft('');
       setOrgNameDraft('');
+      setOrgOverviewDraft('');
+      setOrgResponsibilitiesDraft('');
+      setOrgDeliverablesDraft('');
+      setOrgWorkingModelDraft('hybrid');
       return;
     }
 
     setBusinessUnitNameDraft('');
+    setBusinessUnitOverviewDraft('');
+    setBusinessUnitObjectivesDraft('');
+    setBusinessUnitProductsDraft('');
+    setBusinessUnitMetricsDraft('');
     setOrgNameDraft('');
+    setOrgOverviewDraft('');
+    setOrgResponsibilitiesDraft('');
+    setOrgDeliverablesDraft('');
+    setOrgWorkingModelDraft('hybrid');
     setActorNameDraft('');
     setActorTitleDraft('');
+    setActorPrimaryObjectiveDraft('');
+    setActorSystemDirectiveDraft('');
+    setActorRoleBriefDraft('');
   }, [selectedNode, selectedBusinessUnit, selectedOrg, selectedActor]);
 
   const orgOptions = useMemo<DropdownOption[]>(
@@ -215,6 +292,28 @@ export function useOrgChartSelectionState(input: {
     setActorNameDraft,
     actorTitleDraft,
     setActorTitleDraft,
+    businessUnitOverviewDraft,
+    setBusinessUnitOverviewDraft,
+    businessUnitObjectivesDraft,
+    setBusinessUnitObjectivesDraft,
+    businessUnitProductsDraft,
+    setBusinessUnitProductsDraft,
+    businessUnitMetricsDraft,
+    setBusinessUnitMetricsDraft,
+    orgOverviewDraft,
+    setOrgOverviewDraft,
+    orgResponsibilitiesDraft,
+    setOrgResponsibilitiesDraft,
+    orgDeliverablesDraft,
+    setOrgDeliverablesDraft,
+    orgWorkingModelDraft,
+    setOrgWorkingModelDraft,
+    actorPrimaryObjectiveDraft,
+    setActorPrimaryObjectiveDraft,
+    actorSystemDirectiveDraft,
+    setActorSystemDirectiveDraft,
+    actorRoleBriefDraft,
+    setActorRoleBriefDraft,
     orgOptions,
     businessUnitOptions,
     orgScopeOptions,
