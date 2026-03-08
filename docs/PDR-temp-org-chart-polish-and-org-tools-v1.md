@@ -107,6 +107,31 @@ Default V1 behavior:
    - `move_operator`
    - `set_operator_manager`
 
+### Batched execution contract (efficiency, locked)
+The tool must support multi-action batches in one invocation to reduce repeated model/tool context overhead.
+
+Request shape (conceptual):
+1. `operations: [{ operation_id, action, payload, depends_on? }, ...]`
+2. `operation_id` is required and unique within the batch.
+3. `depends_on` is optional and allows sequencing dependencies between operations.
+4. Batch size limit is enforced (V1 default: max 25 operations per call).
+
+Batch behavior:
+1. Execute operations in order with dependency awareness.
+2. Default partial-failure semantics:
+   - successful operations commit,
+   - failed operations return structured error entries.
+3. Do not fail the entire batch unless request-level validation fails.
+4. Return per-operation results in deterministic order.
+
+Temporary reference support:
+1. Operations may refer to entities created earlier in the same batch via temporary references.
+2. Runtime resolves temp references to canonical IDs during batch execution.
+
+Idempotency:
+1. Each operation supports an optional idempotency key.
+2. Duplicate retries with same idempotency key must not create duplicate entities.
+
 ### Allowed actions
 1. `create_business_unit`
 2. `create_org_unit`
@@ -157,6 +182,40 @@ Requirements for that future domain:
 2. No cross-workspace effects.
 3. No direct permission bypass.
 
+### Schema + instruction efficiency requirements
+1. Keep write payloads sparse and patch-oriented where possible.
+2. Prefer concise field contracts and avoid verbose nested wrappers unless required.
+3. Return minimal result payloads by default:
+   - canonical IDs,
+   - placement metadata,
+   - status/error per operation.
+4. Expanded result fields must be opt-in.
+5. Toolbox summary in model context stays compact; expanded schema/help is injected only when needed.
+
+### Throughput constraints (locked before execution)
+1. Read projection controls:
+   - support `select` and `include_counts` so callers request only needed fields.
+2. Cursor pagination on query/list paths:
+   - no unbounded list responses.
+3. Scope-first reads:
+   - prefer scoped reads by BU/org unit; broad global reads require explicit intent.
+4. Optimistic concurrency for writes:
+   - support `expected_version` (or equivalent) to prevent stale overwrite.
+5. Bulk patch path:
+   - support multi-entity update in one request where applicable.
+6. No-op detection:
+   - write operations that produce no data change return `no_change`.
+7. Hard limits:
+   - max operations per batch,
+   - max payload size,
+   - max rows returned per query.
+8. Write response minimization:
+   - return changed fields/diff metadata by default, not full object snapshots.
+9. Server-side computed summaries:
+   - counts and relation summaries computed once server-side.
+10. Telemetry on org tool calls:
+   - emit latency, op count, rows returned/scanned (where meaningful), and failure counts.
+
 ## Data/Contracts
 No new storage engine decisions in this PDR.
 Use existing persisted org/state runtime path already implemented.
@@ -194,6 +253,13 @@ Required output DTO additions for right-pane view cards:
 - [ ] Implement action routing to org command service.
 - [ ] Add audit event emission for tool-created entities.
 - [ ] Add deterministic response schema for created object metadata.
+- [ ] Add batched operation executor with per-op result contract and partial-failure handling.
+- [ ] Add idempotency-key handling for create/update operations.
+- [ ] Add optimistic concurrency checks for write/update paths.
+- [ ] Add no-op detection and `no_change` response status.
+- [ ] Add projection + pagination controls for read/query actions.
+- [ ] Add scoped-read guardrails and explicit global-read override semantics.
+- [ ] Add per-call throughput telemetry fields in debug traces.
 
 ### Phase 5 — Quality + Completion
 - [ ] Add regression tests: view/edit mode transitions and no accidental edit writes.
