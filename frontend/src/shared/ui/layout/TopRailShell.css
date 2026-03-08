@@ -1,0 +1,47 @@
+/*
+ * Purpose: Style reusable full-bleed working-area top rail shell.
+ * Responsibilities:
+ * - Stretch rail to workspace edges while preserving inner content padding.
+ * - Support raised/default visual variants for domain-level control rows.
+ */
+/* @tags: shared-ui,layout,styles */
+/* @status: active */
+/* @owner: founder */
+/* @domain: shared */
+/* @adr: none */
+
+.top-rail-shell {
+  width: auto;
+  min-height: 52px;
+  margin-top: calc(var(--working-area-padding-top, 26px) * -1);
+  margin-left: calc(var(--working-area-padding-x, 28px) * -1);
+  margin-right: calc(var(--working-area-padding-x, 28px) * -1);
+  margin-bottom: 14px;
+  padding: 10px var(--working-area-padding-x, 28px);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.top-rail-shell-default {
+  border-bottom: 1px solid var(--border-strong);
+}
+
+.top-rail-shell-raised {
+  background: linear-gradient(180deg, #161b25 0%, #121720 100%);
+  border-bottom: 1px solid var(--border-strong);
+  box-shadow: inset 0 -1px 0 color-mix(in srgb, #a9bad7 14%, transparent);
+}
+
+.top-rail-shell-left,
+.top-rail-shell-right {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.top-rail-shell-right {
+  justify-content: flex-end;
+}

@@ -12,6 +12,7 @@
 
 import type { ViewMode } from './model/ui-contract';
 import { VIEW_DEFINITIONS, VIEW_ORDER } from './view-registry';
+import { NavTooltipPopover } from '../../shared/ui';
 import './GlobalRail.css';
 
 type GlobalRailProps = {
@@ -95,15 +96,13 @@ export function GlobalRail({ viewMode, setViewMode }: GlobalRailProps) {
             <button
               key={mode}
               type="button"
-              className={`rail-item${active ? ' active' : ''}`}
+              className={`rail-item nav-tooltip-host${active ? ' active' : ''}`}
               aria-label={def.label}
               aria-current={active ? 'page' : undefined}
               onClick={() => setViewMode(mode)}
             >
               <RailIcon mode={mode} />
-              <span className="rail-tooltip" role="tooltip">
-                {def.label}
-              </span>
+              <NavTooltipPopover label={def.label} orientation="vertical" side="right" align="center" />
             </button>
           );
         })}
@@ -111,15 +110,13 @@ export function GlobalRail({ viewMode, setViewMode }: GlobalRailProps) {
       <div className="global-rail-group bottom">
         <button
           type="button"
-          className={`rail-item${viewMode === settingsMode ? ' active' : ''}`}
+          className={`rail-item nav-tooltip-host${viewMode === settingsMode ? ' active' : ''}`}
           aria-label={VIEW_DEFINITIONS[settingsMode].label}
           aria-current={viewMode === settingsMode ? 'page' : undefined}
           onClick={() => setViewMode(settingsMode)}
         >
           <RailIcon mode={settingsMode} />
-          <span className="rail-tooltip" role="tooltip">
-            {VIEW_DEFINITIONS[settingsMode].label}
-          </span>
+          <NavTooltipPopover label={VIEW_DEFINITIONS[settingsMode].label} orientation="vertical" side="right" align="center" />
         </button>
       </div>
     </nav>

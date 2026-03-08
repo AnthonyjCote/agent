@@ -1,7 +1,7 @@
 /**
  * Purpose: Define the agent-chart top-level view surface entrypoint.
  * Responsibilities:
- * - Provide the route-level mount component for agent-chart.
+ * - Mount the agent-chart route surface composition.
  */
 // @tags: domain,agent-chart,view
 // @status: active
@@ -9,6 +9,8 @@
 // @domain: agent-chart
 // @adr: none
 
+import { AgentChartSurface } from './surface';
+
 export function AgentChartView() {
-  return null;
+  return <AgentChartSurface />;
 }

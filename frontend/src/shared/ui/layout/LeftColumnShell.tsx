@@ -16,11 +16,12 @@ import './LeftColumnShell.css';
 type LeftColumnShellProps = {
   left: ReactNode;
   right: ReactNode;
+  width?: 'standard' | 'wide';
 };
 
-export function LeftColumnShell({ left, right }: LeftColumnShellProps) {
+export function LeftColumnShell({ left, right, width = 'standard' }: LeftColumnShellProps) {
   return (
-    <section className="left-column-shell">
+    <section className={`left-column-shell left-column-shell-${width}`}>
       <aside className="left-column-shell-left">{left}</aside>
       <div className="left-column-shell-right">{right}</div>
     </section>

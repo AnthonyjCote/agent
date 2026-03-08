@@ -1,0 +1,610 @@
+/*
+ * Purpose: Style org-chart hierarchy editor with file-system-like tree interactions.
+ * Responsibilities:
+ * - Provide clear tree affordances for selection and hierarchy edit mode.
+ * - Keep details panel readable for org unit and actor editing.
+ */
+/* @tags: domain,agent-chart,surface,styles */
+/* @status: active */
+/* @owner: founder */
+/* @domain: agent-chart */
+/* @adr: none */
+
+.agent-chart-surface {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+
+.agent-chart-left-pane {
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  min-height: 0;
+}
+
+.agent-chart-icon-actions,
+.agent-chart-history-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.agent-chart-icon-button {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--border-subtle) 88%, transparent);
+  background: color-mix(in srgb, var(--surface-elevated, #181d28) 85%, transparent);
+  color: var(--text-secondary, #a5afc4);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  position: relative;
+  overflow: visible;
+}
+
+.agent-chart-icon-button svg {
+  width: 15px;
+  height: 15px;
+}
+
+.agent-chart-icon-button:hover {
+  background: color-mix(in srgb, #2a3242 70%, transparent);
+  color: var(--text-primary, #e6ebff);
+}
+
+.agent-chart-icon-button.active {
+  border-color: color-mix(in srgb, #4e6ed7 48%, #2a3145);
+  color: #d4deff;
+  background: color-mix(in srgb, #243356 72%, transparent);
+}
+
+.agent-chart-icon-button:disabled {
+  opacity: 0.38;
+  cursor: default;
+}
+
+.agent-chart-icon-button:disabled:hover {
+  background: color-mix(in srgb, var(--surface-elevated, #181d28) 85%, transparent);
+  color: var(--text-secondary, #a5afc4);
+}
+
+
+.agent-chart-error-banner {
+  margin: 10px 12px 0;
+  color: #ff8d8d;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.agent-chart-tree {
+  min-height: 0;
+  overflow: auto;
+  padding: 10px 0 14px;
+}
+
+.agent-chart-tree-section-heading {
+  color: var(--text-muted, #8f99af);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 10px 12px 6px;
+}
+
+.agent-chart-tree-section-empty {
+  color: var(--text-muted, #8f99af);
+  font-size: 12px;
+  padding: 2px 12px 8px;
+}
+
+.agent-chart-tree-node {
+  min-width: 0;
+}
+
+.agent-chart-business-unit-row {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  display: flex;
+  align-items: center;
+  padding: 4px 8px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.agent-chart-business-unit-row:hover {
+  background: transparent;
+}
+
+.agent-chart-business-unit-row.drop-inside {
+  background: transparent;
+}
+
+.agent-chart-tree-row {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  text-align: left;
+  cursor: pointer;
+  position: relative;
+}
+
+.agent-chart-tree-guides {
+  position: relative;
+  align-self: stretch;
+  height: 100%;
+  min-height: 24px;
+  display: block;
+  pointer-events: none;
+}
+
+.agent-chart-tree-guide-line {
+  position: absolute;
+  top: -10px;
+  bottom: -10px;
+  width: 1px;
+  background: rgba(132, 151, 190, 0.62);
+}
+
+.agent-chart-tree-guide-elbow {
+  position: absolute;
+  top: 50%;
+  width: 10px;
+  height: 10px;
+  border-left: 1px solid rgba(132, 151, 190, 0.72);
+  border-bottom: 1px solid rgba(132, 151, 190, 0.72);
+  transform: translateY(-50%);
+}
+
+.agent-chart-tree-row.drop-inside {
+  background: transparent;
+}
+
+.agent-chart-tree-row.drop-before::before,
+.agent-chart-tree-row.drop-after::after {
+  content: '';
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  height: 2px;
+  border-radius: 999px;
+  background: #69ba84;
+  box-shadow: 0 0 0 1px rgba(31, 52, 39, 0.62);
+}
+
+.agent-chart-tree-row.drop-before::before {
+  top: -1px;
+}
+
+.agent-chart-tree-row.drop-after::after {
+  bottom: -1px;
+}
+
+.agent-chart-tree-row.drag-source-hidden {
+  display: none;
+}
+
+.agent-chart-row-card {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid rgba(60, 76, 108, 0.46);
+  border-radius: 10px;
+  background: rgba(17, 23, 35, 0.9);
+  box-shadow: inset 0 0 0 1px rgba(26, 36, 54, 0.42);
+  padding: 7px 9px;
+}
+
+.agent-chart-tree-row:hover .agent-chart-row-card,
+.agent-chart-business-unit-row:hover .agent-chart-row-card {
+  background: rgba(23, 31, 47, 0.92);
+  border-color: rgba(90, 113, 154, 0.42);
+}
+
+.agent-chart-tree-row.active .agent-chart-row-card,
+.agent-chart-business-unit-row.active .agent-chart-row-card {
+  background: rgba(30, 43, 66, 0.94);
+  border-color: rgba(108, 144, 214, 0.74);
+  box-shadow:
+    inset 0 0 0 1px rgba(156, 184, 241, 0.38),
+    0 0 0 1px rgba(52, 81, 136, 0.32);
+}
+
+.agent-chart-tree-row.drop-inside .agent-chart-row-card,
+.agent-chart-business-unit-row.drop-inside .agent-chart-row-card {
+  background: rgba(24, 52, 38, 0.9);
+  border-color: rgba(89, 168, 117, 0.7);
+  box-shadow: inset 0 0 0 1px rgba(124, 210, 153, 0.34);
+}
+
+.agent-chart-node-media {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  border: 1px solid color-mix(in srgb, var(--border-subtle) 82%, transparent);
+  display: grid;
+  place-items: center;
+  color: var(--text-muted, #8e99b0);
+  overflow: hidden;
+  background: color-mix(in srgb, #121927 88%, transparent);
+}
+
+.agent-chart-node-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.agent-chart-node-media svg {
+  width: 15px;
+  height: 15px;
+  display: block;
+}
+
+.agent-chart-tree-row.actor .agent-chart-node-media {
+  border-radius: 999px;
+}
+
+.agent-chart-node-media.business-unit {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  color: #9db2dd;
+}
+
+.agent-chart-node-media.business-unit.scope-bucket {
+  color: #b4bfd7;
+}
+
+.agent-chart-node-media.details {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+}
+
+.agent-chart-node-media.details.actor {
+  border-radius: 999px;
+}
+
+.agent-chart-node-content {
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+}
+
+.agent-chart-node-title {
+  color: var(--text-primary, #e7ecf9);
+  font-size: 13px;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.agent-chart-node-meta {
+  color: var(--text-muted, #8f99af);
+  font-size: 11px;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.agent-chart-drop-action-chip {
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, #6fb88a 52%, transparent);
+  background: color-mix(in srgb, #173023 78%, transparent);
+  color: #bce8ca;
+  font-size: 10px;
+  line-height: 1;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  padding: 5px 8px;
+  white-space: nowrap;
+}
+
+.agent-chart-row-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.agent-chart-collapse-toggle {
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(95, 116, 153, 0.56);
+  background: rgba(14, 19, 30, 0.86);
+  color: #b1c1dd;
+  line-height: 0;
+}
+
+.agent-chart-collapse-toggle:hover {
+  border-color: rgba(121, 147, 193, 0.72);
+  color: #dde9ff;
+  background: rgba(22, 30, 46, 0.92);
+}
+
+.agent-chart-collapse-toggle svg {
+  width: 14px;
+  height: 14px;
+  display: block;
+}
+
+.agent-chart-collapse-icon {
+  overflow: visible;
+}
+
+.agent-chart-collapse-icon line,
+.agent-chart-collapse-icon path {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.1;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition:
+    opacity 180ms ease,
+    transform 240ms cubic-bezier(0.2, 0.65, 0.2, 1),
+    stroke-dashoffset 260ms ease;
+  transform-origin: 50% 50%;
+}
+
+.agent-chart-collapse-icon-hamburger {
+  transition: opacity 180ms ease, transform 240ms cubic-bezier(0.2, 0.65, 0.2, 1);
+  transform-origin: 50% 50%;
+}
+
+.agent-chart-collapse-icon-chevron {
+  stroke-dasharray: 22;
+  stroke-dashoffset: 22;
+  opacity: 0;
+  transform: translateY(-1px) scale(0.85);
+}
+
+.agent-chart-collapse-icon.is-open .agent-chart-collapse-icon-hamburger {
+  opacity: 0;
+  transform: translateY(1px) scale(0.86);
+}
+
+.agent-chart-collapse-icon.is-open .agent-chart-collapse-icon-chevron {
+  stroke-dashoffset: 0;
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.agent-chart-right-pane {
+  display: grid;
+  gap: 14px;
+  align-content: start;
+  min-height: 0;
+}
+
+.agent-chart-workspace-meta {
+  display: grid;
+  gap: 1px;
+}
+
+.agent-chart-workspace-title {
+  color: var(--text-primary, #e7ecf9);
+  font-size: 13px;
+  line-height: 1.2;
+  font-weight: 500;
+}
+
+.agent-chart-workspace-status {
+  color: var(--text-muted, #8f99af);
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.agent-chart-view-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px;
+  border: 1px solid color-mix(in srgb, var(--border-strong) 88%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, #131922 92%, transparent);
+}
+
+.agent-chart-view-toggle-button {
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted, #8f99af);
+  padding: 6px 10px;
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.agent-chart-view-toggle-button:hover {
+  color: var(--text-primary, #e6ebfa);
+  background: color-mix(in srgb, #2a3242 60%, transparent);
+}
+
+.agent-chart-view-toggle-button.active {
+  color: #d4deff;
+  background: color-mix(in srgb, #243356 74%, transparent);
+}
+
+.agent-chart-details-card,
+.agent-chart-empty-details,
+.agent-chart-canvas-placeholder {
+  background: color-mix(in srgb, #131821 90%, transparent);
+  border: 1px solid color-mix(in srgb, var(--border-subtle) 84%, transparent);
+  border-radius: 14px;
+  padding: 16px 16px 18px;
+  display: grid;
+  gap: 10px;
+}
+
+.agent-chart-details-card h2,
+.agent-chart-empty-details h2,
+.agent-chart-canvas-placeholder h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text-primary, #e6ebfa);
+}
+
+.agent-chart-empty-details p,
+.agent-chart-canvas-placeholder p {
+  margin: 0;
+  color: var(--text-muted, #919ab0);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.agent-chart-field-label {
+  color: var(--text-muted, #8f98ad);
+  font-size: 12px;
+  line-height: 1.25;
+  margin-top: 2px;
+}
+
+.agent-chart-media-picker {
+  border: 1px solid color-mix(in srgb, var(--border-subtle) 82%, transparent);
+  background: color-mix(in srgb, #111722 90%, transparent);
+  color: var(--text-secondary, #aeb7cb);
+  border-radius: 12px;
+  padding: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  justify-self: start;
+  cursor: pointer;
+}
+
+.agent-chart-media-picker:hover {
+  border-color: color-mix(in srgb, #6f89bd 44%, transparent);
+  background: color-mix(in srgb, #172132 90%, transparent);
+  color: var(--text-primary, #e7ecf9);
+}
+
+.agent-chart-media-picker span {
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.agent-chart-media-input {
+  display: none;
+}
+
+.agent-chart-field-hint {
+  margin: -4px 0 0;
+  color: var(--text-muted, #8f99af);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.agent-chart-child-org-list {
+  display: grid;
+  gap: 6px;
+}
+
+.agent-chart-child-org-items {
+  margin: 0;
+  padding: 0 0 0 18px;
+  display: grid;
+  gap: 4px;
+  color: var(--text-secondary, #aeb7cb);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.agent-chart-details-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 6px;
+}
+
+.agent-chart-drag-chip {
+  position: fixed;
+  z-index: 90;
+  pointer-events: none;
+  min-width: 170px;
+  max-width: 240px;
+  display: grid;
+  grid-template-columns: 26px 1fr;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, #7da2ee 44%, #5a6781);
+  background: linear-gradient(180deg, rgba(21, 30, 45, 0.95) 0%, rgba(15, 21, 33, 0.95) 100%);
+  box-shadow:
+    0 16px 34px rgba(4, 10, 18, 0.58),
+    inset 0 0 0 1px rgba(195, 214, 255, 0.06);
+}
+
+.agent-chart-drag-chip-plus {
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  width: 19px;
+  height: 19px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #84c990;
+  background: #1a4127;
+  color: #b8f0c5;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.agent-chart-drag-chip-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  border: 1px solid color-mix(in srgb, var(--border-subtle) 70%, #8ca0c9 20%);
+  background: rgba(8, 15, 24, 0.82);
+  display: grid;
+  place-items: center;
+  color: #a5b8de;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.agent-chart-drag-chip-meta {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.agent-chart-drag-chip-meta strong {
+  font-size: 12px;
+  color: #e5ecfb;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.agent-chart-drag-chip-meta small {
+  font-size: 11px;
+  color: #98a9cb;
+}
+
+body.agent-chart-pointer-dragging {
+  cursor: grabbing !important;
+  user-select: none;
+}

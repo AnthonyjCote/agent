@@ -1,0 +1,179 @@
+/*
+ * Purpose: Style shared nav/icon tooltip popover with directional arrow variants.
+ * Responsibilities:
+ * - Provide side/align placement presets for rail and topbar icon hosts.
+ * - Keep tooltip visuals consistent across navigation control surfaces.
+ */
+/* @tags: shared-ui,feedback,tooltip,styles */
+/* @status: active */
+/* @owner: founder */
+/* @domain: shared */
+/* @adr: none */
+
+.nav-tooltip-popover {
+  position: absolute;
+  pointer-events: none;
+  opacity: 0;
+  white-space: nowrap;
+  font-size: 11px;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border-strong);
+  background: #232830;
+  color: var(--text-primary, #e7ecf9);
+  box-shadow: 0 8px 24px rgba(6, 10, 16, 0.42);
+  z-index: 50;
+  transition:
+    opacity 0.14s ease,
+    transform 0.14s ease;
+}
+
+.nav-tooltip-popover::before {
+  content: '';
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background: #232830;
+  transform: rotate(45deg);
+}
+
+.nav-tooltip-popover[data-side='right'] {
+  left: calc(100% + 10px);
+  top: 50%;
+  transform: translateY(-50%) translateX(-4px);
+}
+
+.nav-tooltip-popover[data-side='right']::before {
+  left: -5px;
+  top: 50%;
+  border-left: 1px solid var(--border-strong);
+  border-bottom: 1px solid var(--border-strong);
+  transform: translateY(-50%) rotate(45deg);
+}
+
+.nav-tooltip-popover[data-side='left'] {
+  right: calc(100% + 10px);
+  top: 50%;
+  transform: translateY(-50%) translateX(4px);
+}
+
+.nav-tooltip-popover[data-side='left']::before {
+  right: -5px;
+  top: 50%;
+  border-top: 1px solid var(--border-strong);
+  border-right: 1px solid var(--border-strong);
+  transform: translateY(-50%) rotate(45deg);
+}
+
+.nav-tooltip-popover[data-side='bottom'] {
+  top: calc(100% + 10px);
+  transform: translateY(-4px);
+}
+
+.nav-tooltip-popover[data-side='bottom'][data-align='start'] {
+  left: 0;
+}
+
+.nav-tooltip-popover[data-side='bottom'][data-align='center'] {
+  left: 50%;
+  transform: translate(-50%, -4px);
+}
+
+.nav-tooltip-popover[data-side='bottom'][data-align='end'] {
+  right: 0;
+}
+
+.nav-tooltip-popover[data-side='bottom']::before {
+  top: -5px;
+  border-top: 1px solid var(--border-strong);
+  border-left: 1px solid var(--border-strong);
+}
+
+.nav-tooltip-popover[data-side='bottom'][data-align='start']::before {
+  left: 12px;
+}
+
+.nav-tooltip-popover[data-side='bottom'][data-align='center']::before {
+  left: calc(50% - 4px);
+}
+
+.nav-tooltip-popover[data-side='bottom'][data-align='end']::before {
+  right: 12px;
+}
+
+.nav-tooltip-popover[data-side='top'] {
+  bottom: calc(100% + 10px);
+  transform: translateY(4px);
+}
+
+.nav-tooltip-popover[data-side='top'][data-align='start'] {
+  left: 0;
+}
+
+.nav-tooltip-popover[data-side='top'][data-align='center'] {
+  left: 50%;
+  transform: translate(-50%, 4px);
+}
+
+.nav-tooltip-popover[data-side='top'][data-align='end'] {
+  right: 0;
+}
+
+.nav-tooltip-popover[data-side='top']::before {
+  bottom: -5px;
+  border-right: 1px solid var(--border-strong);
+  border-bottom: 1px solid var(--border-strong);
+}
+
+.nav-tooltip-popover[data-side='top'][data-align='start']::before {
+  left: 12px;
+}
+
+.nav-tooltip-popover[data-side='top'][data-align='center']::before {
+  left: calc(50% - 4px);
+}
+
+.nav-tooltip-popover[data-side='top'][data-align='end']::before {
+  right: 12px;
+}
+
+.nav-tooltip-host:hover .nav-tooltip-popover,
+.nav-tooltip-host:focus-visible .nav-tooltip-popover {
+  opacity: 1;
+}
+
+.nav-tooltip-host:hover .nav-tooltip-popover[data-side='right'],
+.nav-tooltip-host:focus-visible .nav-tooltip-popover[data-side='right'] {
+  transform: translateY(-50%) translateX(0);
+}
+
+.nav-tooltip-host:hover .nav-tooltip-popover[data-side='left'],
+.nav-tooltip-host:focus-visible .nav-tooltip-popover[data-side='left'] {
+  transform: translateY(-50%) translateX(0);
+}
+
+.nav-tooltip-host:hover .nav-tooltip-popover[data-side='bottom'][data-align='start'],
+.nav-tooltip-host:focus-visible .nav-tooltip-popover[data-side='bottom'][data-align='start'],
+.nav-tooltip-host:hover .nav-tooltip-popover[data-side='bottom'][data-align='end'],
+.nav-tooltip-host:focus-visible .nav-tooltip-popover[data-side='bottom'][data-align='end'] {
+  transform: translateY(0);
+}
+
+.nav-tooltip-host:hover .nav-tooltip-popover[data-side='bottom'][data-align='center'],
+.nav-tooltip-host:focus-visible .nav-tooltip-popover[data-side='bottom'][data-align='center'] {
+  transform: translate(-50%, 0);
+}
+
+.nav-tooltip-host:hover .nav-tooltip-popover[data-side='top'][data-align='start'],
+.nav-tooltip-host:focus-visible .nav-tooltip-popover[data-side='top'][data-align='start'],
+.nav-tooltip-host:hover .nav-tooltip-popover[data-side='top'][data-align='end'],
+.nav-tooltip-host:focus-visible .nav-tooltip-popover[data-side='top'][data-align='end'] {
+  transform: translateY(0);
+}
+
+.nav-tooltip-host:hover .nav-tooltip-popover[data-side='top'][data-align='center'],
+.nav-tooltip-host:focus-visible .nav-tooltip-popover[data-side='top'][data-align='center'] {
+  transform: translate(-50%, 0);
+}

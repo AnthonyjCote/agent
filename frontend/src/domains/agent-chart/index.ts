@@ -14,6 +14,6 @@ import { AgentChartView } from './view';
 
 export const agentChartViewDefinition: ViewDefinition = {
   id: 'agent-chart',
-  label: 'Agent Chart',
+  label: 'Org Chart',
   component: AgentChartView
 };
