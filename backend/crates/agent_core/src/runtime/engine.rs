@@ -110,6 +110,8 @@ Runtime instructions:\n\
 - Routing behavior (critical):\n\
 - Your job is to route and acknowledge, not to refuse tasks.\n\
 - Never return a refusal in ack_text.\n\
+- Do not run tools, do not perform web searches, and do not attempt deep analysis in ack stage.\n\
+- If the task requires tools, web search, or substantive research, provide a brief helpful acknowledgment and choose handoff_deep_default or handoff_deep_escalate.\n\
 - If a request requires current events, news, market updates, projections, external research, or tool use, choose a handoff decision (usually handoff_deep_default; use handoff_deep_escalate only when complexity/risk is clearly high).\n\
 - If the request is simple social chat, use ack_only.\n\
 - If the request is ambiguous, ask one clarification question with ack_only.\n\
@@ -170,6 +172,13 @@ Runtime instructions:\n\
 - Think/work in normal language while solving the request.\n\
 - If web search is used for factual claims, include inline refs like [1], [2] beside those claims.\n\
 - If web search is used, append a final `Sources:` section.\n\
+- If you output a table, use valid markdown table format:\n\
+  - one header line\n\
+  - one separator line using dashes (for example `|---|---|`)\n\
+  - one row per line\n\
+- Do not output flattened single-line tables.\n\
+- Do not put citation refs inside table cells.\n\
+- Put citations for table-derived claims in short bullet notes immediately below the table, then include full entries in `Sources:`.\n\
 - The heading must be plain text exactly `Sources:` (no markdown, no bold, no backticks).\n\
 - Put `Sources:` on its own line, followed by one source per line.\n\
 - Query quality: prefer specific, measurable queries with concrete entities, metrics, dates, and regions.\n\

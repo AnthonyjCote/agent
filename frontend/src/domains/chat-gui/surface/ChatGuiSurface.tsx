@@ -29,6 +29,11 @@ type CitationSource = {
   url: string;
 };
 
+type MarkdownTable = {
+  header: string[];
+  rows: string[][];
+};
+
 function parseAssistantContentWithSources(content: string): {
   body: string;
   sources: Record<string, CitationSource>;
@@ -134,14 +139,143 @@ function renderInlineMarkdown(
   });
 }
 
+function parseMarkdownTable(lines: string[], startIndex: number): { table: MarkdownTable; consumed: number } | null {
+  const headerLine = lines[startIndex]?.trim() || '';
+  const separatorLine = lines[startIndex + 1]?.trim() || '';
+  if (!headerLine.includes('|') || !separatorLine.includes('|')) {
+    return null;
+  }
+
+  const parseRow = (line: string): string[] =>
+    line
+      .split('|')
+      .map((cell) => cell.trim())
+      .filter((_, index, arr) => !(index === 0 && arr[0] === '') && !(index === arr.length - 1 && arr[arr.length - 1] === ''));
+
+  const header = parseRow(headerLine);
+  const separator = parseRow(separatorLine);
+  if (!header.length || separator.length !== header.length) {
+    return null;
+  }
+  const validSeparator = separator.every((cell) => /^:?-{3,}:?$/.test(cell));
+  if (!validSeparator) {
+    return null;
+  }
+
+  const rows: string[][] = [];
+  let consumed = 2;
+  for (let index = startIndex + 2; index < lines.length; index += 1) {
+    const rowLine = lines[index].trim();
+    if (!rowLine || !rowLine.includes('|')) {
+      break;
+    }
+    const row = parseRow(rowLine);
+    if (row.length !== header.length) {
+      break;
+    }
+    rows.push(row);
+    consumed += 1;
+  }
+
+  if (!rows.length) {
+    return null;
+  }
+
+  return { table: { header, rows }, consumed };
+}
+
+function normalizeInlineMarkdownTable(body: string): string {
+  const separatorRegex = /(\|?\s*:?-{3,}:?\s*(?:\|\s*:?-{3,}:?\s*){1,})/;
+  const separatorMatch = separatorRegex.exec(body);
+  if (!separatorMatch || typeof separatorMatch.index !== 'number') {
+    return body;
+  }
+
+  const parseRow = (line: string): string[] =>
+    line
+      .split('|')
+      .map((cell) => cell.trim())
+      .filter((_, index, arr) => !(index === 0 && arr[0] === '') && !(index === arr.length - 1 && arr[arr.length - 1] === ''));
+
+  const separatorText = separatorMatch[1].trim();
+  const separatorCols = parseRow(separatorText);
+  if (separatorCols.length < 2) {
+    return body;
+  }
+
+  const prefix = body.slice(0, separatorMatch.index);
+  const suffix = body.slice(separatorMatch.index + separatorMatch[1].length);
+  const headerLineCandidate = prefix
+    .split('\n')
+    .pop()
+    ?.split(':')
+    .pop()
+    ?.trim();
+  if (!headerLineCandidate || !headerLineCandidate.includes('|')) {
+    return body;
+  }
+  const headerCols = parseRow(headerLineCandidate);
+  if (headerCols.length !== separatorCols.length) {
+    return body;
+  }
+
+  const sourcesIndex = suffix.search(/\bSources:\b/i);
+  const tableRowsRaw = sourcesIndex >= 0 ? suffix.slice(0, sourcesIndex) : suffix;
+  const remainder = sourcesIndex >= 0 ? suffix.slice(sourcesIndex) : '';
+  const rowStartRegex = /\b[A-Z][A-Za-z0-9.-]*(?:\s+[A-Z][A-Za-z0-9.-]*){0,2}\s+\|/g;
+  const rowStarts: number[] = [];
+  for (const match of tableRowsRaw.matchAll(rowStartRegex)) {
+    const index = match.index;
+    if (typeof index !== 'number') {
+      continue;
+    }
+    if (rowStarts.length === 0 || rowStarts[rowStarts.length - 1] !== index) {
+      rowStarts.push(index);
+    }
+  }
+  if (!rowStarts.length) {
+    return body;
+  }
+  const rowLines: string[] = [];
+  for (let index = 0; index < rowStarts.length; index += 1) {
+    const start = rowStarts[index];
+    const end = index + 1 < rowStarts.length ? rowStarts[index + 1] : tableRowsRaw.length;
+    const segment = tableRowsRaw.slice(start, end).trim();
+    if (!segment) {
+      continue;
+    }
+    const row = parseRow(segment);
+    if (row.length !== headerCols.length) {
+      break;
+    }
+    rowLines.push(`| ${row.join(' | ')} |`);
+  }
+  if (!rowLines.length) {
+    return body;
+  }
+
+  const prefixWithoutHeader = prefix.slice(0, prefix.length - headerLineCandidate.length).trimEnd();
+  const headerLine = `| ${headerCols.join(' | ')} |`;
+  const separatorLine = `| ${separatorCols.join(' | ')} |`;
+  const tableBlock = [headerLine, separatorLine, ...rowLines].join('\n');
+  const joiner = prefixWithoutHeader ? '\n' : '';
+  const remainderJoiner = remainder ? '\n' : '';
+  return `${prefixWithoutHeader}${joiner}${tableBlock}${remainderJoiner}${remainder}`.trim();
+}
+
 function renderAssistantMarkdown(
   content: string,
   searchQueries: SearchQueryLink[] | undefined,
   onOpenCitation: (source: CitationSource) => void,
-  onOpenQuery: (query: SearchQueryLink) => void
+  onOpenQuery: (query: SearchQueryLink) => void,
+  options?: {
+    showSources?: boolean;
+  }
 ): ReactNode {
+  const showSources = options?.showSources ?? true;
   const parsed = parseAssistantContentWithSources(content);
-  const lines = parsed.body.split('\n');
+  const normalizedBody = normalizeInlineMarkdownTable(parsed.body);
+  const lines = normalizedBody.split('\n');
   const blocks: ReactNode[] = [];
   let paragraphLines: string[] = [];
   let bulletItems: string[] = [];
@@ -179,12 +313,48 @@ function renderAssistantMarkdown(
     );
   };
 
-  for (const line of lines) {
+  for (let lineIndex = 0; lineIndex < lines.length; lineIndex += 1) {
+    const line = lines[lineIndex];
     const trimmed = line.trim();
 
     if (!trimmed) {
       flushParagraph();
       flushBullets();
+      continue;
+    }
+
+    const tableParse = parseMarkdownTable(lines, lineIndex);
+    if (tableParse) {
+      flushParagraph();
+      flushBullets();
+      const { table } = tableParse;
+      blocks.push(
+        <div key={`table-${blocks.length}`} className="chat-gui-markdown-table-wrap">
+          <table className="chat-gui-markdown-table">
+            <thead>
+              <tr>
+                {table.header.map((cell, index) => (
+                  <th key={`th-${index}`} className="chat-gui-markdown-th">
+                    {renderInlineMarkdown(cell, parsed.sources, onOpenCitation)}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {table.rows.map((row, rowIndex) => (
+                <tr key={`tr-${rowIndex}`}>
+                  {row.map((cell, cellIndex) => (
+                    <td key={`td-${rowIndex}-${cellIndex}`} className="chat-gui-markdown-td">
+                      {renderInlineMarkdown(cell, parsed.sources, onOpenCitation)}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      );
+      lineIndex += tableParse.consumed - 1;
       continue;
     }
 
@@ -226,7 +396,7 @@ function renderAssistantMarkdown(
   return (
     <div className="chat-gui-markdown">
       {blocks}
-      {sourceList.length > 0 ? (
+      {showSources && sourceList.length > 0 ? (
         <div className="chat-gui-sources">
           <span className="chat-gui-sources-label">Sources</span>
           <div className="chat-gui-sources-list">
@@ -241,7 +411,7 @@ function renderAssistantMarkdown(
           </div>
         </div>
       ) : null}
-      {searchQueries && searchQueries.length > 0 ? (
+      {showSources && searchQueries && searchQueries.length > 0 ? (
         <div className="chat-gui-sources">
           <span className="chat-gui-sources-label">Search Queries</span>
           <div className="chat-gui-sources-list">
@@ -535,7 +705,17 @@ export function ChatGuiSurface() {
                           {message.pendingStatus}
                         </span>
                       ) : null}
-                      {message.content ? <div className="chat-gui-pending-draft">{message.content}</div> : null}
+                      {message.content ? (
+                        <div className="chat-gui-pending-draft">
+                          {renderAssistantMarkdown(
+                            message.content,
+                            undefined,
+                            handleOpenCitation,
+                            handleOpenSearchQuery,
+                            { showSources: false }
+                          )}
+                        </div>
+                      ) : null}
                       {message.pendingReasoning ? (
                         <div className="chat-gui-pending-reasoning">{message.pendingReasoning}</div>
                       ) : null}

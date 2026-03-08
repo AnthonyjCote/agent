@@ -138,53 +138,88 @@ function resolveAssistantPendingStatus(events: RuntimeRunEvent[]): string {
     return 'Run failed';
   }
 
-  const dispatchedTool = [...events]
-    .reverse()
-    .find((event) => event.event === 'tool_use' && event.lifecycle === 'dispatched');
-  if (dispatchedTool && typeof dispatchedTool.tool_name === 'string' && dispatchedTool.tool_name.trim()) {
-    return `Running ${dispatchedTool.tool_name.trim()}...`;
-  }
-  if (dispatchedTool) {
-    return 'Running tools...';
+  const parseStreamJson = (line: string): Record<string, unknown> | null => {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith('{') || !trimmed.endsWith('}')) {
+      return null;
+    }
+    try {
+      return JSON.parse(trimmed) as Record<string, unknown>;
+    } catch {
+      return null;
+    }
+  };
+
+  const isSearchTool = (toolName: string): boolean => {
+    const normalized = toolName.trim().toLowerCase();
+    return normalized === 'google_web_search' || normalized.includes('search');
+  };
+
+  for (let index = events.length - 1; index >= 0; index -= 1) {
+    const event = events[index];
+    if (!event) {
+      continue;
+    }
+
+    if (event.event === 'debug_model_request' && typeof event.phase === 'string') {
+      const phase = event.phase;
+      if (phase === 'deep_default' || phase === 'deep_escalate' || phase === 'agent_loop') {
+        return 'Thinking...';
+      }
+      if (phase === 'ack_stage') {
+        return 'Receiving...';
+      }
+    }
+
+    if (event.event === 'model_delta' && typeof event.text === 'string' && event.text.trim()) {
+      return 'Typing...';
+    }
+
+    if (event.event === 'debug_model_stream_line' && typeof event.line === 'string') {
+      const parsed = parseStreamJson(event.line);
+      if (!parsed) {
+        continue;
+      }
+      const type = typeof parsed.type === 'string' ? parsed.type : '';
+      if (type === 'message') {
+        const role = typeof parsed.role === 'string' ? parsed.role : '';
+        const content = typeof parsed.content === 'string' ? parsed.content : '';
+        if (role === 'assistant' && content.trim()) {
+          return 'Typing...';
+        }
+      }
+      if (type === 'tool_use') {
+        const toolName = typeof parsed.tool_name === 'string' ? parsed.tool_name : '';
+        return isSearchTool(toolName) ? 'Researching...' : 'Working...';
+      }
+      if (type === 'tool_result') {
+        const toolName = typeof parsed.tool_name === 'string' ? parsed.tool_name : '';
+        return isSearchTool(toolName) ? 'Analyzing...' : 'Working...';
+      }
+    }
+
+    if (event.event === 'tool_use' && event.lifecycle === 'dispatched') {
+      const toolName = typeof event.tool_name === 'string' ? event.tool_name : '';
+      return isSearchTool(toolName) ? 'Researching...' : 'Working...';
+    }
+    if (event.event === 'tool_result' && event.lifecycle === 'completed') {
+      const toolName = typeof event.tool_name === 'string' ? event.tool_name : '';
+      return isSearchTool(toolName) ? 'Analyzing...' : 'Working...';
+    }
   }
 
-  const modelResponse = [...events]
-    .reverse()
-    .find((event) => event.event === 'debug_model_response');
-  if (modelResponse) {
-    return 'Drafting response...';
+  const hasStreamLine = events.some((event) => event.event === 'debug_model_stream_line');
+  const hasModelRequest = events.some((event) => event.event === 'debug_model_request');
+  if (hasModelRequest && !hasStreamLine) {
+    return 'Receiving...';
   }
-
-  const modelRequest = [...events]
-    .reverse()
-    .find((event) => event.event === 'debug_model_request');
-  if (modelRequest && typeof modelRequest.phase === 'string') {
-    if (modelRequest.phase === 'ack_stage') {
-      return 'Acknowledging...';
-    }
-    if (modelRequest.phase === 'planner') {
-      return 'Planning...';
-    }
-    if (modelRequest.phase === 'synthesis') {
-      return 'Writing response...';
-    }
-    if (modelRequest.phase === 'deep_default') {
-      return 'Working...';
-    }
-    if (modelRequest.phase === 'deep_escalate') {
-      return 'Escalated analysis...';
-    }
-    if (modelRequest.phase === 'agent_loop') {
-      return 'Working...';
-    }
-  }
-  if (modelRequest) {
+  if (hasModelRequest && hasStreamLine) {
     return 'Thinking...';
   }
 
   const hasStarted = events.some((event) => event.event === 'run_started');
   if (hasStarted) {
-    return 'Thinking...';
+    return 'Receiving...';
   }
 
   return 'Connecting...';
