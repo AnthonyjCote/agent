@@ -23,6 +23,7 @@ import {
   MessageThreadShell,
   ModalTopRail,
   ModalShell,
+  ConfirmDialogModal,
   TextButton,
   TextField,
   DropdownSelector
@@ -447,6 +448,7 @@ export function ChatGuiSurface() {
   const [threadFilterBusinessUnitId, setThreadFilterBusinessUnitId] = useState<string>('all');
   const [threadFilterOrgUnitId, setThreadFilterOrgUnitId] = useState<string>('all');
   const [threadFilterAgentId, setThreadFilterAgentId] = useState<string>('all');
+  const [pendingDeleteThreadId, setPendingDeleteThreadId] = useState<string | null>(null);
   const [debugOpen, setDebugOpen] = useState(false);
   const [editingAgent, setEditingAgent] = useState<AgentManifest | undefined>(undefined);
   const [activeAgentId, setActiveAgentId] = useState<string>(() => localStorage.getItem(ACTIVE_AGENT_STORAGE_KEY) ?? '');
@@ -617,8 +619,12 @@ export function ChatGuiSurface() {
     await openThread(threadId, targetAgent);
     setConversationsOpen(false);
   };
-  const handleDeleteConversation = async (threadId: string) => {
-    await deleteThread(threadId, activeAgent);
+  const handleConfirmDeleteConversation = async () => {
+    if (!pendingDeleteThreadId) {
+      return;
+    }
+    await deleteThread(pendingDeleteThreadId, activeAgent);
+    setPendingDeleteThreadId(null);
   };
 
   const handleEditAgent = (agentId: string) => {
@@ -901,8 +907,10 @@ export function ChatGuiSurface() {
         ) : null}
         {!threadsLoading
           ? filteredThreads.map((thread) => {
-              const operator = operatorByAgentId.get(thread.operatorId);
-              const orgUnitName = operator ? orgUnitById.get(operator.orgUnitId)?.name : undefined;
+              const threadAgent = agents.find((agent) => agent.agentId === thread.operatorId);
+              const displayName = threadAgent?.name || 'Unknown operator';
+              const displayRole = threadAgent?.role || 'Operator';
+              const displayAvatar = threadAgent?.avatarDataUrl || undefined;
               return (
                 <article
                   key={thread.threadId}
@@ -910,37 +918,48 @@ export function ChatGuiSurface() {
                 >
                   <button
                     type="button"
+                    className="chat-gui-conversation-delete-button"
+                    title="Delete conversation"
+                    aria-label="Delete conversation"
+                    onClick={() => setPendingDeleteThreadId(thread.threadId)}
+                  >
+                    <svg viewBox="0 0 20 20" aria-hidden="true">
+                      <path d="M5 6h10M8 6V4h4v2m-6 0 1 10h6l1-10M9 9v5M11 9v5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </button>
+                  <button
+                    type="button"
                     className="chat-gui-conversation-open"
                     onClick={() => void handleOpenConversation(thread.threadId, thread.operatorId)}
                   >
-                    <span className="chat-gui-conversation-title">{thread.title || 'Untitled conversation'}</span>
+                    <span className="chat-gui-conversation-agent">
+                      <AgentAvatar name={displayName} src={displayAvatar} size="sm" shape="circle" />
+                      <span className="chat-gui-conversation-agent-meta">
+                        <span className="chat-gui-conversation-agent-name">{displayName}</span>
+                        <span className="chat-gui-conversation-agent-role">{displayRole}</span>
+                      </span>
+                    </span>
                     <span className="chat-gui-conversation-summary">{thread.summary || 'No summary yet.'}</span>
                     <span className="chat-gui-conversation-meta">
-                      <span>{agents.find((agent) => agent.agentId === thread.operatorId)?.name || 'Unknown operator'}</span>
-                      {orgUnitName ? <span>{orgUnitName}</span> : null}
-                      <span>{thread.messageCount} messages</span>
-                      <span>{formatThreadTimestamp(thread.updatedAtMs)}</span>
+                      <span className="chat-gui-conversation-date">{formatThreadTimestamp(thread.updatedAtMs)}</span>
+                      <span className="chat-gui-conversation-count">{thread.messageCount} messages</span>
                     </span>
                   </button>
-                  <div className="chat-gui-conversation-actions">
-                    <TextButton
-                      label="Open"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => void handleOpenConversation(thread.threadId, thread.operatorId)}
-                    />
-                    <TextButton
-                      label="Delete"
-                      variant="danger"
-                      size="sm"
-                      onClick={() => void handleDeleteConversation(thread.threadId)}
-                    />
-                  </div>
                 </article>
               );
             })
           : null}
       </div>
+      <ConfirmDialogModal
+        open={Boolean(pendingDeleteThreadId)}
+        title="Delete Conversation"
+        message="Delete this conversation thread? This cannot be undone."
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        confirmVariant="danger"
+        onCancel={() => setPendingDeleteThreadId(null)}
+        onConfirm={() => void handleConfirmDeleteConversation()}
+      />
     </ModalShell>
   );
 
