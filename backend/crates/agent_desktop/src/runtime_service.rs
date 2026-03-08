@@ -31,6 +31,7 @@ pub struct StartRunInput {
     pub agent_name: String,
     pub agent_role: String,
     pub agent_business_unit_name: String,
+    pub agent_org_unit_name: String,
     pub agent_primary_objective: String,
     pub system_directive_short: String,
     pub sender: String,
@@ -62,6 +63,10 @@ impl RuntimeService {
         let workspace_id_for_error = input.workspace_id.clone();
         let thread_id_for_error = input.thread_id.clone();
         let history_excerpt = self.render_history_excerpt(&input.thread_id);
+        let org_compact_preload = self
+            .state_store
+            .build_org_compact_preload(&self.workspace_id)
+            .unwrap_or_else(|_| "(org preload unavailable)".to_string());
         let user_message = input.message.trim().to_string();
         let request = RunRequest {
             workspace_id: input.workspace_id.clone(),
@@ -83,8 +88,10 @@ impl RuntimeService {
                     "message": input.message,
                     "history_excerpt": history_excerpt,
                     "agent_business_unit_name": input.agent_business_unit_name,
+                    "agent_org_unit_name": input.agent_org_unit_name,
                     "agent_primary_objective": input.agent_primary_objective,
-                    "allowed_tool_ids": input.allowed_tool_ids
+                    "allowed_tool_ids": input.allowed_tool_ids,
+                    "org_compact_preload": org_compact_preload
                 }),
             },
         };
@@ -107,11 +114,11 @@ impl RuntimeService {
         let workspace_id_for_tools = self.workspace_id.clone();
         let events = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             let mut tool_executor = |tool_name: &str, args: &serde_json::Value| -> Result<Option<ToolOutputEnvelope>, agent_core::models::run::RunError> {
-                if tool_name != "org_manage_entities_v1" {
+                if tool_name != "org_manage_entities_v2" {
                     return Ok(None);
                 }
                 let output = state_store
-                    .execute_org_manage_entities_v1(&workspace_id_for_tools, args)
+                    .execute_org_manage_entities_v2(&workspace_id_for_tools, args)
                     .map_err(|error| agent_core::models::run::RunError {
                         code: "org_manage_tool_failed".to_string(),
                         message: error.to_string(),

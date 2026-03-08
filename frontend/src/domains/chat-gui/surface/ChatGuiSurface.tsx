@@ -483,19 +483,26 @@ export function ChatGuiSurface() {
     }
     return businessUnitById.get(orgUnit.businessUnitId)?.name ?? '';
   }, [activeOperator, businessUnitById, orgUnitById]);
+  const activeOrgUnitName = useMemo(() => {
+    if (!activeOperator) {
+      return '';
+    }
+    return orgUnitById.get(activeOperator.orgUnitId)?.name ?? '';
+  }, [activeOperator, orgUnitById]);
   const activeAgent = useMemo(
     () => ({
       id: activeManifest?.agentId ?? 'agent-default',
       name: activeManifest?.name || 'Coordinator',
       role: activeManifest?.role || 'General Assistant',
       businessUnitName: activeBusinessUnitName || undefined,
+      orgUnitName: activeOrgUnitName || undefined,
       primaryObjective: activeOperator?.primaryObjective || '',
       systemDirectiveShort:
         activeManifest?.systemDirectiveShort || 'Be concise, clear, and helpful.',
       toolsPolicyRef: activeManifest?.toolsPolicyRef || 'policy_default',
       avatarUrl: activeManifest?.avatarDataUrl || undefined
     }),
-    [activeBusinessUnitName, activeManifest, activeOperator?.primaryObjective]
+    [activeBusinessUnitName, activeManifest, activeOperator?.primaryObjective, activeOrgUnitName]
   );
   const {
     messages,
@@ -635,27 +642,24 @@ export function ChatGuiSurface() {
       return;
     }
     const mutatedByOrgTool = runtimeEvents.some((event) => {
-      if (event.event !== 'debug_tool_result' || event.tool_name !== 'org_manage_entities_v1') {
+      if (event.event !== 'debug_tool_result' || event.tool_name !== 'org_manage_entities_v2') {
         return false;
       }
       const output = event.output as
-        | { operations?: Array<{ action?: string; status?: string }> }
+        | { operations?: Array<{ action?: string; status?: string }>; structuredData?: { operations?: Array<{ action?: string; status?: string }> } }
         | undefined;
-      const operations = Array.isArray(output?.operations) ? output.operations : [];
+      const operations = Array.isArray(output?.operations)
+        ? output.operations
+        : Array.isArray(output?.structuredData?.operations)
+          ? output.structuredData.operations
+          : [];
       return operations.some((operation) => {
         const action = (operation?.action || '').toLowerCase();
         const status = (operation?.status || '').toLowerCase();
         if (status !== 'ok') {
           return false;
         }
-        return (
-          action.startsWith('create_') ||
-          action.startsWith('update_') ||
-          action.startsWith('delete_') ||
-          action.startsWith('move_') ||
-          action.startsWith('assign_') ||
-          action.startsWith('set_')
-        );
+        return action === 'create' || action === 'update' || action === 'delete' || action === 'move' || action === 'assign' || action === 'set';
       });
     });
     if (!mutatedByOrgTool) {
@@ -682,6 +686,7 @@ export function ChatGuiSurface() {
           name: manifest.name || 'Coordinator',
           role: manifest.role || 'General Assistant',
           businessUnitName: targetBusinessUnitName || undefined,
+          orgUnitName: targetOrgUnit?.name || undefined,
           primaryObjective: targetOperator?.primaryObjective || '',
           systemDirectiveShort: manifest.systemDirectiveShort || 'Be concise, clear, and helpful.',
           toolsPolicyRef: manifest.toolsPolicyRef || 'policy_default',

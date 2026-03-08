@@ -8,6 +8,7 @@ export interface StartRunInput {
   agentName: string;
   agentRole: string;
   agentBusinessUnitName?: string;
+  agentOrgUnitName?: string;
   agentPrimaryObjective?: string;
   systemDirectiveShort: string;
   sender: string;

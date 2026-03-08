@@ -37,6 +37,7 @@ export type ActiveAgent = {
   name: string;
   role?: string;
   businessUnitName?: string;
+  orgUnitName?: string;
   primaryObjective?: string;
   systemDirectiveShort?: string;
   toolsPolicyRef?: string;

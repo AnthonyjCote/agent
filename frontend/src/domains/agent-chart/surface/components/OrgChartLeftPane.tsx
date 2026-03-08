@@ -19,7 +19,8 @@ type OrgChartLeftPaneProps = {
   onUndo: () => void;
   onRedo: () => void;
   selectedNode: SelectedNode;
-  setSelectedNode: Dispatch<SetStateAction<SelectedNode>>;
+  selectedNodeKeys: Set<string>;
+  onNodeClick: (next: SelectedNode, options?: { shiftKey?: boolean }) => void;
   operators: Operator[];
   orgUnits: OrgUnit[];
   businessUnits: BusinessUnit[];
@@ -52,7 +53,8 @@ export function OrgChartLeftPane(props: OrgChartLeftPaneProps) {
     onUndo,
     onRedo,
     selectedNode,
-    setSelectedNode,
+    selectedNodeKeys,
+    onNodeClick,
     operators,
     orgUnits,
     businessUnits,
@@ -154,7 +156,8 @@ export function OrgChartLeftPane(props: OrgChartLeftPaneProps) {
 
       <OrgHierarchyTree
         selectedNode={selectedNode}
-        setSelectedNode={setSelectedNode}
+        selectedNodeKeys={selectedNodeKeys}
+        onNodeClick={onNodeClick}
         operators={operators}
         orgUnits={orgUnits}
         businessUnits={businessUnits}

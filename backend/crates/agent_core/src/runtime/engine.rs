@@ -46,6 +46,7 @@ struct AckEnvelopeRaw {
     decision: Option<String>,
     ack_text: Option<String>,
     prefetch_tools: Option<Vec<String>>,
+    requires_web_search: Option<bool>,
 }
 
 #[derive(Debug, Clone)]
@@ -53,6 +54,7 @@ struct AckEnvelope {
     decision: AckDecision,
     ack_text: String,
     prefetch_tools: Vec<String>,
+    requires_web_search: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -103,6 +105,7 @@ fn ack_prompt(
     agent_name: &str,
     agent_role: &str,
     business_unit_name: &str,
+    org_unit_name: &str,
     primary_objective: &str,
     history_excerpt: &str,
     toolbox_summary: &str,
@@ -121,6 +124,7 @@ fn ack_prompt(
     format!(
         "You are the acknowledgement router for agent {agent_name} ({agent_role}).\n\
 Business unit: {business_unit_name}\n\
+Org unit: {org_unit_name}\n\
 Primary objective: {primary_objective}\n\
 Current datetime: {now}\n\
 {history_section}\
@@ -148,8 +152,9 @@ Runtime instructions:\n\
 - `prefetch_tools` is the explicit handoff mechanism used to provide expanded tool schema/instructions to deep stage.\n\
 - Include every app tool that is likely required for first-pass execution, up to the cap.\n\
 - Keep prefetch_tools small (max 5).\n\
+- Set `requires_web_search` to true only when the request needs current external facts/news/market data.\n\
 - Required JSON schema:\n\
-{{\"decision\":\"ack_only|handoff_deep_default|handoff_deep_escalate\",\"ack_text\":\"short user-facing text\",\"prefetch_tools\":[\"tool_id\"]}}"
+{{\"decision\":\"ack_only|handoff_deep_default|handoff_deep_escalate\",\"ack_text\":\"short user-facing text\",\"prefetch_tools\":[\"tool_id\"],\"requires_web_search\":false}}"
     )
 }
 
@@ -160,14 +165,18 @@ fn strip_final_response_sentinel(text: &str) -> String {
 fn deep_prompt(
     agent_name: &str,
     agent_role: &str,
+    business_unit_name: &str,
+    org_unit_name: &str,
     directive: &str,
     history_excerpt: &str,
     toolbox_summary: &str,
     prefetched_tool_details: &str,
+    org_compact_preload: &str,
     tool_results_log: &[String],
     work_log: &[String],
     step_index: usize,
     user_prompt: &str,
+    requires_web_search: bool,
 ) -> String {
     let now = Local::now().format("%Y-%m-%d %H:%M:%S %:z").to_string();
     let history_section = if history_excerpt.trim().is_empty() {
@@ -199,35 +208,16 @@ fn deep_prompt(
     } else {
         format!("Run work log (latest first):\n{}\n", work_log.join("\n"))
     };
-
-    format!(
-        "You are {agent_name}, acting as {agent_role}. This is step {step_index}.\n\
-Current datetime: {now}\n\
-Directive: {directive}\n\
-{history_section}\
-Toolbox summary (only these app tools are explicitly allowed):\n\
-{toolbox_summary}\n\
-{prefetch_section}\
-{tool_results_section}\
-{work_log_section}\
-User prompt: {user_prompt}\n\n\
-Runtime instructions:\n\
-- You may use native model capabilities/tools (for example web search) when needed.\n\
-- Think/work in normal language while solving the request.\n\
-- To call app tools from the toolbox, output one JSON object at the end of your message with this exact shape:\n\
-  {{\"tool_calls\":[{{\"tool\":\"tool_id\",\"args\":{{}}}}],\"final_response\":null}}\n\
-- For app tool calls: keep reasoning short, keep tool_calls minimal, and only use tool IDs listed in toolbox summary.\n\
-- Do not repeat the same tool call with the same args if prior app tool results already provide the needed data.\n\
-- If prior app tool results are sufficient to answer, output {FINAL_RESPONSE_SENTINEL} and finalize instead of calling tools again.\n\
-- Termination contract (critical):\n\
-- After a successful mutating app tool call (create/update/delete/move/assign/set), re-evaluate remaining requested work.\n\
-- If requested work is complete, do NOT call more tools; output {FINAL_RESPONSE_SENTINEL} and deliver the final user-facing result.\n\
-- Never emit the same mutating app tool call again after a success unless the user explicitly asks to repeat it.\n\
-- `final_response`: null is only valid when unresolved requested actions remain.\n\
-- If all requested actions are satisfied, terminate the loop in the next response.\n\
-- In your final response for creation/update workflows, confirm completion and include created/updated entity names and IDs when available from tool results.\n\
-- Do not wrap tool call JSON in markdown fences.\n\
-- If web search is used for factual claims, include inline refs like [1], [2] beside those claims.\n\
+    let org_preload_section = if org_compact_preload.trim().is_empty() {
+        "Org structure preload: (none)\n".to_string()
+    } else {
+        format!(
+            "Org structure preload (name-based hierarchy):\n{}\n",
+            org_compact_preload.trim()
+        )
+    };
+    let web_rules = if requires_web_search {
+        "- If web search is used for factual claims, include inline refs like [1], [2] beside those claims.\n\
 - If web search is used, append a final `Sources:` section.\n\
 - If you output a table, use valid markdown table format:\n\
   - one header line\n\
@@ -251,6 +241,42 @@ Runtime instructions:\n\
 - Never clean, shorten, decode, resolve, or rewrite grounding URLs.\n\
 - Do not include `Sources:` if no web grounding was used.\n\
 - Do not fabricate citations or URLs.\n\
+".to_string()
+    } else {
+        String::new()
+    };
+
+    format!(
+        "You are {agent_name}, acting as {agent_role}. This is step {step_index}.\n\
+Business unit: {business_unit_name}\n\
+Org unit: {org_unit_name}\n\
+Current datetime: {now}\n\
+Directive: {directive}\n\
+{history_section}\
+Toolbox summary (only these app tools are explicitly allowed):\n\
+{toolbox_summary}\n\
+{prefetch_section}\
+{org_preload_section}\
+{tool_results_section}\
+{work_log_section}\
+User prompt: {user_prompt}\n\n\
+Runtime instructions:\n\
+- You may use native model capabilities/tools (for example web search) when needed.\n\
+- Think/work in normal language while solving the request.\n\
+- To call app tools from the toolbox, output one JSON object at the end of your message with this exact shape:\n\
+  {{\"tool_calls\":[{{\"tool\":\"tool_id\",\"args\":{{}}}}],\"final_response\":null}}\n\
+- For app tool calls: keep reasoning short, keep tool_calls minimal, and only use tool IDs listed in toolbox summary.\n\
+- Do not repeat the same tool call with the same args if prior app tool results already provide the needed data.\n\
+- If prior app tool results are sufficient to answer, output {FINAL_RESPONSE_SENTINEL} and finalize instead of calling tools again.\n\
+- Termination contract (critical):\n\
+- After a successful mutating app tool call (create/update/delete/move/assign/set), re-evaluate remaining requested work.\n\
+- If requested work is complete, do NOT call more tools; output {FINAL_RESPONSE_SENTINEL} and deliver the final user-facing result.\n\
+- Never emit the same mutating app tool call again after a success unless the user explicitly asks to repeat it.\n\
+- `final_response`: null is only valid when unresolved requested actions remain.\n\
+- If all requested actions are satisfied, terminate the loop in the next response.\n\
+- In your final response for creation/update workflows, confirm completion and include created/updated entity names and placement details from tool results.\n\
+- Do not wrap tool call JSON in markdown fences.\n\
+{web_rules}\
 - Keep formatting minimal by default: prefer plain paragraphs and only use bullets/bold/numbering when they add clear readability value.\n\
 - When you are ready to deliver the user-facing final answer, the FIRST token must be {FINAL_RESPONSE_SENTINEL}.\n\
 - Do not emit {FINAL_RESPONSE_SENTINEL} until final answer.\n\
@@ -309,10 +335,12 @@ fn parse_ack_envelope(raw: &str, allowed_tool_ids: &[String]) -> Option<AckEnvel
         if prefetch.len() > ACK_PREFETCH_MAX {
             prefetch.truncate(ACK_PREFETCH_MAX);
         }
+        let requires_web_search = parsed.requires_web_search.unwrap_or(false);
         Some(AckEnvelope {
             decision,
             ack_text,
             prefetch_tools: prefetch,
+            requires_web_search,
         })
     }
 
@@ -344,6 +372,7 @@ fn resolve_ack_envelope(raw_ack_output: &str, allowed_tool_ids: &[String]) -> Re
             decision: AckDecision::AckOnly,
             ack_text: trimmed.to_string(),
             prefetch_tools: Vec::new(),
+            requires_web_search: false,
         });
     }
 
@@ -426,6 +455,7 @@ fn format_debug_tool_output(output: &ToolOutputEnvelope) -> serde_json::Value {
 
     serde_json::json!({
         "summary": output.summary,
+        "structuredData": output.structured_data,
         "structuredDataPreview": structured_preview,
         "artifacts": output.artifacts,
         "errors": output.errors
@@ -584,6 +614,13 @@ pub fn execute_run_once_with_tools<M: ModelInferencePort>(
         .and_then(|value| value.as_str())
         .unwrap_or("")
         .to_string();
+    let org_unit_name = request
+        .input
+        .metadata
+        .get("agent_org_unit_name")
+        .and_then(|value| value.as_str())
+        .unwrap_or("")
+        .to_string();
     let primary_objective = request
         .input
         .metadata
@@ -592,6 +629,13 @@ pub fn execute_run_once_with_tools<M: ModelInferencePort>(
         .unwrap_or("")
         .to_string();
     let directive = request.system_directive_short.clone();
+    let org_compact_preload = request
+        .input
+        .metadata
+        .get("org_compact_preload")
+        .and_then(|value| value.as_str())
+        .unwrap_or("")
+        .to_string();
 
     let trace_store = MemoryTraceStore::new();
     append_event(
@@ -610,6 +654,7 @@ pub fn execute_run_once_with_tools<M: ModelInferencePort>(
         &agent_name,
         &agent_role,
         &business_unit_name,
+        &org_unit_name,
         &primary_objective,
         &history_excerpt,
         &toolbox_summary,
@@ -725,14 +770,18 @@ pub fn execute_run_once_with_tools<M: ModelInferencePort>(
         let deep_prompt_text = deep_prompt(
             &agent_name,
             &agent_role,
+            &business_unit_name,
+            &org_unit_name,
             &directive,
             &history_excerpt,
             &toolbox_summary,
             &prefetched_tool_details,
+            &org_compact_preload,
             &tool_results_log,
             &work_log,
             step,
             &prompt,
+            ack_envelope.requires_web_search,
         );
         append_event(
             &trace_store,

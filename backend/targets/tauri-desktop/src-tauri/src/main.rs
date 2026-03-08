@@ -271,6 +271,8 @@ struct StartRunPayload {
     #[serde(default)]
     agent_business_unit_name: String,
     #[serde(default)]
+    agent_org_unit_name: String,
+    #[serde(default)]
     agent_primary_objective: String,
     system_directive_short: String,
     sender: String,
@@ -301,6 +303,7 @@ fn start_run(runtime: State<'_, Arc<RuntimeService>>, payload: StartRunPayload) 
             agent_name: payload.agent_name,
             agent_role: payload.agent_role,
             agent_business_unit_name: payload.agent_business_unit_name,
+            agent_org_unit_name: payload.agent_org_unit_name,
             agent_primary_objective: payload.agent_primary_objective,
             system_directive_short: payload.system_directive_short,
             sender: payload.sender,

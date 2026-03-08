@@ -54,10 +54,18 @@ impl RuntimeService {
             .trim()
             .to_string();
         let history_excerpt = self.render_history_excerpt(&thread_id);
+        let org_compact_preload = self
+            .state_store
+            .build_org_compact_preload(&self.workspace_id)
+            .unwrap_or_else(|_| "(org preload unavailable)".to_string());
         if let Some(metadata) = request.input.metadata.as_object_mut() {
             metadata.insert(
                 "history_excerpt".to_string(),
                 serde_json::Value::String(history_excerpt.clone()),
+            );
+            metadata.insert(
+                "org_compact_preload".to_string(),
+                serde_json::Value::String(org_compact_preload),
             );
         }
 
@@ -78,11 +86,11 @@ impl RuntimeService {
         let workspace_id_for_tools = self.workspace_id.clone();
         let events = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             let mut tool_executor = |tool_name: &str, args: &serde_json::Value| -> Result<Option<ToolOutputEnvelope>, agent_core::models::run::RunError> {
-                if tool_name != "org_manage_entities_v1" {
+                if tool_name != "org_manage_entities_v2" {
                     return Ok(None);
                 }
                 let output = state_store
-                    .execute_org_manage_entities_v1(&workspace_id_for_tools, args)
+                    .execute_org_manage_entities_v2(&workspace_id_for_tools, args)
                     .map_err(|error| agent_core::models::run::RunError {
                         code: "org_manage_tool_failed".to_string(),
                         message: error.to_string(),

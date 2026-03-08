@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use super::{
-    org_manage_entities_v1::manifest::manifest as org_manage_entities_tool_manifest,
+    org_manage_entities_v2::manifest::manifest as org_manage_entities_tool_manifest,
     shared::definition::ToolDefinition,
     weather_open_meteo::manifest::manifest as weather_tool_manifest,
 };

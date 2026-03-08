@@ -20,7 +20,8 @@ type DndFacade = {
 
 type OrgHierarchyTreeProps = {
   selectedNode: SelectedNode;
-  setSelectedNode: (next: SelectedNode) => void;
+  selectedNodeKeys: Set<string>;
+  onNodeClick: (next: SelectedNode, options?: { shiftKey?: boolean }) => void;
   operators: Operator[];
   orgUnits: OrgUnit[];
   businessUnits: Array<{ id: string; logoDataUrl: string }>;
@@ -43,7 +44,8 @@ type OrgHierarchyTreeProps = {
 export function OrgHierarchyTree(props: OrgHierarchyTreeProps) {
   const {
     selectedNode,
-    setSelectedNode,
+    selectedNodeKeys,
+    onNodeClick,
     operators,
     orgUnits,
     businessUnits,
@@ -74,7 +76,10 @@ export function OrgHierarchyTree(props: OrgHierarchyTreeProps) {
 
   const renderActorNode = (node: OperatorTreeNode, depth: number): React.ReactNode => {
     const operator = node.operator;
-    const selected = selectedNode?.kind === 'operator' && selectedNode.id === operator.id;
+    const selected =
+      selectedNode?.kind === 'operator' && selectedNode.id === operator.id
+        ? true
+        : selectedNodeKeys.has(`operator:${operator.id}`);
     const reportsCount = reportCountByManager.get(operator.id) ?? 0;
     const hasChildren = node.children.length > 0;
     const collapsed = collapsedActorIds.has(operator.id);
@@ -86,7 +91,7 @@ export function OrgHierarchyTree(props: OrgHierarchyTreeProps) {
         <button
           type="button"
           className={`agent-chart-tree-row operator${selected ? ' active' : ''}${dragState.isTarget && dragState.placement === 'inside' ? ' drop-inside' : ''}${dragState.isSource ? ' drag-source-hidden' : ''}`}
-          onClick={() => setSelectedNode({ kind: 'operator', id: operator.id })}
+          onClick={(event) => onNodeClick({ kind: 'operator', id: operator.id }, { shiftKey: event.shiftKey })}
           ref={(nodeRef) => dnd.setRowRef('operator', operator.id, nodeRef)}
           onPointerDown={(event) => dnd.beginRowDragCandidate(event, { kind: 'operator', id: operator.id })}
         >
@@ -125,7 +130,10 @@ export function OrgHierarchyTree(props: OrgHierarchyTreeProps) {
   };
 
   const renderOrgNode = (node: OrgUnitTreeNode, depth = 0): React.ReactNode => {
-    const selected = selectedNode?.kind === 'org_unit' && selectedNode.id === node.unit.id;
+    const selected =
+      selectedNode?.kind === 'org_unit' && selectedNode.id === node.unit.id
+        ? true
+        : selectedNodeKeys.has(`org_unit:${node.unit.id}`);
     const actorTree = buildOperatorTree(operators, node.unit.id);
     const hasChildren = actorTree.length > 0 || node.children.length > 0;
     const collapsed = collapsedOrgUnitIds.has(node.unit.id);
@@ -141,7 +149,7 @@ export function OrgHierarchyTree(props: OrgHierarchyTreeProps) {
         <button
           type="button"
           className={`agent-chart-tree-row org${selected ? ' active' : ''}${beforeClass}${afterClass}${insideClass}${sourceClass}`}
-          onClick={() => setSelectedNode({ kind: 'org_unit', id: node.unit.id })}
+          onClick={(event) => onNodeClick({ kind: 'org_unit', id: node.unit.id }, { shiftKey: event.shiftKey })}
           ref={(nodeRef) => dnd.setRowRef('org_unit', node.unit.id, nodeRef)}
           onPointerDown={(event) => dnd.beginRowDragCandidate(event, { kind: 'org_unit', id: node.unit.id })}
         >
@@ -179,7 +187,10 @@ export function OrgHierarchyTree(props: OrgHierarchyTreeProps) {
 
   const renderBusinessUnitNode = (node: BusinessUnitTreeNode, depth = 0): React.ReactNode => {
     const assignedCount = orgUnits.filter((unit) => unit.businessUnitId === node.id).length;
-    const selected = selectedNode?.kind === 'business_unit' && selectedNode.id === node.id;
+    const selected =
+      selectedNode?.kind === 'business_unit' && selectedNode.id === node.id
+        ? true
+        : selectedNodeKeys.has(`business_unit:${node.id}`);
     const attachedOrgRoots = orgRootsByBusinessUnit.get(node.id) ?? [];
     const hasChildren = attachedOrgRoots.length > 0 || node.children.length > 0;
     const collapsed = collapsedBusinessUnitIds.has(node.id);
@@ -193,7 +204,7 @@ export function OrgHierarchyTree(props: OrgHierarchyTreeProps) {
           type="button"
           className={`agent-chart-business-unit-row${selected ? ' active' : ''}${dragState.isTarget && dragState.placement === 'inside' ? ' drop-inside' : ''}`}
           style={{ paddingLeft: `${12 + depth * 18}px` }}
-          onClick={() => setSelectedNode({ kind: 'business_unit', id: node.id })}
+          onClick={(event) => onNodeClick({ kind: 'business_unit', id: node.id }, { shiftKey: event.shiftKey })}
           ref={(nodeRef) => dnd.setRowRef('business_unit', node.id, nodeRef)}
         >
           <span className="agent-chart-row-card">
@@ -228,7 +239,10 @@ export function OrgHierarchyTree(props: OrgHierarchyTreeProps) {
   };
 
   const renderScopeBucketNode = (scope: 'unassigned', title: string, roots: OrgUnitTreeNode[]) => {
-    const selected = selectedNode?.kind === 'scope_bucket' && selectedNode.scope === scope;
+    const selected =
+      selectedNode?.kind === 'scope_bucket' && selectedNode.scope === scope
+        ? true
+        : selectedNodeKeys.has(`scope_bucket:${scope}`);
     const hasChildren = roots.length > 0;
     const collapsed = collapsedScopeBuckets.has(scope);
     const dragState = dnd.getRowDragState('scope_bucket', scope);
@@ -240,7 +254,7 @@ export function OrgHierarchyTree(props: OrgHierarchyTreeProps) {
           type="button"
           className={`agent-chart-business-unit-row${selected ? ' active' : ''}${dragState.isTarget && dragState.placement === 'inside' ? ' drop-inside' : ''}`}
           style={{ paddingLeft: '12px' }}
-          onClick={() => setSelectedNode({ kind: 'scope_bucket', scope })}
+          onClick={(event) => onNodeClick({ kind: 'scope_bucket', scope }, { shiftKey: event.shiftKey })}
           ref={(nodeRef) => dnd.setRowRef('scope_bucket', scope, nodeRef)}
         >
           <span className="agent-chart-row-card">

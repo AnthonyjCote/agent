@@ -83,6 +83,8 @@ struct StartRunPayload {
     #[serde(default)]
     agent_business_unit_name: String,
     #[serde(default)]
+    agent_org_unit_name: String,
+    #[serde(default)]
     agent_primary_objective: String,
     system_directive_short: String,
     sender: String,
@@ -109,6 +111,7 @@ async fn start_run(
     let agent_name = payload.agent_name;
     let agent_role = payload.agent_role;
     let agent_business_unit_name = payload.agent_business_unit_name;
+    let agent_org_unit_name = payload.agent_org_unit_name;
     let agent_primary_objective = payload.agent_primary_objective;
     let system_directive_short = payload.system_directive_short;
     let sender = payload.sender;
@@ -135,6 +138,7 @@ async fn start_run(
             metadata: serde_json::json!({
                 "message": message,
                 "agent_business_unit_name": agent_business_unit_name,
+                "agent_org_unit_name": agent_org_unit_name,
                 "agent_primary_objective": agent_primary_objective,
                 "allowed_tool_ids": allowed_tool_ids
             }),
