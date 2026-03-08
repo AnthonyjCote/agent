@@ -383,7 +383,7 @@ function resolvePendingAssistantState(events: RuntimeRunEvent[]): {
   };
 }
 
-export function useChatGuiState(activeAgent: ActiveAgent, runtimeClient: AgentRuntimeClient) {
+export function useChatGuiState(runtimeClient: AgentRuntimeClient) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState('');
   const [isRunning, setIsRunning] = useState(false);
@@ -492,7 +492,7 @@ export function useChatGuiState(activeAgent: ActiveAgent, runtimeClient: AgentRu
     return resolved;
   };
 
-  const submitDraft = async () => {
+  const submitDraft = async (activeAgent: ActiveAgent) => {
     const content = draft.trim();
     if (!content) {
       return;

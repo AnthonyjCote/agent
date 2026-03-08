@@ -12,13 +12,12 @@
 // @adr: none
 
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useRuntimeClient } from '../../../app/runtime/RuntimeProvider';
 import { type AgentManifest, useAgentManifestStore } from '../../../shared/config/agents';
 import { useOrgChartStore } from '../../../shared/config/org-chart';
 import { AgentManifestModal } from '../../../shared/modules';
 import { AgentAvatar, AgentGrid, CenteredEmptyState, ChatComposerShell, MessageThreadShell, ModalShell, TextButton } from '../../../shared/ui';
 import type { SearchQueryLink } from '../lib';
-import { useChatGuiState } from '../model/useChatGuiState';
+import { useChatGuiStore } from '../model/ChatGuiStoreProvider';
 import './ChatGuiSurface.css';
 
 const ACTIVE_AGENT_STORAGE_KEY = 'agent-deck:chat:active-agent-id';
@@ -429,7 +428,6 @@ function renderAssistantMarkdown(
 }
 
 export function ChatGuiSurface() {
-  const runtimeClient = useRuntimeClient();
   const { agents, updateAgent, deleteAgent } = useAgentManifestStore();
   const { orgUnits, operators, execute: executeOrgCommand } = useOrgChartStore();
   const [agentPickerOpen, setAgentPickerOpen] = useState(false);
@@ -468,7 +466,8 @@ export function ChatGuiSurface() {
     setSelectedDebugRunId,
     setDraft,
     submitDraft
-  } = useChatGuiState(activeAgent, runtimeClient);
+  } = useChatGuiStore();
+  const submitActiveDraft = useCallback(() => submitDraft(activeAgent), [submitDraft, activeAgent]);
   const composerPlaceholder = isRunning ? 'Agent is responding...' : `Message ${activeAgent.name}`;
   const isEmpty = messages.length === 0;
   const currentThreadId = `thread_${activeAgent.id}`;
@@ -718,7 +717,7 @@ export function ChatGuiSurface() {
               <ChatComposerShell
                 value={draft}
                 onValueChange={setDraft}
-                onSubmit={submitDraft}
+                onSubmit={submitActiveDraft}
                 placeholder={composerPlaceholder}
               />
             }
@@ -800,7 +799,7 @@ export function ChatGuiSurface() {
           <ChatComposerShell
             value={draft}
             onValueChange={setDraft}
-            onSubmit={submitDraft}
+            onSubmit={submitActiveDraft}
             placeholder={composerPlaceholder}
           />
         </div>

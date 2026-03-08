@@ -33,7 +33,7 @@ import './AgentChartSurface.css';
 export function AgentChartSurface() {
   const { businessUnits, orgUnits, operators, execute, canUndo, canRedo, undo, redo, getOrgUnitById, getOperatorById } =
     useOrgChartStore();
-  const { createAgent, deleteAgent } = useAgentManifestStore();
+  const { agents, createAgent, updateAgent, deleteAgent } = useAgentManifestStore();
   const [createEntityKind, setCreateEntityKind] = useState<'business_unit' | 'org_unit' | 'operator' | null>(null);
   const [createActorDefaultOrgUnitId, setCreateActorDefaultOrgUnitId] = useState('');
 
@@ -81,6 +81,7 @@ export function AgentChartSurface() {
         sourceDataUrl,
         croppedDataUrl
       });
+      syncLinkedAgentManifest(target.id, undefined, { sourceDataUrl, croppedDataUrl });
     }
   });
 
@@ -94,6 +95,39 @@ export function AgentChartSurface() {
   const selectedBusinessUnit = selection.selectedBusinessUnit;
   const selectedOrg = selection.selectedOrg;
   const selectedOperator = selection.selectedOperator;
+  const syncLinkedAgentManifest = (
+    operatorId: string,
+    patch?: Partial<{
+      name: string;
+      title: string;
+      primaryObjective: string;
+      systemDirective: string;
+      roleBrief: string;
+    }>,
+    avatar?: { sourceDataUrl: string; croppedDataUrl: string }
+  ) => {
+    const operator = getOperatorById(operatorId);
+    if (!operator?.sourceAgentId) {
+      return;
+    }
+
+    const merged = {
+      ...operator,
+      ...(patch ?? {}),
+      avatarSourceDataUrl: avatar?.sourceDataUrl ?? operator.avatarSourceDataUrl,
+      avatarDataUrl: avatar?.croppedDataUrl ?? operator.avatarDataUrl
+    };
+    const existingManifest = agents.find((agent) => agent.agentId === operator.sourceAgentId);
+    updateAgent(operator.sourceAgentId, {
+      avatarSourceDataUrl: merged.avatarSourceDataUrl,
+      avatarDataUrl: merged.avatarDataUrl,
+      name: merged.name,
+      role: merged.title,
+      primaryObjective: merged.primaryObjective,
+      systemDirectiveShort: merged.systemDirective,
+      toolsPolicyRef: existingManifest?.toolsPolicyRef ?? 'policy_default'
+    });
+  };
   const openBusinessUnitMedia = (businessUnit: NonNullable<typeof selectedBusinessUnit>) => {
     mediaEditor.openMediaEditor(
       { kind: 'business_unit', id: businessUnit.id },
@@ -190,6 +224,14 @@ export function AgentChartSurface() {
             selectedOrg={selectedOrg}
             selectedOperator={selectedOperator}
             executeCommand={actions.executeCommand}
+            onSaveOperatorPatch={(operator, patch) => {
+              actions.executeCommand({
+                kind: 'update_operator',
+                operatorId: operator.id,
+                patch
+              });
+              syncLinkedAgentManifest(operator.id, patch);
+            }}
             setPendingDelete={actions.setPendingDelete}
             onOpenBusinessUnitMedia={openBusinessUnitMedia}
             onOpenOrgUnitMedia={openOrgUnitMedia}

@@ -12,6 +12,10 @@ type OrgChartRightPaneProps = {
   selectedOrg: OrgUnit | undefined;
   selectedOperator: Operator | undefined;
   executeCommand: (command: OrgCommand) => void;
+  onSaveOperatorPatch: (
+    operator: Operator,
+    patch: Partial<Pick<Operator, 'name' | 'title' | 'primaryObjective' | 'systemDirective' | 'roleBrief'>>
+  ) => void;
   setPendingDelete: (next: PendingDelete) => void;
   onOpenBusinessUnitMedia: (businessUnit: BusinessUnit) => void;
   onOpenOrgUnitMedia: (orgUnit: OrgUnit) => void;
@@ -25,6 +29,7 @@ export function OrgChartRightPane(props: OrgChartRightPaneProps) {
     selectedOrg,
     selectedOperator,
     executeCommand,
+    onSaveOperatorPatch,
     setPendingDelete,
     onOpenBusinessUnitMedia,
     onOpenOrgUnitMedia,
@@ -175,16 +180,12 @@ export function OrgChartRightPane(props: OrgChartRightPaneProps) {
             executeCommand({ kind: 'set_operator_manager', operatorId: selectedOperator.id, managerOperatorId: value || null })
           }
           onSave={() =>
-            executeCommand({
-              kind: 'update_operator',
-              operatorId: selectedOperator.id,
-              patch: {
-                name: selection.actorNameDraft,
-                title: selection.actorTitleDraft,
-                primaryObjective: selection.actorPrimaryObjectiveDraft,
-                systemDirective: selection.actorSystemDirectiveDraft,
-                roleBrief: selection.actorRoleBriefDraft
-              }
+            onSaveOperatorPatch(selectedOperator, {
+              name: selection.actorNameDraft,
+              title: selection.actorTitleDraft,
+              primaryObjective: selection.actorPrimaryObjectiveDraft,
+              systemDirective: selection.actorSystemDirectiveDraft,
+              roleBrief: selection.actorRoleBriefDraft
             })
           }
           onDelete={() =>

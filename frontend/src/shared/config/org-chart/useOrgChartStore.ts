@@ -10,7 +10,16 @@
 // @domain: shared
 // @adr: none
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  createContext,
+  createElement,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type PropsWithChildren
+} from 'react';
 import { useRuntimeClient } from '../../../app/runtime/RuntimeProvider';
 import { AGENT_MANIFESTS_CHANGED_EVENT, loadAgentManifests } from '../agents/agent-storage';
 import type { AgentManifest } from '../agents';
@@ -170,7 +179,26 @@ function syncOperatorsFromAgents(
   return changed ? next : current;
 }
 
-export function useOrgChartStore() {
+type OrgChartStoreValue = {
+  data: OrgChartData;
+  businessUnits: OrgChartData['snapshot']['businessUnits'];
+  orgUnits: OrgChartData['snapshot']['orgUnits'];
+  operators: OrgChartData['snapshot']['operators'];
+  links: OrgChartData['snapshot']['links'];
+  activityEvents: OrgChartData['activityEvents'];
+  canUndo: boolean;
+  canRedo: boolean;
+  execute: (command: OrgCommand) => OrgCommandResult;
+  undo: () => void;
+  redo: () => void;
+  getBusinessUnitById: (id: BusinessUnitId) => OrgChartData['snapshot']['businessUnits'][number] | undefined;
+  getOrgUnitById: (id: OrgUnitId) => OrgChartData['snapshot']['orgUnits'][number] | undefined;
+  getOperatorById: (id: OperatorId) => OrgChartData['snapshot']['operators'][number] | undefined;
+};
+
+const OrgChartStoreContext = createContext<OrgChartStoreValue | null>(null);
+
+function useOrgChartStoreState(): OrgChartStoreValue {
   const runtimeClient = useRuntimeClient();
   const [data, setData] = useState<OrgChartData>(() => createInitialOrgChartData());
   const [hydrated, setHydrated] = useState(false);
@@ -329,4 +357,17 @@ export function useOrgChartStore() {
     getOrgUnitById,
     getOperatorById
   };
+}
+
+export function OrgChartStoreProvider({ children }: PropsWithChildren) {
+  const value = useOrgChartStoreState();
+  return createElement(OrgChartStoreContext.Provider, { value }, children);
+}
+
+export function useOrgChartStore(): OrgChartStoreValue {
+  const value = useContext(OrgChartStoreContext);
+  if (!value) {
+    throw new Error('Org chart store missing. Wrap app with OrgChartStoreProvider.');
+  }
+  return value;
 }

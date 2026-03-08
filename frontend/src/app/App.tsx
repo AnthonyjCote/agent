@@ -12,6 +12,9 @@
 
 import { useEffect, useState } from 'react';
 import { RuntimeProvider } from './runtime/RuntimeProvider';
+import { AgentManifestStoreProvider } from '../shared/config/agents';
+import { OrgChartStoreProvider } from '../shared/config/org-chart';
+import { ChatGuiStoreProvider } from '../domains/chat-gui/model/ChatGuiStoreProvider';
 import type { ViewMode } from './shell/model/ui-contract';
 import { VIEW_DEFINITIONS, VIEW_ORDER } from './shell/view-registry';
 import { ShellFrame } from './shell/ShellFrame';
@@ -45,11 +48,17 @@ export function App() {
 
   return (
     <RuntimeProvider>
-      <ShellFrame
-        viewMode={viewMode}
-        setViewMode={setViewMode}
-        viewDefinition={VIEW_DEFINITIONS[viewMode]}
-      />
+      <AgentManifestStoreProvider>
+        <OrgChartStoreProvider>
+          <ChatGuiStoreProvider>
+            <ShellFrame
+              viewMode={viewMode}
+              setViewMode={setViewMode}
+              viewDefinition={VIEW_DEFINITIONS[viewMode]}
+            />
+          </ChatGuiStoreProvider>
+        </OrgChartStoreProvider>
+      </AgentManifestStoreProvider>
     </RuntimeProvider>
   );
 }

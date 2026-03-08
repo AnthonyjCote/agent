@@ -10,7 +10,15 @@
 // @domain: shared
 // @adr: none
 
-import { useEffect, useMemo, useState } from 'react';
+import {
+  createContext,
+  createElement,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type PropsWithChildren
+} from 'react';
 import { useRuntimeClient } from '../../../app/runtime/RuntimeProvider';
 import {
   applyAgentManifestUpdate,
@@ -44,7 +52,16 @@ function emitAgentManifestsChanged() {
   window.dispatchEvent(new CustomEvent(AGENT_MANIFESTS_CHANGED_EVENT));
 }
 
-export function useAgentManifestStore() {
+type AgentManifestStoreValue = {
+  agents: AgentManifest[];
+  createAgent: (input: AgentManifestInput) => AgentManifest;
+  updateAgent: (agentId: string, input: AgentManifestInput) => void;
+  deleteAgent: (agentId: string) => void;
+};
+
+const AgentManifestStoreContext = createContext<AgentManifestStoreValue | null>(null);
+
+function useAgentManifestStoreState(): AgentManifestStoreValue {
   const runtimeClient = useRuntimeClient();
   const [agents, setAgents] = useState<AgentManifest[]>([]);
   const [hydrated, setHydrated] = useState(false);
@@ -129,4 +146,17 @@ export function useAgentManifestStore() {
     updateAgent,
     deleteAgent
   };
+}
+
+export function AgentManifestStoreProvider({ children }: PropsWithChildren) {
+  const value = useAgentManifestStoreState();
+  return createElement(AgentManifestStoreContext.Provider, { value }, children);
+}
+
+export function useAgentManifestStore(): AgentManifestStoreValue {
+  const value = useContext(AgentManifestStoreContext);
+  if (!value) {
+    throw new Error('Agent manifest store missing. Wrap app with AgentManifestStoreProvider.');
+  }
+  return value;
 }
