@@ -19,6 +19,8 @@ Define a persistence architecture for Agent Deck that:
 9. Cross-DB writes use explicit application orchestration with compensating behavior (no fake global transactions).
 10. Startup runs migration + health checks before UI persistence operations are enabled.
 11. Runtime query APIs are paginated/limited by default; no unbounded list endpoints.
+12. `workspace_id` is generated once on first bootstrap and persisted in `workspace/workspace.json` (never hardcoded).
+13. V1 SQLite adapter uses `rusqlite`; repository boundary stays engine-agnostic for future Postgres adapter.
 
 ## Scope
 This PDR covers desktop and server storage internals only.
@@ -57,6 +59,12 @@ Workspace root (per workspace):
 
 Workspace metadata file:
 - `workspace/workspace.json` (workspace id, schema versions, migration flags, created/updated timestamps)
+
+Workspace ID policy (locked):
+1. On first bootstrap, generate `workspace_id` if missing.
+2. Persist it in `workspace/workspace.json`.
+3. Reuse same `workspace_id` for all subsequent runs.
+4. Do not hardcode `workspace_id` in frontend or backend runtime code paths.
 
 ### `core.sqlite`
 Source of truth for structural and governance entities:
@@ -281,7 +289,7 @@ Default API limits:
 - [ ] Create Rust crate: `backend/crates/agent_persistence`.
 - [ ] Define DB-agnostic repository interfaces for core/runtime/knowledge domains.
 - [ ] Define DB registry/resolver for workspace paths.
-- [ ] Implement SQLite adapter for repository interfaces (`core`, `runtime`, `kb-core`, `kb-<business_unit_id>`).
+- [ ] Implement SQLite adapter (rusqlite) for repository interfaces (`core`, `runtime`, `kb-core`, `kb-<business_unit_id>`).
 - [ ] Add migration runner per DB type.
 - [ ] Add workspace bootstrap routine to create required DB files/folders + workspace metadata file.
 - [ ] Add startup persistence health checks and readiness gate.
