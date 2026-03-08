@@ -21,6 +21,8 @@ Define a persistence architecture for Agent Deck that:
 11. Runtime query APIs are paginated/limited by default; no unbounded list endpoints.
 12. `workspace_id` is generated once on first bootstrap and persisted in `workspace/workspace.json` (never hardcoded).
 13. V1 SQLite adapter uses `rusqlite`; repository boundary stays engine-agnostic for future Postgres adapter.
+14. Conversation history UX is modal-first (no persistent left rail in chat): thread browser uses a searchable/filterable card grid.
+15. Conversation persistence and conversation-browser UI are built in tandem against the same runtime thread/message contracts.
 
 ## Scope
 This PDR covers desktop and server storage internals only.
@@ -140,8 +142,45 @@ Required contract groups in V1:
 4. Workspace / Persistence Health
   - `bootstrap_workspace(workspace_id)`
   - `get_persistence_health(workspace_id)`
+5. Conversations / Threads
+  - `list_threads(workspace_id, operator_id, filters, page)`
+  - `get_thread_messages(workspace_id, thread_id, page)`
+  - `create_thread(workspace_id, operator_id, title?)`
+  - `update_thread(workspace_id, thread_id, patch)` (rename/archive/unarchive)
+  - `delete_thread(workspace_id, thread_id)`
+  - `append_thread_message(workspace_id, thread_id, message)`
 
 Rule: frontend must not write localStorage for manifests/org chart after cutover.
+
+## Conversation Browser UX + Persistence Addendum (V1)
+Conversation browsing is implemented as a large modal grid in Chat GUI (not a permanent left sidebar).
+
+UI requirements:
+1. Top rail filter controls:
+  - business unit filter,
+  - org unit filter (dependent on business unit),
+  - operator filter,
+  - status filter (`active`, `archived`),
+  - sort selector (`recent`, `oldest`, `most messages`),
+  - typed search bar (title + summary + preview text match).
+2. Grid cards show:
+  - thread title,
+  - summary snippet,
+  - last updated timestamp,
+  - message count,
+  - owning operator identity.
+3. Card actions:
+  - open thread,
+  - rename,
+  - archive/unarchive,
+  - delete.
+4. Selected thread loads full message history and resumes chat in place.
+
+Persistence requirements:
+1. `runtime.sqlite` stores canonical thread metadata and message rows.
+2. Thread list queries support server-side filtering, search, sorting, and pagination.
+3. Message query APIs are paginated and ordered deterministically.
+4. Thread updates must be idempotent and race-safe.
 
 ## Agent Runtime Workspace Isolation
 Each operator has a dedicated runtime folder:
@@ -280,25 +319,25 @@ Default API limits:
 
 ## Implementation Checklist
 ### Phase 0: Contracts and Cutover Plan
-- [ ] Freeze DTO contracts for manifest/org-chart/runtime/workspace health APIs (desktop + server parity).
-- [ ] Define transport mapping table (Tauri command name <-> HTTP path).
-- [ ] Define frontend cutover flag and remove-write path for localStorage once backend persistence is enabled.
-- [ ] Add migration marker schema to `workspace/workspace.json`.
+- [x] Freeze DTO contracts for manifest/org-chart/runtime/workspace health APIs (desktop + server parity).
+- [x] Define transport mapping table (Tauri command name <-> HTTP path).
+- [x] Define frontend cutover flag and remove-write path for localStorage once backend persistence is enabled.
+- [x] Add migration marker schema to `workspace/workspace.json`.
 
 ### Phase 1: Persistence Foundation
-- [ ] Create Rust crate: `backend/crates/agent_persistence`.
+- [x] Create Rust crate: `backend/crates/agent_persistence`.
 - [ ] Define DB-agnostic repository interfaces for core/runtime/knowledge domains.
-- [ ] Define DB registry/resolver for workspace paths.
-- [ ] Implement SQLite adapter (rusqlite) for repository interfaces (`core`, `runtime`, `kb-core`, `kb-<business_unit_id>`).
-- [ ] Add migration runner per DB type.
-- [ ] Add workspace bootstrap routine to create required DB files/folders + workspace metadata file.
-- [ ] Add startup persistence health checks and readiness gate.
+- [x] Define DB registry/resolver for workspace paths.
+- [x] Implement SQLite adapter (rusqlite) for repository interfaces (`core`, `runtime`, `kb-core`, `kb-<business_unit_id>`).
+- [x] Add migration runner per DB type.
+- [x] Add workspace bootstrap routine to create required DB files/folders + workspace metadata file.
+- [x] Add startup persistence health checks and readiness gate.
 
 ### Phase 2: Core Schema + Repositories
-- [ ] Add core schema migrations for org, operator, agent manifest, config entities.
+- [x] Add core schema migrations for org, operator, agent manifest, config entities.
 - [ ] Implement repository interfaces for core entities.
-- [ ] Implement desktop/server bridge APIs for core entities with identical DTOs.
-- [ ] Replace frontend local-storage adapters with backend calls (desktop target first, then server).
+- [x] Implement desktop/server bridge APIs for core entities with identical DTOs.
+- [x] Replace frontend local-storage adapters with backend calls (desktop target first, then server).
 
 ### Phase 3: Runtime Schema + Repositories
 - [ ] Add runtime schema migrations for threads/messages/runs/events/tool calls.
@@ -306,6 +345,15 @@ Default API limits:
 - [ ] Enforce pagination defaults and max limits in runtime query APIs.
 - [ ] Wire chat runtime persistence paths to runtime repository.
 - [ ] Add backpressure-safe append path for run events.
+
+### Phase 3A: Conversation Browser (Modal Grid) + Persistence
+- [ ] Add thread metadata schema in `runtime.sqlite` (`thread_id`, `operator_id`, title, summary, status, counts, timestamps).
+- [ ] Add thread list APIs with filter rail support (BU/org/operator/status/sort/search).
+- [ ] Add thread card DTO for modal grid.
+- [ ] Add message pagination API + cursor contract for thread hydration.
+- [ ] Build Chat GUI `Conversations` modal (grid cards + top filter rail + typed search bar).
+- [ ] Wire open/rename/archive/delete thread actions in modal to runtime persistence APIs.
+- [ ] Persist selected thread per active operator and restore on reopen.
 
 ### Phase 4: Knowledge Split by BU
 - [ ] Add knowledge schema migrations (core + BU DBs).
@@ -342,4 +390,4 @@ Default API limits:
 - Add Postgres adapter for `core/runtime` using same repository interfaces when scale/concurrency demands it.
 
 ## Status
-Proposed for immediate implementation after review.
+In progress. Persistence foundation and core cutover are partially implemented; runtime thread/message persistence and conversation browser UI are the next active slice.
