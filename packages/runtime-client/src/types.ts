@@ -83,6 +83,89 @@ export interface AppendThreadMessageInput {
   content: string;
 }
 
+export type WorkUnitDispatchMode = 'direct' | 'orchestrated';
+export type WorkUnitExecutionMode = 'agent_run' | 'automation_run';
+
+export interface WorkUnit {
+  id?: string;
+  domain: string;
+  actionType: string;
+  targetOperator: string;
+  scope: {
+    businessUnitNameRef: string;
+    orgUnitNameRef: string;
+  };
+  input: Record<string, unknown>;
+  toolScope: string[];
+  priority: {
+    urgencyScore: number;
+    importanceScore: number;
+    deadlineAt?: string;
+  };
+  execution: {
+    mode: WorkUnitExecutionMode;
+    maxAttempts: number;
+    timeoutMs: number;
+  };
+  ordering?: {
+    sequenceKey?: string;
+    dependsOn?: string[];
+  };
+  idempotency: {
+    dedupeKey: string;
+  };
+  trace: {
+    correlationId: string;
+    causationId: string;
+    sourceEventType: string;
+    sourceEventId: string;
+  };
+}
+
+export interface DispatchWorkUnitInput {
+  workUnit: WorkUnit;
+  options?: {
+    executionModeOverride?: WorkUnitDispatchMode;
+    dryRun?: boolean;
+    requestedBy?: string;
+  };
+}
+
+export interface DispatchWorkUnitResult {
+  workUnitId: string;
+  status: 'queued' | 'running' | 'completed' | 'failed' | 'dead_lettered';
+  runId?: string;
+  resultRef?: string;
+  error?: {
+    code: string;
+    message: string;
+    retryable: boolean;
+  };
+  trace: {
+    correlationId: string;
+    causationId: string;
+  };
+  dispatchMode: WorkUnitDispatchMode;
+}
+
+export interface WorkUnitRecord {
+  workUnitId: string;
+  domain: string;
+  actionType: string;
+  targetOperator: string;
+  status: string;
+  dispatchMode: string;
+  executionMode: string;
+  runId?: string;
+  dedupeKey: string;
+  correlationId: string;
+  causationId: string;
+  workUnit: Record<string, unknown>;
+  result?: Record<string, unknown>;
+  createdAtMs: number;
+  updatedAtMs: number;
+}
+
 export interface AgentRuntimeClient {
   getCapabilities(): Promise<RuntimeCapabilities>;
   listAgents(): Promise<AgentSummary[]>;
@@ -98,6 +181,8 @@ export interface AgentRuntimeClient {
   deleteThread(threadId: string): Promise<void>;
   listThreadMessages(threadId: string, limit?: number, offset?: number): Promise<ChatThreadMessageRecord[]>;
   appendThreadMessage(input: AppendThreadMessageInput): Promise<ChatThreadMessageRecord>;
+  dispatchWorkUnit(input: DispatchWorkUnitInput): Promise<DispatchWorkUnitResult>;
+  listWorkUnits(status?: string, limit?: number, offset?: number): Promise<WorkUnitRecord[]>;
   startRun(input: StartRunInput): Promise<StartRunResponse>;
   listRunEvents(runId: string): Promise<RuntimeRunEvent[]>;
 }

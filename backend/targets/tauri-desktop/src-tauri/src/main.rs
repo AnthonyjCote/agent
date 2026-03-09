@@ -3,12 +3,19 @@
 use adapter::{desktop_capabilities, list_seed_agents, AgentSummary, RuntimeCapabilities};
 use agent_persistence::{
     bootstrap_workspace, OrgChartStateRecord, PersistenceHealthReport, PersistenceStateStore,
-    ThreadMessageRecord, ThreadRecord,
+    ThreadMessageRecord, ThreadRecord, WorkUnitRecord,
 };
 use agent_desktop::runtime_service::{RuntimeService, StartRunInput};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tauri::State;
+
+fn now_ms() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|duration| duration.as_millis() as i64)
+        .unwrap_or(0)
+}
 
 #[tauri::command]
 fn get_capabilities() -> RuntimeCapabilities {
@@ -261,6 +268,216 @@ fn append_thread_message(
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
+struct DispatchWorkUnitInput {
+    work_unit: serde_json::Value,
+    #[serde(default)]
+    options: Option<DispatchWorkUnitOptions>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DispatchWorkUnitOptions {
+    execution_mode_override: Option<String>,
+    #[serde(default)]
+    dry_run: bool,
+    #[allow(dead_code)]
+    requested_by: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DispatchWorkUnitResponse {
+    work_unit_id: String,
+    status: String,
+    run_id: Option<String>,
+    result_ref: Option<String>,
+    error: Option<serde_json::Value>,
+    trace: serde_json::Value,
+    dispatch_mode: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct EmbeddedRunPayload {
+    thread_id: String,
+    agent_id: String,
+    agent_name: String,
+    agent_role: String,
+    #[serde(default)]
+    agent_business_unit_name: String,
+    #[serde(default)]
+    agent_org_unit_name: String,
+    #[serde(default)]
+    agent_primary_objective: String,
+    system_directive_short: String,
+    sender: String,
+    recipient: String,
+    message: String,
+    #[serde(default)]
+    allowed_tool_ids: Vec<String>,
+}
+
+#[tauri::command]
+fn list_work_units(
+    state_store: State<'_, Arc<PersistenceStateStore>>,
+    status: Option<String>,
+    limit: Option<i64>,
+    offset: Option<i64>,
+) -> Result<Vec<WorkUnitRecord>, String> {
+    let workspace_id = state_store.workspace_id().map_err(|error| error.to_string())?;
+    state_store
+        .list_work_units(
+            &workspace_id,
+            status.as_deref(),
+            limit.unwrap_or(200),
+            offset.unwrap_or(0),
+        )
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn dispatch_work_unit(
+    runtime: State<'_, Arc<RuntimeService>>,
+    state_store: State<'_, Arc<PersistenceStateStore>>,
+    input: DispatchWorkUnitInput,
+) -> Result<DispatchWorkUnitResponse, String> {
+    let workspace_id = state_store.workspace_id().map_err(|error| error.to_string())?;
+    let work_unit = input.work_unit;
+    let object = work_unit
+        .as_object()
+        .ok_or_else(|| "workUnit must be an object".to_string())?;
+    let work_unit_id = object
+        .get("id")
+        .and_then(|value| value.as_str())
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| format!("wu_{}", now_ms()));
+    let domain = object
+        .get("domain")
+        .and_then(|value| value.as_str())
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| "workUnit.domain is required".to_string())?;
+    let action_type = object
+        .get("actionType")
+        .and_then(|value| value.as_str())
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| "workUnit.actionType is required".to_string())?;
+    let target_operator = object
+        .get("targetOperator")
+        .and_then(|value| value.as_str())
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| "workUnit.targetOperator is required".to_string())?;
+    let dedupe_key = object
+        .get("idempotency")
+        .and_then(|value| value.get("dedupeKey"))
+        .and_then(|value| value.as_str())
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| "workUnit.idempotency.dedupeKey is required".to_string())?;
+    let correlation_id = object
+        .get("trace")
+        .and_then(|value| value.get("correlationId"))
+        .and_then(|value| value.as_str())
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| "workUnit.trace.correlationId is required".to_string())?;
+    let causation_id = object
+        .get("trace")
+        .and_then(|value| value.get("causationId"))
+        .and_then(|value| value.as_str())
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| "workUnit.trace.causationId is required".to_string())?;
+    let execution_mode = object
+        .get("execution")
+        .and_then(|value| value.get("mode"))
+        .and_then(|value| value.as_str())
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| "agent_run".to_string());
+    let dispatch_mode = input
+        .options
+        .as_ref()
+        .and_then(|value| value.execution_mode_override.as_deref())
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| "direct".to_string());
+    let dry_run = input.options.as_ref().map(|value| value.dry_run).unwrap_or(false);
+
+    let mut run_id: Option<String> = None;
+    let mut status = "queued".to_string();
+    if !dry_run && dispatch_mode == "direct" && execution_mode == "agent_run" {
+        let maybe_run = object
+            .get("input")
+            .and_then(|value| value.get("run"));
+        if let Some(run_value) = maybe_run {
+            if let Ok(run_payload) = serde_json::from_value::<EmbeddedRunPayload>(run_value.clone()) {
+                let generated_run_id = format!("run_{}", now_ms());
+                run_id = Some(generated_run_id.clone());
+                status = "running".to_string();
+                runtime.reserve_run(&generated_run_id, &workspace_id, &run_payload.thread_id);
+                let runtime_cloned = runtime.inner().clone();
+                let workspace_id_for_run = workspace_id.clone();
+                tauri::async_runtime::spawn(async move {
+                    let _ = runtime_cloned.start_run(StartRunInput {
+                        workspace_id: workspace_id_for_run,
+                        run_id: generated_run_id,
+                        thread_id: run_payload.thread_id,
+                        agent_id: run_payload.agent_id,
+                        agent_name: run_payload.agent_name,
+                        agent_role: run_payload.agent_role,
+                        agent_business_unit_name: run_payload.agent_business_unit_name,
+                        agent_org_unit_name: run_payload.agent_org_unit_name,
+                        agent_primary_objective: run_payload.agent_primary_objective,
+                        system_directive_short: run_payload.system_directive_short,
+                        sender: run_payload.sender,
+                        recipient: run_payload.recipient,
+                        message: run_payload.message,
+                        allowed_tool_ids: run_payload.allowed_tool_ids,
+                    });
+                });
+            }
+        }
+    }
+
+    state_store
+        .upsert_work_unit(
+            &workspace_id,
+            &work_unit_id,
+            &domain,
+            &action_type,
+            &target_operator,
+            &status,
+            &dispatch_mode,
+            &execution_mode,
+            run_id.as_deref(),
+            &dedupe_key,
+            &correlation_id,
+            &causation_id,
+            &work_unit,
+            None,
+        )
+        .map_err(|error| error.to_string())?;
+
+    Ok(DispatchWorkUnitResponse {
+        work_unit_id,
+        status,
+        run_id,
+        result_ref: None,
+        error: None,
+        trace: serde_json::json!({
+            "correlationId": correlation_id,
+            "causationId": causation_id
+        }),
+        dispatch_mode,
+    })
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct StartRunPayload {
     workspace_id: String,
     run_id: String,
@@ -361,6 +578,8 @@ fn main() {
             delete_thread,
             list_thread_messages,
             append_thread_message,
+            list_work_units,
+            dispatch_work_unit,
             start_run,
             list_run_events,
             open_external_url

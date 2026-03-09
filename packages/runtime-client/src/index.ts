@@ -1,6 +1,8 @@
 export type {
   AgentRuntimeClient,
   AppendThreadMessageInput,
+  DispatchWorkUnitInput,
+  DispatchWorkUnitResult,
   ChatThreadMessageRecord,
   ChatThreadSummary,
   CreateThreadInput,
@@ -11,7 +13,9 @@ export type {
   StartRunInput,
   StartRunResponse,
   ThreadStatus,
-  UpdateThreadInput
+  UpdateThreadInput,
+  WorkUnit,
+  WorkUnitRecord
 } from './types';
 export { createAgentRuntimeClient } from './createClient';
 export type { CreateClientOptions, RuntimeTarget } from './createClient';

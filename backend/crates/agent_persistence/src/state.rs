@@ -48,6 +48,26 @@ pub struct ThreadMessageRecord {
     pub created_at_ms: i64,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkUnitRecord {
+    pub work_unit_id: String,
+    pub domain: String,
+    pub action_type: String,
+    pub target_operator: String,
+    pub status: String,
+    pub dispatch_mode: String,
+    pub execution_mode: String,
+    pub run_id: Option<String>,
+    pub dedupe_key: String,
+    pub correlation_id: String,
+    pub causation_id: String,
+    pub work_unit: Value,
+    pub result: Option<Value>,
+    pub created_at_ms: i64,
+    pub updated_at_ms: i64,
+}
+
 #[derive(Debug, Clone)]
 pub struct PersistenceStateStore {
     paths: WorkspacePaths,
@@ -530,6 +550,281 @@ impl PersistenceStateStore {
             content: content.to_string(),
             created_at_ms: now,
         })
+    }
+
+    pub fn list_work_units(
+        &self,
+        workspace_id: &str,
+        status: Option<&str>,
+        limit: i64,
+        offset: i64,
+    ) -> Result<Vec<WorkUnitRecord>, PersistenceError> {
+        let connection = self.open_runtime_db()?;
+        let mut statement = connection
+            .prepare(
+                "
+                SELECT
+                    work_unit_id,
+                    domain,
+                    action_type,
+                    target_operator,
+                    status,
+                    dispatch_mode,
+                    execution_mode,
+                    run_id,
+                    dedupe_key,
+                    correlation_id,
+                    causation_id,
+                    work_unit_json,
+                    result_json,
+                    created_at_ms,
+                    updated_at_ms
+                FROM work_units
+                WHERE workspace_id = ?1
+                  AND (?2 IS NULL OR status = ?2)
+                ORDER BY updated_at_ms DESC
+                LIMIT ?3 OFFSET ?4
+                ",
+            )
+            .map_err(|error| self.runtime_sql_error("Failed to prepare list_work_units query", error))?;
+
+        let rows = statement
+            .query_map(
+                params![
+                    workspace_id,
+                    status.map(|value| value.trim()).filter(|value| !value.is_empty()),
+                    limit.max(1).min(500),
+                    offset.max(0)
+                ],
+                |row| {
+                    let work_unit_json: String = row.get(11)?;
+                    let result_json: Option<String> = row.get(12)?;
+                    Ok(WorkUnitRecord {
+                        work_unit_id: row.get(0)?,
+                        domain: row.get(1)?,
+                        action_type: row.get(2)?,
+                        target_operator: row.get(3)?,
+                        status: row.get(4)?,
+                        dispatch_mode: row.get(5)?,
+                        execution_mode: row.get(6)?,
+                        run_id: row.get(7)?,
+                        dedupe_key: row.get(8)?,
+                        correlation_id: row.get(9)?,
+                        causation_id: row.get(10)?,
+                        work_unit: serde_json::from_str(&work_unit_json).unwrap_or_else(|_| serde_json::json!({})),
+                        result: result_json
+                            .and_then(|value| serde_json::from_str::<Value>(&value).ok()),
+                        created_at_ms: row.get(13)?,
+                        updated_at_ms: row.get(14)?,
+                    })
+                },
+            )
+            .map_err(|error| self.runtime_sql_error("Failed to query work_units", error))?;
+
+        let mut result = Vec::new();
+        for row in rows {
+            result.push(row.map_err(|error| self.runtime_sql_error("Failed to read work_unit row", error))?);
+        }
+        Ok(result)
+    }
+
+    pub fn upsert_work_unit(
+        &self,
+        workspace_id: &str,
+        work_unit_id: &str,
+        domain: &str,
+        action_type: &str,
+        target_operator: &str,
+        status: &str,
+        dispatch_mode: &str,
+        execution_mode: &str,
+        run_id: Option<&str>,
+        dedupe_key: &str,
+        correlation_id: &str,
+        causation_id: &str,
+        work_unit: &Value,
+        result: Option<&Value>,
+    ) -> Result<WorkUnitRecord, PersistenceError> {
+        let connection = self.open_runtime_db()?;
+        let now = now_ms();
+        let work_unit_json = serde_json::to_string(work_unit).map_err(|error| PersistenceError::JsonSerialize {
+            context: "Failed to serialize work unit payload",
+            source: error,
+        })?;
+        let result_json = result
+            .map(|value| serde_json::to_string(value))
+            .transpose()
+            .map_err(|error| PersistenceError::JsonSerialize {
+                context: "Failed to serialize work unit result payload",
+                source: error,
+            })?;
+
+        connection
+            .execute(
+                "
+                INSERT INTO work_units (
+                    workspace_id,
+                    work_unit_id,
+                    domain,
+                    action_type,
+                    target_operator,
+                    status,
+                    dispatch_mode,
+                    execution_mode,
+                    run_id,
+                    dedupe_key,
+                    correlation_id,
+                    causation_id,
+                    work_unit_json,
+                    result_json,
+                    created_at_ms,
+                    updated_at_ms
+                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?15)
+                ON CONFLICT(workspace_id, work_unit_id) DO UPDATE SET
+                    status = excluded.status,
+                    dispatch_mode = excluded.dispatch_mode,
+                    execution_mode = excluded.execution_mode,
+                    run_id = excluded.run_id,
+                    dedupe_key = excluded.dedupe_key,
+                    correlation_id = excluded.correlation_id,
+                    causation_id = excluded.causation_id,
+                    work_unit_json = excluded.work_unit_json,
+                    result_json = excluded.result_json,
+                    updated_at_ms = excluded.updated_at_ms
+                ",
+                params![
+                    workspace_id,
+                    work_unit_id,
+                    domain.trim(),
+                    action_type.trim(),
+                    target_operator.trim(),
+                    status.trim(),
+                    dispatch_mode.trim(),
+                    execution_mode.trim(),
+                    run_id.map(|value| value.trim()).filter(|value| !value.is_empty()),
+                    dedupe_key.trim(),
+                    correlation_id.trim(),
+                    causation_id.trim(),
+                    work_unit_json,
+                    result_json,
+                    now
+                ],
+            )
+            .map_err(|error| self.runtime_sql_error("Failed to upsert work unit", error))?;
+
+        self.get_work_unit(workspace_id, work_unit_id)?.ok_or_else(|| PersistenceError::Sql {
+            context: "Work unit not found immediately after upsert",
+            source: rusqlite::Error::QueryReturnedNoRows,
+            path: Some(self.paths.runtime_db_path.clone()),
+        })
+    }
+
+    pub fn get_work_unit(
+        &self,
+        workspace_id: &str,
+        work_unit_id: &str,
+    ) -> Result<Option<WorkUnitRecord>, PersistenceError> {
+        let connection = self.open_runtime_db()?;
+        let row: Option<(
+            String,
+            String,
+            String,
+            String,
+            String,
+            String,
+            String,
+            Option<String>,
+            String,
+            String,
+            String,
+            String,
+            Option<String>,
+            i64,
+            i64,
+        )> = connection
+            .query_row(
+                "
+                SELECT
+                    work_unit_id,
+                    domain,
+                    action_type,
+                    target_operator,
+                    status,
+                    dispatch_mode,
+                    execution_mode,
+                    run_id,
+                    dedupe_key,
+                    correlation_id,
+                    causation_id,
+                    work_unit_json,
+                    result_json,
+                    created_at_ms,
+                    updated_at_ms
+                FROM work_units
+                WHERE workspace_id = ?1 AND work_unit_id = ?2
+                ",
+                params![workspace_id, work_unit_id],
+                |row| {
+                    Ok((
+                        row.get(0)?,
+                        row.get(1)?,
+                        row.get(2)?,
+                        row.get(3)?,
+                        row.get(4)?,
+                        row.get(5)?,
+                        row.get(6)?,
+                        row.get(7)?,
+                        row.get(8)?,
+                        row.get(9)?,
+                        row.get(10)?,
+                        row.get(11)?,
+                        row.get(12)?,
+                        row.get(13)?,
+                        row.get(14)?,
+                    ))
+                },
+            )
+            .optional()
+            .map_err(|error| self.runtime_sql_error("Failed to load work unit", error))?;
+
+        let Some((
+            work_unit_id,
+            domain,
+            action_type,
+            target_operator,
+            status,
+            dispatch_mode,
+            execution_mode,
+            run_id,
+            dedupe_key,
+            correlation_id,
+            causation_id,
+            work_unit_json,
+            result_json,
+            created_at_ms,
+            updated_at_ms,
+        )) = row
+        else {
+            return Ok(None);
+        };
+
+        Ok(Some(WorkUnitRecord {
+            work_unit_id,
+            domain,
+            action_type,
+            target_operator,
+            status,
+            dispatch_mode,
+            execution_mode,
+            run_id,
+            dedupe_key,
+            correlation_id,
+            causation_id,
+            work_unit: serde_json::from_str(&work_unit_json).unwrap_or_else(|_| serde_json::json!({})),
+            result: result_json.and_then(|value| serde_json::from_str::<Value>(&value).ok()),
+            created_at_ms,
+            updated_at_ms,
+        }))
     }
 
     fn open_core_db(&self) -> Result<Connection, PersistenceError> {

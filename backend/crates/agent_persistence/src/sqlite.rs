@@ -12,7 +12,7 @@ use crate::{
 };
 
 const CORE_SCHEMA_VERSION: u32 = 1;
-const RUNTIME_SCHEMA_VERSION: u32 = 1;
+const RUNTIME_SCHEMA_VERSION: u32 = 2;
 const KNOWLEDGE_SCHEMA_VERSION: u32 = 1;
 
 #[derive(Debug, Clone, Copy)]
@@ -323,6 +323,38 @@ fn apply_migration(
             )
             .map_err(|error| PersistenceError::Sql {
                 context: "Failed to apply runtime schema migration",
+                source: error,
+                path: Some(db_path.to_path_buf()),
+            })?,
+        (DatabaseKind::Runtime, 2) => transaction
+            .execute_batch(
+                "
+                CREATE TABLE IF NOT EXISTS work_units (
+                    workspace_id TEXT NOT NULL,
+                    work_unit_id TEXT NOT NULL,
+                    domain TEXT NOT NULL,
+                    action_type TEXT NOT NULL,
+                    target_operator TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    dispatch_mode TEXT NOT NULL DEFAULT 'direct',
+                    execution_mode TEXT NOT NULL DEFAULT 'agent_run',
+                    run_id TEXT,
+                    dedupe_key TEXT NOT NULL,
+                    correlation_id TEXT NOT NULL,
+                    causation_id TEXT NOT NULL,
+                    work_unit_json TEXT NOT NULL,
+                    result_json TEXT,
+                    created_at_ms INTEGER NOT NULL,
+                    updated_at_ms INTEGER NOT NULL,
+                    PRIMARY KEY (workspace_id, work_unit_id)
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_work_units_workspace_status_updated
+                ON work_units (workspace_id, status, updated_at_ms DESC);
+                ",
+            )
+            .map_err(|error| PersistenceError::Sql {
+                context: "Failed to apply runtime schema migration (work units)",
                 source: error,
                 path: Some(db_path.to_path_buf()),
             })?,

@@ -2,6 +2,8 @@ import type { AgentSummary, RuntimeCapabilities } from '@agent-deck/schemas';
 import type {
   AppendThreadMessageInput,
   AgentRuntimeClient,
+  DispatchWorkUnitInput,
+  DispatchWorkUnitResult,
   ChatThreadMessageRecord,
   ChatThreadSummary,
   CreateThreadInput,
@@ -11,7 +13,8 @@ import type {
   RuntimeRunEvent,
   StartRunInput,
   StartRunResponse,
-  UpdateThreadInput
+  UpdateThreadInput,
+  WorkUnitRecord
 } from '../types';
 
 export class HttpTransport implements AgentRuntimeClient {
@@ -159,6 +162,31 @@ export class HttpTransport implements AgentRuntimeClient {
       throw new Error(`Failed to append thread message: ${response.status}`);
     }
     return (await response.json()) as ChatThreadMessageRecord;
+  }
+
+  async dispatchWorkUnit(input: DispatchWorkUnitInput): Promise<DispatchWorkUnitResult> {
+    const response = await fetch(`${this.baseUrl}/work-units/dispatch`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(input)
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to dispatch work unit: ${response.status}`);
+    }
+    return (await response.json()) as DispatchWorkUnitResult;
+  }
+
+  async listWorkUnits(status?: string, limit?: number, offset?: number): Promise<WorkUnitRecord[]> {
+    const params = new URLSearchParams();
+    if (status) params.set('status', status);
+    if (typeof limit === 'number') params.set('limit', String(limit));
+    if (typeof offset === 'number') params.set('offset', String(offset));
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+    const response = await fetch(`${this.baseUrl}/work-units${suffix}`);
+    if (!response.ok) {
+      throw new Error(`Failed to list work units: ${response.status}`);
+    }
+    return (await response.json()) as WorkUnitRecord[];
   }
 
   async startRun(input: StartRunInput): Promise<StartRunResponse> {

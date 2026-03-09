@@ -2,6 +2,8 @@ import type { AgentSummary, RuntimeCapabilities } from '@agent-deck/schemas';
 import type {
   AppendThreadMessageInput,
   AgentRuntimeClient,
+  DispatchWorkUnitInput,
+  DispatchWorkUnitResult,
   ChatThreadMessageRecord,
   ChatThreadSummary,
   CreateThreadInput,
@@ -11,7 +13,8 @@ import type {
   RuntimeRunEvent,
   StartRunInput,
   StartRunResponse,
-  UpdateThreadInput
+  UpdateThreadInput,
+  WorkUnitRecord
 } from '../types';
 
 type TauriInvoke = <T>(command: string, args?: Record<string, unknown>) => Promise<T>;
@@ -87,6 +90,16 @@ export class TauriTransport implements AgentRuntimeClient {
   async appendThreadMessage(input: AppendThreadMessageInput): Promise<ChatThreadMessageRecord> {
     const invoke = await this.getInvoke();
     return invoke<ChatThreadMessageRecord>('append_thread_message', { input });
+  }
+
+  async dispatchWorkUnit(input: DispatchWorkUnitInput): Promise<DispatchWorkUnitResult> {
+    const invoke = await this.getInvoke();
+    return invoke<DispatchWorkUnitResult>('dispatch_work_unit', { input });
+  }
+
+  async listWorkUnits(status?: string, limit?: number, offset?: number): Promise<WorkUnitRecord[]> {
+    const invoke = await this.getInvoke();
+    return invoke<WorkUnitRecord[]>('list_work_units', { status, limit, offset });
   }
 
   async startRun(input: StartRunInput): Promise<StartRunResponse> {

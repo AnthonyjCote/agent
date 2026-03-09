@@ -1,7 +1,7 @@
 use adapter::{list_seed_agents, server_capabilities, AgentSummary, RuntimeCapabilities};
 use agent_persistence::{
     bootstrap_workspace, OrgChartStateRecord, PersistenceHealthReport, PersistenceStateStore,
-    ThreadMessageRecord, ThreadRecord,
+    ThreadMessageRecord, ThreadRecord, WorkUnitRecord,
 };
 use agent_core::models::{
     channels::{ChannelEnvelope, ChannelKind},
@@ -18,6 +18,13 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tower_http::cors::CorsLayer;
+
+fn now_ms() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|duration| duration.as_millis() as i64)
+        .unwrap_or(0)
+}
 
 #[derive(Clone)]
 struct AppState {
@@ -378,6 +385,231 @@ async fn append_thread_message(
     Ok(Json(message))
 }
 
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DispatchWorkUnitInput {
+    work_unit: serde_json::Value,
+    #[serde(default)]
+    options: Option<DispatchWorkUnitOptions>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DispatchWorkUnitOptions {
+    execution_mode_override: Option<String>,
+    #[serde(default)]
+    dry_run: bool,
+    #[allow(dead_code)]
+    requested_by: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DispatchWorkUnitResponse {
+    work_unit_id: String,
+    status: String,
+    run_id: Option<String>,
+    result_ref: Option<String>,
+    error: Option<serde_json::Value>,
+    trace: serde_json::Value,
+    dispatch_mode: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct EmbeddedRunPayload {
+    thread_id: String,
+    agent_id: String,
+    agent_name: String,
+    agent_role: String,
+    #[serde(default)]
+    agent_business_unit_name: String,
+    #[serde(default)]
+    agent_org_unit_name: String,
+    #[serde(default)]
+    agent_primary_objective: String,
+    system_directive_short: String,
+    sender: String,
+    recipient: String,
+    message: String,
+    #[serde(default)]
+    allowed_tool_ids: Vec<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ListWorkUnitsQuery {
+    status: Option<String>,
+    limit: Option<i64>,
+    offset: Option<i64>,
+}
+
+async fn list_work_units(
+    State(state): State<AppState>,
+    axum::extract::Query(query): axum::extract::Query<ListWorkUnitsQuery>,
+) -> Result<Json<Vec<WorkUnitRecord>>, (axum::http::StatusCode, String)> {
+    let rows = state
+        .state_store
+        .list_work_units(
+            &state.workspace_id,
+            query.status.as_deref(),
+            query.limit.unwrap_or(200),
+            query.offset.unwrap_or(0),
+        )
+        .map_err(internal_error)?;
+    Ok(Json(rows))
+}
+
+async fn dispatch_work_unit(
+    State(state): State<AppState>,
+    Json(input): Json<DispatchWorkUnitInput>,
+) -> Result<Json<DispatchWorkUnitResponse>, (axum::http::StatusCode, String)> {
+    let work_unit = input.work_unit;
+    let object = work_unit
+        .as_object()
+        .ok_or((axum::http::StatusCode::BAD_REQUEST, "workUnit must be an object".to_string()))?;
+    let work_unit_id = object
+        .get("id")
+        .and_then(|value| value.as_str())
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| format!("wu_{}", now_ms()));
+    let domain = object
+        .get("domain")
+        .and_then(|value| value.as_str())
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .ok_or((axum::http::StatusCode::BAD_REQUEST, "workUnit.domain is required".to_string()))?;
+    let action_type = object
+        .get("actionType")
+        .and_then(|value| value.as_str())
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .ok_or((axum::http::StatusCode::BAD_REQUEST, "workUnit.actionType is required".to_string()))?;
+    let target_operator = object
+        .get("targetOperator")
+        .and_then(|value| value.as_str())
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .ok_or((axum::http::StatusCode::BAD_REQUEST, "workUnit.targetOperator is required".to_string()))?;
+    let dedupe_key = object
+        .get("idempotency")
+        .and_then(|value| value.get("dedupeKey"))
+        .and_then(|value| value.as_str())
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .ok_or((axum::http::StatusCode::BAD_REQUEST, "workUnit.idempotency.dedupeKey is required".to_string()))?;
+    let correlation_id = object
+        .get("trace")
+        .and_then(|value| value.get("correlationId"))
+        .and_then(|value| value.as_str())
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .ok_or((axum::http::StatusCode::BAD_REQUEST, "workUnit.trace.correlationId is required".to_string()))?;
+    let causation_id = object
+        .get("trace")
+        .and_then(|value| value.get("causationId"))
+        .and_then(|value| value.as_str())
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .ok_or((axum::http::StatusCode::BAD_REQUEST, "workUnit.trace.causationId is required".to_string()))?;
+    let execution_mode = object
+        .get("execution")
+        .and_then(|value| value.get("mode"))
+        .and_then(|value| value.as_str())
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| "agent_run".to_string());
+    let dispatch_mode = input
+        .options
+        .as_ref()
+        .and_then(|value| value.execution_mode_override.as_deref())
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .unwrap_or_else(|| "direct".to_string());
+    let dry_run = input.options.as_ref().map(|value| value.dry_run).unwrap_or(false);
+
+    let mut run_id: Option<String> = None;
+    let mut status = "queued".to_string();
+    if !dry_run && dispatch_mode == "direct" && execution_mode == "agent_run" {
+        let maybe_run = object
+            .get("input")
+            .and_then(|value| value.get("run"));
+        if let Some(run_value) = maybe_run {
+            if let Ok(run_payload) = serde_json::from_value::<EmbeddedRunPayload>(run_value.clone()) {
+                let generated_run_id = format!("run_{}", now_ms());
+                run_id = Some(generated_run_id.clone());
+                status = "running".to_string();
+                state
+                    .runtime
+                    .reserve_run(&generated_run_id, &state.workspace_id, &run_payload.thread_id);
+                let runtime_cloned = state.runtime.clone();
+                let request = RunRequest {
+                    workspace_id: state.workspace_id.clone(),
+                    run_id: generated_run_id.clone(),
+                    thread_id: run_payload.thread_id.clone(),
+                    agent_id: run_payload.agent_id,
+                    agent_name: run_payload.agent_name,
+                    agent_role: run_payload.agent_role,
+                    system_directive_short: run_payload.system_directive_short,
+                    input: ChannelEnvelope {
+                        workspace_id: state.workspace_id.clone(),
+                        channel: ChannelKind::ChatUi,
+                        sender: run_payload.sender,
+                        recipient: run_payload.recipient,
+                        thread_id: run_payload.thread_id,
+                        task_id: Some(work_unit_id.clone()),
+                        correlation_id: correlation_id.clone(),
+                        metadata: serde_json::json!({
+                            "message": run_payload.message,
+                            "agent_business_unit_name": run_payload.agent_business_unit_name,
+                            "agent_org_unit_name": run_payload.agent_org_unit_name,
+                            "agent_primary_objective": run_payload.agent_primary_objective,
+                            "allowed_tool_ids": run_payload.allowed_tool_ids
+                        }),
+                    },
+                };
+                tokio::spawn(async move {
+                    let _ = runtime_cloned.start_run(request);
+                });
+            }
+        }
+    }
+
+    state
+        .state_store
+        .upsert_work_unit(
+            &state.workspace_id,
+            &work_unit_id,
+            &domain,
+            &action_type,
+            &target_operator,
+            &status,
+            &dispatch_mode,
+            &execution_mode,
+            run_id.as_deref(),
+            &dedupe_key,
+            &correlation_id,
+            &causation_id,
+            &work_unit,
+            None,
+        )
+        .map_err(internal_error)?;
+
+    Ok(Json(DispatchWorkUnitResponse {
+        work_unit_id,
+        status,
+        run_id,
+        result_ref: None,
+        error: None,
+        trace: serde_json::json!({
+            "correlationId": correlation_id,
+            "causationId": causation_id
+        }),
+        dispatch_mode,
+    }))
+}
+
 #[tokio::main]
 async fn main() {
     let _ = agent_server::server_ready();
@@ -423,6 +655,8 @@ async fn main() {
         )
         .route("/runs", post(start_run))
         .route("/runs/{run_id}/events", get(run_events))
+        .route("/work-units", get(list_work_units))
+        .route("/work-units/dispatch", post(dispatch_work_unit))
         .with_state(app_state)
         .layer(CorsLayer::permissive());
 

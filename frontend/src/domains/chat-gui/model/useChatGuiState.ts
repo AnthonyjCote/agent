@@ -248,9 +248,15 @@ function resolvePendingAssistantState(events: RuntimeRunEvent[]): {
       .replace(/_/g, ' ')
       .replace(/\s+/g, ' ')
       .trim();
+  const toolDisplayName = (raw: string): string =>
+    humanizeToolName(raw)
+      .split(' ')
+      .filter((part) => part.length > 0)
+      .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+      .join(' ');
 
   const summarizeToolUse = (toolName: string, params: Record<string, unknown> | null): string => {
-    const label = humanizeToolName(toolName || 'tool');
+    const label = toolDisplayName(toolName || 'tool');
     if (!params) {
       return `Using ${label}`;
     }
@@ -293,7 +299,7 @@ function resolvePendingAssistantState(events: RuntimeRunEvent[]): {
             const toolId = typeof parsed.tool_id === 'string' ? parsed.tool_id : 'tool';
             const status = typeof parsed.status === 'string' ? parsed.status : 'success';
             const output = typeof parsed.output === 'string' ? parsed.output.trim() : '';
-            const label = humanizeToolName(toolName || toolId);
+            const label = toolDisplayName(toolName || toolId);
             if (status === 'error') {
               reasoningToolLines.push(`Failed ${label}`);
             } else {
@@ -308,7 +314,7 @@ function resolvePendingAssistantState(events: RuntimeRunEvent[]): {
 
     if (event.event === 'tool_use' && event.lifecycle === 'dispatched') {
       const toolName = typeof event.tool_name === 'string' && event.tool_name.trim() ? event.tool_name.trim() : 'tool';
-      reasoningToolLines.push(`Using ${humanizeToolName(toolName)}`);
+      reasoningToolLines.push(`Using ${toolDisplayName(toolName)}`);
       continue;
     }
 
@@ -316,9 +322,9 @@ function resolvePendingAssistantState(events: RuntimeRunEvent[]): {
       const toolName = typeof event.tool_name === 'string' && event.tool_name.trim() ? event.tool_name.trim() : 'tool';
       const lifecycle = typeof event.lifecycle === 'string' ? event.lifecycle : 'completed';
       if (lifecycle === 'failed') {
-        reasoningToolLines.push(`Failed ${humanizeToolName(toolName)}`);
+        reasoningToolLines.push(`Failed ${toolDisplayName(toolName)}`);
       } else if (lifecycle === 'completed') {
-        reasoningToolLines.push(`Completed ${humanizeToolName(toolName)}`);
+        reasoningToolLines.push(`Completed ${toolDisplayName(toolName)}`);
       }
       continue;
     }
@@ -499,7 +505,7 @@ export function useChatGuiState(runtimeClient: AgentRuntimeClient) {
     }
   };
   const resolveAllowedToolIds = (toolsPolicyRef?: string): string[] => {
-    const defaultTools = ['weather_open_meteo', 'org_manage_entities_v2'];
+    const defaultTools = ['weather_open_meteo', 'org_manage_entities_v2', 'comms_tool'];
     if (toolsPolicyRef === 'policy_default') {
       return defaultTools;
     }
