@@ -79,11 +79,8 @@
 }
 
 .dropdown-selector-options {
-  position: absolute;
-  top: calc(100% + 8px);
-  left: 0;
-  right: 0;
-  z-index: 30;
+  position: fixed;
+  z-index: 240;
   margin: 0;
   padding: 6px;
   list-style: none;
@@ -91,6 +88,8 @@
   border: 1px solid color-mix(in srgb, var(--border-strong) 84%, transparent);
   background: linear-gradient(180deg, #1a202a 0%, #151a23 100%);
   box-shadow: 0 16px 30px rgba(0, 0, 0, 0.32);
+  max-height: min(280px, calc(100vh - 40px));
+  overflow: auto;
 }
 
 .dropdown-selector-options-compact {

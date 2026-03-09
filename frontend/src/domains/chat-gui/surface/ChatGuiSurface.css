@@ -635,3 +635,106 @@
   overflow-wrap: anywhere;
   word-break: break-word;
 }
+
+.chat-gui-debug-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-bottom: 14px;
+  align-items: center;
+}
+
+.chat-gui-debug-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.chat-gui-debug-cards {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 12px;
+}
+
+.chat-gui-debug-card {
+  border: 1px solid color-mix(in srgb, var(--border-strong) 90%, #2f3f58);
+  border-radius: 12px;
+  background: linear-gradient(180deg, #1b2636 0%, #151e2d 100%);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  padding: 10px 12px;
+  min-width: 0;
+}
+
+.chat-gui-debug-card.tone-success {
+  border-color: color-mix(in srgb, #48d597 45%, var(--border-strong));
+}
+
+.chat-gui-debug-card.tone-warning {
+  border-color: color-mix(in srgb, #f2b366 45%, var(--border-strong));
+}
+
+.chat-gui-debug-card.tone-danger {
+  border-color: color-mix(in srgb, var(--accent-danger) 55%, var(--border-strong));
+}
+
+.chat-gui-debug-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.chat-gui-debug-card-head h4 {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.chat-gui-debug-card-head p {
+  margin: 2px 0 0;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.chat-gui-debug-copy {
+  border: 1px solid color-mix(in srgb, var(--border-strong) 72%, transparent);
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: 8px;
+  font-size: 11px;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
+.chat-gui-debug-copy:hover {
+  color: var(--text-primary);
+  border-color: color-mix(in srgb, var(--text-primary) 35%, transparent);
+}
+
+.chat-gui-debug-card-summary {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: color-mix(in srgb, var(--text-primary) 90%, #fff);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.chat-gui-debug-raw-details {
+  margin-top: 8px;
+}
+
+.chat-gui-debug-raw-details summary {
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.chat-gui-debug-divider {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}

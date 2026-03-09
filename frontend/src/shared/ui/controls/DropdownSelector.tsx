@@ -10,7 +10,8 @@
 // @domain: shared
 // @adr: none
 
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent } from 'react';
+import { createPortal } from 'react-dom';
 import './DropdownSelector.css';
 
 export type DropdownOption = {
@@ -36,7 +37,45 @@ export function DropdownSelector({
   size = 'default'
 }: DropdownSelectorProps) {
   const [open, setOpen] = useState(false);
+  const [menuStyle, setMenuStyle] = useState<CSSProperties>({});
   const rootRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    const updateMenuPosition = () => {
+      if (!rootRef.current) {
+        return;
+      }
+      const rect = rootRef.current.getBoundingClientRect();
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      const menuHeight = size === 'compact' ? 220 : 260;
+      const gap = 8;
+      const spaceBelow = viewportHeight - rect.bottom;
+      const placeAbove = spaceBelow < menuHeight && rect.top > menuHeight;
+      const desiredWidth = Math.max(rect.width, 400);
+      const maxLeft = Math.max(gap, viewportWidth - desiredWidth - gap);
+      const clampedLeft = Math.min(Math.max(gap, rect.left), maxLeft);
+      setMenuStyle({
+        position: 'fixed',
+        left: clampedLeft,
+        width: desiredWidth,
+        top: placeAbove ? rect.top - gap : rect.bottom + gap,
+        transform: placeAbove ? 'translateY(-100%)' : undefined
+      });
+    };
+
+    updateMenuPosition();
+    window.addEventListener('resize', updateMenuPosition);
+    window.addEventListener('scroll', updateMenuPosition, true);
+    return () => {
+      window.removeEventListener('resize', updateMenuPosition);
+      window.removeEventListener('scroll', updateMenuPosition, true);
+    };
+  }, [open, size]);
 
   const selected = useMemo(
     () => options.find((option) => option.value === value) ?? options[0],
@@ -101,24 +140,33 @@ export function DropdownSelector({
           <path d="m5 7 5 6 5-6" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
         </svg>
       </span>
-      {open ? (
-        <ul className={`dropdown-selector-options dropdown-selector-options-${size}`} role="listbox" aria-label={ariaLabel}>
-          {options.map((option) => {
-            const active = option.value === value;
-            return (
-              <li key={option.value} role="option" aria-selected={active}>
-                <button
-                  type="button"
-                  className={`dropdown-selector-option dropdown-selector-option-${size}${active ? ' active' : ''}`}
-                  onClick={() => handleOptionSelect(option.value)}
-                >
-                  {option.label}
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      ) : null}
+      {open
+        ? createPortal(
+            <ul
+              className={`dropdown-selector-options dropdown-selector-options-${size}`}
+              role="listbox"
+              aria-label={ariaLabel}
+              style={menuStyle}
+              onMouseDown={(event) => event.stopPropagation()}
+            >
+              {options.map((option) => {
+                const active = option.value === value;
+                return (
+                  <li key={option.value} role="option" aria-selected={active}>
+                    <button
+                      type="button"
+                      className={`dropdown-selector-option dropdown-selector-option-${size}${active ? ' active' : ''}`}
+                      onClick={() => handleOptionSelect(option.value)}
+                    >
+                      {option.label}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>,
+            document.body
+          )
+        : null}
     </div>
   );
 }

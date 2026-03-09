@@ -77,6 +77,19 @@ struct CollectedInference {
     delta_chunks: Vec<String>,
 }
 
+fn find_tool_envelope_start(text: &str) -> Option<usize> {
+    let tool_calls_key_index = text.find("\"tool_calls\"")?;
+    text[..=tool_calls_key_index].rfind('{')
+}
+
+fn visible_delta_prefix(text: &str) -> &str {
+    if let Some(start) = find_tool_envelope_start(text) {
+        &text[..start]
+    } else {
+        text
+    }
+}
+
 fn collect_text(events: &[InferenceEvent]) -> String {
     let mut parts = Vec::new();
 
@@ -266,6 +279,8 @@ Runtime instructions:\n\
 - To call app tools from the toolbox, output one JSON object at the end of your message with this exact shape:\n\
   {{\"tool_calls\":[{{\"tool\":\"tool_id\",\"args\":{{}}}}],\"final_response\":null}}\n\
 - For app tool calls: keep reasoning short, keep tool_calls minimal, and only use tool IDs listed in toolbox summary.\n\
+- Keep streamed status/reasoning updates bite-sized (short, plain-language lines).\n\
+- Never include raw tool-call JSON in explanatory prose; if calling app tools, put the single JSON object only at the end.\n\
 - Do not repeat the same tool call with the same args if prior app tool results already provide the needed data.\n\
 - If prior app tool results are sufficient to answer, output {FINAL_RESPONSE_SENTINEL} and finalize instead of calling tools again.\n\
 - Termination contract (critical):\n\
@@ -500,25 +515,39 @@ fn infer_and_collect<M: ModelInferencePort>(
     on_event: &mut dyn FnMut(RunEvent),
     trace_store: &MemoryTraceStore,
 ) -> Result<CollectedInference, RunError> {
-    let mut streamed_parts = Vec::new();
+    let mut streamed_parts_raw = Vec::new();
+    let mut streamed_parts_visible = Vec::new();
+    let mut stream_accumulator = String::new();
+    let mut emitted_visible_len = 0usize;
     let mut on_inference_event = |event: InferenceEvent| {
         if let InferenceEvent::Delta(text) = event {
             if text.trim().is_empty() {
                 return;
             }
             let chunk = text.to_string();
-            streamed_parts.push(chunk.clone());
-            if emit_model_deltas {
-                append_event(
-                    trace_store,
-                    on_event,
-                    RunEvent::ModelDelta {
-                        run_id: run_id.to_string(),
-                        phase: phase.to_string(),
-                        text: chunk,
-                    },
-                );
+            streamed_parts_raw.push(chunk.clone());
+            stream_accumulator.push_str(&chunk);
+
+            let visible_all = visible_delta_prefix(&stream_accumulator);
+            if visible_all.len() > emitted_visible_len {
+                let delta_visible = visible_all[emitted_visible_len..].to_string();
+                if !delta_visible.trim().is_empty() {
+                    streamed_parts_visible.push(delta_visible.clone());
+                    if emit_model_deltas {
+                        append_event(
+                            trace_store,
+                            on_event,
+                            RunEvent::ModelDelta {
+                                run_id: run_id.to_string(),
+                                phase: phase.to_string(),
+                                text: delta_visible,
+                            },
+                        );
+                    }
+                }
+                emitted_visible_len = visible_all.len();
             }
+
             return;
         }
 
@@ -550,14 +579,14 @@ fn infer_and_collect<M: ModelInferencePort>(
     )?;
 
     let collected = collect_text(&events);
-    let text = if collected.trim().is_empty() && !streamed_parts.is_empty() {
-        streamed_parts.join("")
+    let text = if collected.trim().is_empty() && !streamed_parts_raw.is_empty() {
+        streamed_parts_raw.join("")
     } else {
         collected
     };
     Ok(CollectedInference {
         text,
-        delta_chunks: streamed_parts,
+        delta_chunks: streamed_parts_visible,
     })
 }
 

@@ -235,6 +235,14 @@ function resolvePendingAssistantState(events: RuntimeRunEvent[]): {
   reasoning: string;
   responseDraft: string;
 } {
+  const stripToolEnvelopeFromReasoning = (text: string): string => {
+    const match = /\{\s*\"tool_calls\"\s*:/m.exec(text);
+    if (!match || match.index === undefined) {
+      return text;
+    }
+    return text.slice(0, match.index);
+  };
+
   const humanizeToolName = (raw: string): string =>
     raw
       .replace(/_/g, ' ')
@@ -375,7 +383,9 @@ function resolvePendingAssistantState(events: RuntimeRunEvent[]): {
     responseDraft += chunk;
   }
 
-  const reasoningBody = (postSentinel ? reasoningText : reasoningText + sentinelCarry)
+  const reasoningBody = stripToolEnvelopeFromReasoning(
+    (postSentinel ? reasoningText : reasoningText + sentinelCarry)
+  )
     .replace(/\n{3,}/g, '\n\n')
     .trim();
   const toolsBody = reasoningToolLines.join('\n').trim();
