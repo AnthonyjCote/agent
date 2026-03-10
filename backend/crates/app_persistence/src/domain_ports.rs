@@ -1,4 +1,7 @@
-use app_domain_comms::ports::{CommsToolExecutionOutput, CommsToolPort};
+use app_domain_comms::{
+    ports::{CommsToolExecutionOutput, CommsToolPort, CommsToolStore},
+    CommsDomainService,
+};
 use app_domain_org::ports::{OrgToolExecutionOutput, OrgToolPort};
 use app_domains_core::{errors::DomainError, DomainResult};
 
@@ -48,6 +51,192 @@ impl PersistenceCommsToolPort {
             workspace_id: workspace_id.into(),
         }
     }
+
+    fn to_json<T: serde::Serialize>(value: T) -> DomainResult<serde_json::Value> {
+        serde_json::to_value(value).map_err(|error| DomainError::Internal(error.to_string()))
+    }
+}
+
+impl CommsToolStore for PersistenceCommsToolPort {
+    fn get_account(&self, account_id: &str) -> DomainResult<Option<serde_json::Value>> {
+        let account = self
+            .store
+            .get_comms_account(&self.workspace_id, account_id)
+            .map_err(|error| DomainError::Internal(error.to_string()))?;
+        account
+            .map(Self::to_json)
+            .transpose()
+    }
+
+    fn list_accounts(&self, operator_id: Option<&str>, channel: Option<&str>) -> DomainResult<Vec<serde_json::Value>> {
+        let records = self
+            .store
+            .list_comms_accounts(&self.workspace_id, operator_id, channel)
+            .map_err(|error| DomainError::Internal(error.to_string()))?;
+        records
+            .into_iter()
+            .map(Self::to_json)
+            .collect()
+    }
+
+    fn get_thread(&self, thread_id: &str) -> DomainResult<Option<serde_json::Value>> {
+        let thread = self
+            .store
+            .get_comms_thread(&self.workspace_id, thread_id)
+            .map_err(|error| DomainError::Internal(error.to_string()))?;
+        thread
+            .map(Self::to_json)
+            .transpose()
+    }
+
+    fn list_threads(
+        &self,
+        channel: Option<&str>,
+        account_id: Option<&str>,
+        folder: Option<&str>,
+        search: Option<&str>,
+        limit: i64,
+        offset: i64,
+    ) -> DomainResult<Vec<serde_json::Value>> {
+        let records = self
+            .store
+            .list_comms_threads(
+                &self.workspace_id,
+                channel,
+                account_id,
+                folder,
+                search,
+                limit,
+                offset,
+            )
+            .map_err(|error| DomainError::Internal(error.to_string()))?;
+        records
+            .into_iter()
+            .map(Self::to_json)
+            .collect()
+    }
+
+    fn list_messages(&self, thread_id: &str, limit: i64, offset: i64) -> DomainResult<Vec<serde_json::Value>> {
+        let records = self
+            .store
+            .list_comms_messages(&self.workspace_id, thread_id, limit, offset)
+            .map_err(|error| DomainError::Internal(error.to_string()))?;
+        records
+            .into_iter()
+            .map(Self::to_json)
+            .collect()
+    }
+
+    fn get_message(&self, thread_id: &str, message_id: &str) -> DomainResult<Option<serde_json::Value>> {
+        let message = self
+            .store
+            .get_comms_message(&self.workspace_id, thread_id, message_id)
+            .map_err(|error| DomainError::Internal(error.to_string()))?;
+        message
+            .map(Self::to_json)
+            .transpose()
+    }
+
+    fn upsert_account(
+        &self,
+        account_id: &str,
+        operator_id: &str,
+        channel: &str,
+        address: &str,
+        display_name: &str,
+        status: Option<&str>,
+    ) -> DomainResult<serde_json::Value> {
+        let record = self
+            .store
+            .upsert_comms_account(
+                &self.workspace_id,
+                account_id,
+                operator_id,
+                channel,
+                address,
+                display_name,
+                status,
+            )
+            .map_err(|error| DomainError::Internal(error.to_string()))?;
+        Self::to_json(record)
+    }
+
+    fn create_thread(
+        &self,
+        channel: &str,
+        account_id: &str,
+        title: Option<&str>,
+        subject: Option<&str>,
+        participants: Option<&serde_json::Value>,
+        folder: Option<&str>,
+    ) -> DomainResult<serde_json::Value> {
+        let record = self
+            .store
+            .create_comms_thread(
+                &self.workspace_id,
+                channel,
+                account_id,
+                title,
+                subject,
+                participants,
+                folder,
+            )
+            .map_err(|error| DomainError::Internal(error.to_string()))?;
+        Self::to_json(record)
+    }
+
+    fn append_message(
+        &self,
+        thread_id: &str,
+        direction: &str,
+        from_account_ref: &str,
+        to_participants: Option<&serde_json::Value>,
+        cc_participants: Option<&serde_json::Value>,
+        bcc_participants: Option<&serde_json::Value>,
+        subject: Option<&str>,
+        body_text: &str,
+        reply_to_message_id: Option<&str>,
+    ) -> DomainResult<serde_json::Value> {
+        let record = self
+            .store
+            .append_comms_message(
+                &self.workspace_id,
+                thread_id,
+                direction,
+                from_account_ref,
+                to_participants,
+                cc_participants,
+                bcc_participants,
+                subject,
+                body_text,
+                reply_to_message_id,
+            )
+            .map_err(|error| DomainError::Internal(error.to_string()))?;
+        Self::to_json(record)
+    }
+
+    fn update_thread(
+        &self,
+        thread_id: &str,
+        title: Option<&str>,
+        subject: Option<&str>,
+        status: Option<&str>,
+        folder: Option<&str>,
+    ) -> DomainResult<Option<serde_json::Value>> {
+        let record = self
+            .store
+            .update_comms_thread(&self.workspace_id, thread_id, title, subject, status, folder)
+            .map_err(|error| DomainError::Internal(error.to_string()))?;
+        record
+            .map(Self::to_json)
+            .transpose()
+    }
+
+    fn delete_thread(&self, thread_id: &str) -> DomainResult<()> {
+        self.store
+            .delete_comms_thread(&self.workspace_id, thread_id)
+            .map_err(|error| DomainError::Internal(error.to_string()))
+    }
 }
 
 impl CommsToolPort for PersistenceCommsToolPort {
@@ -55,13 +244,6 @@ impl CommsToolPort for PersistenceCommsToolPort {
         &self,
         args: &serde_json::Value,
     ) -> DomainResult<CommsToolExecutionOutput> {
-        let output = self
-            .store
-            .execute_comms_tool(&self.workspace_id, args)
-            .map_err(|error| DomainError::Internal(error.to_string()))?;
-        Ok(CommsToolExecutionOutput {
-            summary: output.summary,
-            structured_data: output.structured_data,
-        })
+        CommsDomainService::default().execute_tool_request(self, args)
     }
 }
