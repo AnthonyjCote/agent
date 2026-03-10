@@ -12,9 +12,13 @@ use crate::{
     runtime::memory_trace_store::MemoryTraceStore,
     tools::{
         registry::execute_tool_by_id,
+        toolbox_prefetch::{
+            manifest::ACK_PREFETCH_SCHEMA, PrefetchPacket, PrefetchResolution, PrefetchSpec,
+            PrefetchSpecRaw, resolve_prefetch,
+        },
         toolbox::{
-        allowed_tool_ids_from_metadata, render_tool_details, render_toolbox_summary,
-        sanitize_requested_tool_ids,
+            allowed_tool_ids_from_metadata, render_tool_details, render_toolbox_summary,
+            sanitize_requested_tool_ids,
         },
     },
 };
@@ -45,8 +49,15 @@ impl AckDecision {
 struct AckEnvelopeRaw {
     decision: Option<String>,
     ack_text: Option<String>,
-    prefetch_tools: Option<Vec<String>>,
+    prefetch_tools: Option<Vec<AckPrefetchEntryRaw>>,
     requires_web_search: Option<bool>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+enum AckPrefetchEntryRaw {
+    ToolId(String),
+    ToolSpec(PrefetchSpecRaw),
 }
 
 #[derive(Debug, Clone)]
@@ -54,6 +65,7 @@ struct AckEnvelope {
     decision: AckDecision,
     ack_text: String,
     prefetch_tools: Vec<String>,
+    prefetch_specs: Vec<PrefetchSpec>,
     requires_web_search: bool,
 }
 
@@ -165,9 +177,10 @@ Runtime instructions:\n\
 - `prefetch_tools` is the explicit handoff mechanism used to provide expanded tool schema/instructions to deep stage.\n\
 - Include every app tool that is likely required for first-pass execution, up to the cap.\n\
 - Keep prefetch_tools small (max 5).\n\
+- {ACK_PREFETCH_SCHEMA}\n\
 - Set `requires_web_search` to true only when the request needs current external facts/news/market data.\n\
 - Required JSON schema:\n\
-{{\"decision\":\"ack_only|handoff_deep_default|handoff_deep_escalate\",\"ack_text\":\"short user-facing text\",\"prefetch_tools\":[\"tool_id\"],\"requires_web_search\":false}}"
+{{\"decision\":\"ack_only|handoff_deep_default|handoff_deep_escalate\",\"ack_text\":\"short user-facing text\",\"prefetch_tools\":[\"tool_id\"|{{\"tool\":\"tool_id\",\"intent\":\"intent\",\"args\":{{}}}}],\"requires_web_search\":false}}"
     )
 }
 
@@ -184,6 +197,7 @@ fn deep_prompt(
     history_excerpt: &str,
     toolbox_summary: &str,
     prefetched_tool_details: &str,
+    prefetched_context_packets: &[PrefetchPacket],
     org_compact_preload: &str,
     tool_results_log: &[String],
     work_log: &[String],
@@ -207,6 +221,13 @@ fn deep_prompt(
             "Prefetched tool details:\n{}\n",
             prefetched_tool_details.trim()
         )
+    };
+    let prefetch_packets_section = if prefetched_context_packets.is_empty() {
+        "Resolved prefetch context: (none)\n".to_string()
+    } else {
+        let rendered = serde_json::to_string_pretty(prefetched_context_packets)
+            .unwrap_or_else(|_| "[]".to_string());
+        format!("Resolved prefetch context packets:\n{}\n", rendered)
     };
     let tool_results_section = if tool_results_log.is_empty() {
         "App tool results: (none)\n".to_string()
@@ -269,6 +290,7 @@ Directive: {directive}\n\
 Toolbox summary (only these app tools are explicitly allowed):\n\
 {toolbox_summary}\n\
 {prefetch_section}\
+{prefetch_packets_section}\
 {org_preload_section}\
 {tool_results_section}\
 {work_log_section}\
@@ -345,16 +367,51 @@ fn parse_ack_envelope(raw: &str, allowed_tool_ids: &[String]) -> Option<AckEnvel
         if ack_text.is_empty() {
             return None;
         }
-        let requested = parsed.prefetch_tools.unwrap_or_default();
-        let mut prefetch = sanitize_requested_tool_ids(&requested, allowed_tool_ids);
+        let mut requested_tool_ids = Vec::new();
+        let mut requested_specs = Vec::new();
+        for entry in parsed.prefetch_tools.unwrap_or_default() {
+            match entry {
+                AckPrefetchEntryRaw::ToolId(tool_id) => {
+                    requested_tool_ids.push(tool_id);
+                }
+                AckPrefetchEntryRaw::ToolSpec(spec) => {
+                    requested_tool_ids.push(spec.tool.clone());
+                    requested_specs.push(PrefetchSpec {
+                        tool: spec.tool,
+                        intent: spec.intent.map(|value| value.trim().to_string()).filter(|value| !value.is_empty()),
+                        args: spec.args.unwrap_or(serde_json::Value::Object(serde_json::Map::new())),
+                    });
+                }
+            }
+        }
+        let mut prefetch = sanitize_requested_tool_ids(&requested_tool_ids, allowed_tool_ids);
         if prefetch.len() > ACK_PREFETCH_MAX {
             prefetch.truncate(ACK_PREFETCH_MAX);
+        }
+        let prefetch_set = prefetch.iter().map(String::as_str).collect::<std::collections::HashSet<_>>();
+        let mut dedupe_spec_keys = std::collections::HashSet::new();
+        let mut prefetch_specs = requested_specs
+            .into_iter()
+            .filter(|spec| prefetch_set.contains(spec.tool.as_str()))
+            .filter(|spec| {
+                let key = format!(
+                    "{}|{}|{}",
+                    spec.tool,
+                    spec.intent.clone().unwrap_or_default(),
+                    compact_for_log(&spec.args.to_string(), 320)
+                );
+                dedupe_spec_keys.insert(key)
+            })
+            .collect::<Vec<_>>();
+        if prefetch_specs.len() > ACK_PREFETCH_MAX {
+            prefetch_specs.truncate(ACK_PREFETCH_MAX);
         }
         let requires_web_search = parsed.requires_web_search.unwrap_or(false);
         Some(AckEnvelope {
             decision,
             ack_text,
             prefetch_tools: prefetch,
+            prefetch_specs,
             requires_web_search,
         })
     }
@@ -387,6 +444,7 @@ fn resolve_ack_envelope(raw_ack_output: &str, allowed_tool_ids: &[String]) -> Re
             decision: AckDecision::AckOnly,
             ack_text: trimmed.to_string(),
             prefetch_tools: Vec::new(),
+            prefetch_specs: Vec::new(),
             requires_web_search: false,
         });
     }
@@ -790,9 +848,98 @@ pub fn execute_run_once_with_tools<M: ModelInferencePort>(
         .deep_phase()
         .unwrap_or("deep_default")
         .to_string();
-    let prefetched_tool_details = render_tool_details(&ack_envelope.prefetch_tools, &allowed_tool_ids);
+    let mut prefetch_resolution = PrefetchResolution::empty();
+    if !ack_envelope.prefetch_specs.is_empty() {
+        let Some(executor) = tool_executor.as_deref_mut() else {
+            append_event(
+                &trace_store,
+                on_event,
+                RunEvent::RunFailed {
+                    run_id,
+                    error: RunError {
+                        code: "prefetch_execution_unavailable".to_string(),
+                        message: "Ack prefetch requested deterministic tool resolution, but no app tool executor is configured.".to_string(),
+                        retryable: false,
+                    },
+                },
+            );
+            return trace_store.snapshot();
+        };
+        prefetch_resolution = resolve_prefetch(
+            &ack_envelope.prefetch_specs,
+            &allowed_tool_ids,
+            executor,
+        );
+    }
+
+    if let Some(question) = prefetch_resolution.clarification_prompt.clone() {
+        append_event(
+            &trace_store,
+            on_event,
+            RunEvent::ModelDelta {
+                run_id: run_id.clone(),
+                phase: "ack_stage".to_string(),
+                text: question.clone(),
+            },
+        );
+        append_event(
+            &trace_store,
+            on_event,
+            RunEvent::BlocksProduced {
+                run_id: run_id.clone(),
+                blocks: vec![MessageBlock::AssistantText { text: question }],
+            },
+        );
+        append_event(
+            &trace_store,
+            on_event,
+            RunEvent::RunCompleted {
+                run_id,
+                usage: Some(RunUsage {
+                    prompt_tokens: 0,
+                    completion_tokens: 0,
+                    pruned_tokens: 0,
+                    latency_ms: 0,
+                }),
+            },
+        );
+        return trace_store.snapshot();
+    }
+
+    let mut static_prefetch_tool_ids = ack_envelope.prefetch_tools.clone();
+    if ack_envelope
+        .prefetch_specs
+        .iter()
+        .any(|spec| spec.tool == "comms_tool" && spec.intent.as_deref() == Some("message_send"))
+    {
+        static_prefetch_tool_ids.retain(|tool_id| tool_id != "comms_tool");
+    }
+    if prefetch_resolution
+        .requested_tool_ids
+        .iter()
+        .any(|tool_id| tool_id == "comms_tool")
+    {
+        static_prefetch_tool_ids.retain(|tool_id| tool_id != "comms_tool");
+    }
+    let mut prefetched_tool_details_sections = Vec::new();
+    let static_details = render_tool_details(&static_prefetch_tool_ids, &allowed_tool_ids);
+    if !static_details.trim().is_empty() {
+        prefetched_tool_details_sections.push(static_details);
+    }
+    if !prefetch_resolution.detail_blocks.is_empty() {
+        prefetched_tool_details_sections.push(prefetch_resolution.detail_blocks.join("\n\n"));
+    }
+    let prefetched_tool_details = prefetched_tool_details_sections.join("\n\n");
     let mut tool_results_log: Vec<String> = Vec::new();
     let mut work_log: Vec<String> = Vec::new();
+    if !prefetch_resolution.work_log_entries.is_empty() {
+        for entry in prefetch_resolution.work_log_entries {
+            work_log.insert(0, entry);
+        }
+        if work_log.len() > 24 {
+            work_log.truncate(24);
+        }
+    }
 
     let mut step: usize = 1;
     loop {
@@ -805,6 +952,7 @@ pub fn execute_run_once_with_tools<M: ModelInferencePort>(
             &history_excerpt,
             &toolbox_summary,
             &prefetched_tool_details,
+            &prefetch_resolution.packets,
             &org_compact_preload,
             &tool_results_log,
             &work_log,
