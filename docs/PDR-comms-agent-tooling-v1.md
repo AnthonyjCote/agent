@@ -29,6 +29,18 @@ Define a clean, deterministic comms tool contract for agents so they can reliabl
   - `delete`
 - Batched ops remain supported through `ops[]`.
 
+## Fast-Ack Prefetch Integration
+Shared fast-ack prefetch contract is defined in:
+- `docs/PDR-fast-ack-tool-prefetch-v1.md`
+
+Comms-specific requirement:
+- For `tool=comms_tool` and `intent=message_send`, runtime must apply method-specific packetization.
+- Method options:
+  - `email`
+  - `sms`
+  - `chat`
+- Only method-relevant instructions and recipient fields may be injected into deep context.
+
 ## New Read Capability
 ### `read operator_directory`
 Single call for recipient lookup + contact return data.
@@ -106,3 +118,5 @@ Agent pattern:
 - Locked decision: include ambiguity/confidence semantics in directory responses.
 - Locked decision: keep deterministic send behavior and require clarification on unresolved targets.
 - Added fuzzy-lookup roadmap for typo handling (e.g., `satshi` -> `Satoshi`).
+- Moved shared fast-ack prefetch contract to `PDR-fast-ack-tool-prefetch-v1.md`.
+- Retained comms-only packetization constraints in this PDR.
