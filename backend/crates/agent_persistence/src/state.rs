@@ -1,6 +1,8 @@
 use rusqlite::{params, Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
 
 use crate::{
     error::PersistenceError,
@@ -45,6 +47,57 @@ pub struct ThreadMessageRecord {
     pub thread_id: String,
     pub role: String,
     pub content: String,
+    pub created_at_ms: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CommsAccountRecord {
+    pub account_id: String,
+    pub operator_id: String,
+    pub channel: String,
+    pub address: String,
+    pub display_name: String,
+    pub status: String,
+    pub provider: String,
+    pub provider_config_ref: Option<String>,
+    pub created_at_ms: i64,
+    pub updated_at_ms: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CommsThreadRecord {
+    pub thread_id: String,
+    pub channel: String,
+    pub account_id: String,
+    pub title: String,
+    pub subject: String,
+    pub thread_key: String,
+    pub participants: Value,
+    pub state: String,
+    pub folder: String,
+    pub message_count: i64,
+    pub created_at_ms: i64,
+    pub updated_at_ms: i64,
+    pub last_message_at_ms: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CommsMessageRecord {
+    pub message_id: String,
+    pub thread_id: String,
+    pub channel: String,
+    pub direction: String,
+    pub from_account_ref: String,
+    pub to_participants: Value,
+    pub cc_participants: Value,
+    pub bcc_participants: Value,
+    pub subject: String,
+    pub body_text: String,
+    pub reply_to_message_id: Option<String>,
+    pub external_message_ref: Option<String>,
     pub created_at_ms: i64,
 }
 
@@ -552,6 +605,818 @@ impl PersistenceStateStore {
         })
     }
 
+    pub fn list_comms_accounts(
+        &self,
+        workspace_id: &str,
+        operator_id: Option<&str>,
+        channel: Option<&str>,
+    ) -> Result<Vec<CommsAccountRecord>, PersistenceError> {
+        let connection = self.open_runtime_db()?;
+        let mut statement = connection
+            .prepare(
+                "
+                SELECT account_id, operator_id, channel, address, display_name, status, provider, provider_config_ref, created_at_ms, updated_at_ms
+                FROM comms_accounts
+                WHERE workspace_id = ?1
+                  AND (?2 IS NULL OR operator_id = ?2)
+                  AND (?3 IS NULL OR channel = ?3)
+                ORDER BY updated_at_ms DESC
+                ",
+            )
+            .map_err(|error| self.runtime_sql_error("Failed to prepare list_comms_accounts query", error))?;
+        let rows = statement
+            .query_map(
+                params![
+                    workspace_id,
+                    operator_id.map(|value| value.trim()).filter(|value| !value.is_empty()),
+                    channel.map(|value| value.trim()).filter(|value| !value.is_empty())
+                ],
+                |row| {
+                    Ok(CommsAccountRecord {
+                        account_id: row.get(0)?,
+                        operator_id: row.get(1)?,
+                        channel: row.get(2)?,
+                        address: row.get(3)?,
+                        display_name: row.get(4)?,
+                        status: row.get(5)?,
+                        provider: row.get(6)?,
+                        provider_config_ref: row.get(7)?,
+                        created_at_ms: row.get(8)?,
+                        updated_at_ms: row.get(9)?,
+                    })
+                },
+            )
+            .map_err(|error| self.runtime_sql_error("Failed to query comms accounts", error))?;
+        let mut result = Vec::new();
+        for row in rows {
+            result.push(row.map_err(|error| self.runtime_sql_error("Failed to read comms account row", error))?);
+        }
+        Ok(result)
+    }
+
+    pub fn upsert_comms_account(
+        &self,
+        workspace_id: &str,
+        account_id: &str,
+        operator_id: &str,
+        channel: &str,
+        address: &str,
+        display_name: &str,
+        status: Option<&str>,
+    ) -> Result<CommsAccountRecord, PersistenceError> {
+        let connection = self.open_runtime_db()?;
+        let channel_value = channel.trim().to_lowercase();
+        let mut address_value = address.trim().to_string();
+        if channel_value == "sms" && address_value.is_empty() {
+            address_value = self.generate_unique_sandbox_sms_address(
+                workspace_id,
+                operator_id.trim(),
+                account_id.trim(),
+            )?;
+        }
+        let now = now_ms();
+        connection
+            .execute(
+                "
+                INSERT INTO comms_accounts (
+                    workspace_id, account_id, operator_id, channel, address, display_name, status, provider, provider_config_ref, created_at_ms, updated_at_ms
+                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, COALESCE(?7, 'active'), 'sandbox', NULL, ?8, ?8)
+                ON CONFLICT(workspace_id, account_id) DO UPDATE SET
+                    operator_id = excluded.operator_id,
+                    channel = excluded.channel,
+                    address = excluded.address,
+                    display_name = excluded.display_name,
+                    status = excluded.status,
+                    updated_at_ms = excluded.updated_at_ms
+                ",
+                params![
+                    workspace_id,
+                    account_id.trim(),
+                    operator_id.trim(),
+                    channel_value,
+                    address_value,
+                    display_name.trim(),
+                    status.map(|value| value.trim()).filter(|value| !value.is_empty()),
+                    now
+                ],
+            )
+            .map_err(|error| self.runtime_sql_error("Failed to upsert comms account", error))?;
+        self.get_comms_account(workspace_id, account_id)?.ok_or_else(|| PersistenceError::Sql {
+            context: "Comms account not found immediately after upsert",
+            source: rusqlite::Error::QueryReturnedNoRows,
+            path: Some(self.paths.runtime_db_path.clone()),
+        })
+    }
+
+    pub fn get_comms_account(
+        &self,
+        workspace_id: &str,
+        account_id: &str,
+    ) -> Result<Option<CommsAccountRecord>, PersistenceError> {
+        let connection = self.open_runtime_db()?;
+        connection
+            .query_row(
+                "
+                SELECT account_id, operator_id, channel, address, display_name, status, provider, provider_config_ref, created_at_ms, updated_at_ms
+                FROM comms_accounts
+                WHERE workspace_id = ?1 AND account_id = ?2
+                ",
+                params![workspace_id, account_id],
+                |row| {
+                    Ok(CommsAccountRecord {
+                        account_id: row.get(0)?,
+                        operator_id: row.get(1)?,
+                        channel: row.get(2)?,
+                        address: row.get(3)?,
+                        display_name: row.get(4)?,
+                        status: row.get(5)?,
+                        provider: row.get(6)?,
+                        provider_config_ref: row.get(7)?,
+                        created_at_ms: row.get(8)?,
+                        updated_at_ms: row.get(9)?,
+                    })
+                },
+            )
+            .optional()
+            .map_err(|error| self.runtime_sql_error("Failed to load comms account", error))
+    }
+
+    pub fn get_comms_account_by_address(
+        &self,
+        workspace_id: &str,
+        channel: &str,
+        address: &str,
+    ) -> Result<Option<CommsAccountRecord>, PersistenceError> {
+        let connection = self.open_runtime_db()?;
+        connection
+            .query_row(
+                "
+                SELECT account_id, operator_id, channel, address, display_name, status, provider, provider_config_ref, created_at_ms, updated_at_ms
+                FROM comms_accounts
+                WHERE workspace_id = ?1
+                  AND channel = ?2
+                  AND lower(address) = lower(?3)
+                ORDER BY updated_at_ms DESC
+                LIMIT 1
+                ",
+                params![workspace_id, channel.trim(), address.trim()],
+                |row| {
+                    Ok(CommsAccountRecord {
+                        account_id: row.get(0)?,
+                        operator_id: row.get(1)?,
+                        channel: row.get(2)?,
+                        address: row.get(3)?,
+                        display_name: row.get(4)?,
+                        status: row.get(5)?,
+                        provider: row.get(6)?,
+                        provider_config_ref: row.get(7)?,
+                        created_at_ms: row.get(8)?,
+                        updated_at_ms: row.get(9)?,
+                    })
+                },
+            )
+            .optional()
+            .map_err(|error| self.runtime_sql_error("Failed to load comms account by address", error))
+    }
+
+    pub fn list_comms_threads(
+        &self,
+        workspace_id: &str,
+        channel: Option<&str>,
+        account_id: Option<&str>,
+        folder: Option<&str>,
+        search: Option<&str>,
+        limit: i64,
+        offset: i64,
+    ) -> Result<Vec<CommsThreadRecord>, PersistenceError> {
+        let connection = self.open_runtime_db()?;
+        let mut statement = connection
+            .prepare(
+                "
+                SELECT thread_id, channel, account_id, title, subject, thread_key, participants_json, state, folder, message_count, created_at_ms, updated_at_ms, last_message_at_ms
+                FROM comms_threads
+                WHERE workspace_id = ?1
+                  AND (?2 IS NULL OR channel = ?2)
+                  AND (?3 IS NULL OR account_id = ?3)
+                  AND (?4 IS NULL OR folder = ?4)
+                  AND (?5 IS NULL OR title LIKE ?5 OR subject LIKE ?5)
+                ORDER BY updated_at_ms DESC
+                LIMIT ?6 OFFSET ?7
+                ",
+            )
+            .map_err(|error| self.runtime_sql_error("Failed to prepare list_comms_threads query", error))?;
+        let search_like = search
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty())
+            .map(|value| format!("%{}%", value));
+        let rows = statement
+            .query_map(
+                params![
+                    workspace_id,
+                    channel.map(|value| value.trim()).filter(|value| !value.is_empty()),
+                    account_id.map(|value| value.trim()).filter(|value| !value.is_empty()),
+                    folder.map(|value| value.trim()).filter(|value| !value.is_empty()),
+                    search_like,
+                    limit.max(1).min(500),
+                    offset.max(0)
+                ],
+                |row| {
+                    let participants_json: String = row.get(6)?;
+                    Ok(CommsThreadRecord {
+                        thread_id: row.get(0)?,
+                        channel: row.get(1)?,
+                        account_id: row.get(2)?,
+                        title: row.get(3)?,
+                        subject: row.get(4)?,
+                        thread_key: row.get(5)?,
+                        participants: serde_json::from_str(&participants_json)
+                            .unwrap_or_else(|_| serde_json::json!([])),
+                        state: row.get(7)?,
+                        folder: row.get(8)?,
+                        message_count: row.get(9)?,
+                        created_at_ms: row.get(10)?,
+                        updated_at_ms: row.get(11)?,
+                        last_message_at_ms: row.get(12)?,
+                    })
+                },
+            )
+            .map_err(|error| self.runtime_sql_error("Failed to query comms threads", error))?;
+        let mut result = Vec::new();
+        for row in rows {
+            result.push(row.map_err(|error| self.runtime_sql_error("Failed to read comms thread row", error))?);
+        }
+        Ok(result)
+    }
+
+    pub fn create_comms_thread(
+        &self,
+        workspace_id: &str,
+        channel: &str,
+        account_id: &str,
+        title: Option<&str>,
+        subject: Option<&str>,
+        participants: Option<&Value>,
+        folder: Option<&str>,
+    ) -> Result<CommsThreadRecord, PersistenceError> {
+        let channel_value = channel.trim().to_lowercase();
+        let account_id_value = account_id.trim().to_string();
+        if channel_value == "sms" {
+            if let Some(peer_number) = extract_sms_peer_number(participants) {
+                let thread_key = format!("sms:peer:{}", peer_number.trim().to_lowercase());
+                if let Some(existing) = self.find_latest_comms_thread_by_thread_key(
+                    workspace_id,
+                    "sms",
+                    &account_id_value,
+                    &thread_key,
+                )? {
+                    let desired_title = title
+                        .map(|value| value.trim())
+                        .filter(|value| !value.is_empty());
+                    if let Some(desired_title) = desired_title {
+                        if existing.title != desired_title {
+                            if let Some(updated) = self.update_comms_thread(
+                                workspace_id,
+                                &existing.thread_id,
+                                Some(desired_title),
+                                None,
+                                None,
+                                None,
+                            )? {
+                                return Ok(updated);
+                            }
+                        }
+                    }
+                    return Ok(existing);
+                }
+            }
+        }
+
+        let connection = self.open_runtime_db()?;
+        let now = now_ms();
+        let thread_id = format!("cth_{}", uuid_like_id());
+        let title_value = title
+            .map(|value| value.trim().to_string())
+            .filter(|value| !value.is_empty())
+            .unwrap_or_else(|| "New thread".to_string());
+        let subject_value = subject
+            .map(|value| value.trim().to_string())
+            .unwrap_or_default();
+        let thread_key_value = if channel_value == "sms" {
+            extract_sms_peer_number(participants)
+                .map(|peer_number| format!("sms:peer:{}", peer_number.trim().to_lowercase()))
+                .unwrap_or_default()
+        } else {
+            String::new()
+        };
+        let participants_json = serde_json::to_string(participants.unwrap_or(&serde_json::json!([])))
+            .map_err(|error| PersistenceError::JsonSerialize {
+                context: "Failed to serialize comms thread participants",
+                source: error,
+            })?;
+        connection
+            .execute(
+                "
+                INSERT INTO comms_threads (
+                    workspace_id, thread_id, channel, account_id, title, subject, thread_key, participants_json, state, folder, message_count, created_at_ms, updated_at_ms, last_message_at_ms
+                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 'open', COALESCE(?9, 'inbox'), 0, ?10, ?10, ?10)
+                ",
+                params![
+                    workspace_id,
+                    thread_id,
+                    channel_value,
+                    account_id_value,
+                    title_value,
+                    subject_value,
+                    thread_key_value,
+                    participants_json,
+                    folder.map(|value| value.trim()).filter(|value| !value.is_empty()),
+                    now
+                ],
+            )
+            .map_err(|error| self.runtime_sql_error("Failed to create comms thread", error))?;
+        self.get_comms_thread(workspace_id, &thread_id)?.ok_or_else(|| PersistenceError::Sql {
+            context: "Comms thread not found immediately after create",
+            source: rusqlite::Error::QueryReturnedNoRows,
+            path: Some(self.paths.runtime_db_path.clone()),
+        })
+    }
+
+    pub fn get_comms_thread(
+        &self,
+        workspace_id: &str,
+        thread_id: &str,
+    ) -> Result<Option<CommsThreadRecord>, PersistenceError> {
+        let connection = self.open_runtime_db()?;
+        connection
+            .query_row(
+                "
+                SELECT thread_id, channel, account_id, title, subject, thread_key, participants_json, state, folder, message_count, created_at_ms, updated_at_ms, last_message_at_ms
+                FROM comms_threads
+                WHERE workspace_id = ?1 AND thread_id = ?2
+                ",
+                params![workspace_id, thread_id],
+                |row| {
+                    let participants_json: String = row.get(6)?;
+                    Ok(CommsThreadRecord {
+                        thread_id: row.get(0)?,
+                        channel: row.get(1)?,
+                        account_id: row.get(2)?,
+                        title: row.get(3)?,
+                        subject: row.get(4)?,
+                        thread_key: row.get(5)?,
+                        participants: serde_json::from_str(&participants_json)
+                            .unwrap_or_else(|_| serde_json::json!([])),
+                        state: row.get(7)?,
+                        folder: row.get(8)?,
+                        message_count: row.get(9)?,
+                        created_at_ms: row.get(10)?,
+                        updated_at_ms: row.get(11)?,
+                        last_message_at_ms: row.get(12)?,
+                    })
+                },
+            )
+            .optional()
+            .map_err(|error| self.runtime_sql_error("Failed to load comms thread", error))
+    }
+
+    pub fn find_latest_comms_thread_by_subject(
+        &self,
+        workspace_id: &str,
+        channel: &str,
+        account_id: &str,
+        folder: &str,
+        subject: &str,
+    ) -> Result<Option<CommsThreadRecord>, PersistenceError> {
+        let connection = self.open_runtime_db()?;
+        connection
+            .query_row(
+                "
+                SELECT thread_id, channel, account_id, title, subject, thread_key, participants_json, state, folder, message_count, created_at_ms, updated_at_ms, last_message_at_ms
+                FROM comms_threads
+                WHERE workspace_id = ?1
+                  AND channel = ?2
+                  AND account_id = ?3
+                  AND folder = ?4
+                  AND subject = ?5
+                ORDER BY updated_at_ms DESC
+                LIMIT 1
+                ",
+                params![
+                    workspace_id,
+                    channel.trim(),
+                    account_id.trim(),
+                    folder.trim(),
+                    subject.trim()
+                ],
+                |row| {
+                    let participants_json: String = row.get(6)?;
+                    Ok(CommsThreadRecord {
+                        thread_id: row.get(0)?,
+                        channel: row.get(1)?,
+                        account_id: row.get(2)?,
+                        title: row.get(3)?,
+                        subject: row.get(4)?,
+                        thread_key: row.get(5)?,
+                        participants: serde_json::from_str(&participants_json)
+                            .unwrap_or_else(|_| serde_json::json!([])),
+                        state: row.get(7)?,
+                        folder: row.get(8)?,
+                        message_count: row.get(9)?,
+                        created_at_ms: row.get(10)?,
+                        updated_at_ms: row.get(11)?,
+                        last_message_at_ms: row.get(12)?,
+                    })
+                },
+            )
+            .optional()
+            .map_err(|error| self.runtime_sql_error("Failed to find latest comms thread by subject", error))
+    }
+
+    pub fn find_latest_comms_thread_by_thread_key(
+        &self,
+        workspace_id: &str,
+        channel: &str,
+        account_id: &str,
+        thread_key: &str,
+    ) -> Result<Option<CommsThreadRecord>, PersistenceError> {
+        let connection = self.open_runtime_db()?;
+        connection
+            .query_row(
+                "
+                SELECT thread_id, channel, account_id, title, subject, thread_key, participants_json, state, folder, message_count, created_at_ms, updated_at_ms, last_message_at_ms
+                FROM comms_threads
+                WHERE workspace_id = ?1
+                  AND channel = ?2
+                  AND account_id = ?3
+                  AND thread_key = ?4
+                ORDER BY updated_at_ms DESC
+                LIMIT 1
+                ",
+                params![
+                    workspace_id,
+                    channel.trim(),
+                    account_id.trim(),
+                    thread_key.trim()
+                ],
+                |row| {
+                    let participants_json: String = row.get(6)?;
+                    Ok(CommsThreadRecord {
+                        thread_id: row.get(0)?,
+                        channel: row.get(1)?,
+                        account_id: row.get(2)?,
+                        title: row.get(3)?,
+                        subject: row.get(4)?,
+                        thread_key: row.get(5)?,
+                        participants: serde_json::from_str(&participants_json)
+                            .unwrap_or_else(|_| serde_json::json!([])),
+                        state: row.get(7)?,
+                        folder: row.get(8)?,
+                        message_count: row.get(9)?,
+                        created_at_ms: row.get(10)?,
+                        updated_at_ms: row.get(11)?,
+                        last_message_at_ms: row.get(12)?,
+                    })
+                },
+            )
+            .optional()
+            .map_err(|error| self.runtime_sql_error("Failed to find latest comms thread by thread key", error))
+    }
+
+    pub fn update_comms_thread(
+        &self,
+        workspace_id: &str,
+        thread_id: &str,
+        title: Option<&str>,
+        subject: Option<&str>,
+        state: Option<&str>,
+        folder: Option<&str>,
+    ) -> Result<Option<CommsThreadRecord>, PersistenceError> {
+        let connection = self.open_runtime_db()?;
+        let now = now_ms();
+        connection
+            .execute(
+                "
+                UPDATE comms_threads
+                SET
+                    title = COALESCE(?3, title),
+                    subject = COALESCE(?4, subject),
+                    state = COALESCE(?5, state),
+                    folder = COALESCE(?6, folder),
+                    updated_at_ms = ?7
+                WHERE workspace_id = ?1 AND thread_id = ?2
+                ",
+                params![
+                    workspace_id,
+                    thread_id,
+                    title.map(|value| value.trim()).filter(|value| !value.is_empty()),
+                    subject.map(|value| value.trim()),
+                    state.map(|value| value.trim()).filter(|value| !value.is_empty()),
+                    folder.map(|value| value.trim()).filter(|value| !value.is_empty()),
+                    now
+                ],
+            )
+            .map_err(|error| self.runtime_sql_error("Failed to update comms thread", error))?;
+        self.get_comms_thread(workspace_id, thread_id)
+    }
+
+    pub fn update_comms_thread_thread_key(
+        &self,
+        workspace_id: &str,
+        thread_id: &str,
+        thread_key: &str,
+    ) -> Result<(), PersistenceError> {
+        let connection = self.open_runtime_db()?;
+        connection
+            .execute(
+                "
+                UPDATE comms_threads
+                SET
+                    thread_key = ?3,
+                    updated_at_ms = ?4
+                WHERE workspace_id = ?1 AND thread_id = ?2
+                ",
+                params![workspace_id, thread_id, thread_key.trim(), now_ms()],
+            )
+            .map_err(|error| self.runtime_sql_error("Failed to update comms thread key", error))?;
+        Ok(())
+    }
+
+    pub fn delete_comms_thread(
+        &self,
+        workspace_id: &str,
+        thread_id: &str,
+    ) -> Result<(), PersistenceError> {
+        let mut connection = self.open_runtime_db()?;
+        let transaction = connection
+            .transaction()
+            .map_err(|error| self.runtime_sql_error("Failed to begin delete_comms_thread transaction", error))?;
+        transaction
+            .execute(
+                "DELETE FROM comms_messages WHERE workspace_id = ?1 AND thread_id = ?2",
+                params![workspace_id, thread_id],
+            )
+            .map_err(|error| self.runtime_sql_error("Failed to delete comms thread messages", error))?;
+        transaction
+            .execute(
+                "DELETE FROM comms_threads WHERE workspace_id = ?1 AND thread_id = ?2",
+                params![workspace_id, thread_id],
+            )
+            .map_err(|error| self.runtime_sql_error("Failed to delete comms thread", error))?;
+        transaction
+            .commit()
+            .map_err(|error| self.runtime_sql_error("Failed to commit delete_comms_thread transaction", error))?;
+        Ok(())
+    }
+
+    pub fn list_comms_messages(
+        &self,
+        workspace_id: &str,
+        thread_id: &str,
+        limit: i64,
+        offset: i64,
+    ) -> Result<Vec<CommsMessageRecord>, PersistenceError> {
+        let connection = self.open_runtime_db()?;
+        let mut statement = connection
+            .prepare(
+                "
+                SELECT message_id, thread_id, channel, direction, from_account_ref, to_participants_json, cc_participants_json, bcc_participants_json, subject, body_text, reply_to_message_id, external_message_ref, created_at_ms
+                FROM comms_messages
+                WHERE workspace_id = ?1 AND thread_id = ?2
+                ORDER BY created_at_ms ASC
+                LIMIT ?3 OFFSET ?4
+                ",
+            )
+            .map_err(|error| self.runtime_sql_error("Failed to prepare list_comms_messages query", error))?;
+        let rows = statement
+            .query_map(
+                params![workspace_id, thread_id, limit.max(1).min(1000), offset.max(0)],
+                |row| {
+                    let to_json: String = row.get(5)?;
+                    let cc_json: String = row.get(6)?;
+                    let bcc_json: String = row.get(7)?;
+                    Ok(CommsMessageRecord {
+                        message_id: row.get(0)?,
+                        thread_id: row.get(1)?,
+                        channel: row.get(2)?,
+                        direction: row.get(3)?,
+                        from_account_ref: row.get(4)?,
+                        to_participants: serde_json::from_str(&to_json).unwrap_or_else(|_| serde_json::json!([])),
+                        cc_participants: serde_json::from_str(&cc_json).unwrap_or_else(|_| serde_json::json!([])),
+                        bcc_participants: serde_json::from_str(&bcc_json).unwrap_or_else(|_| serde_json::json!([])),
+                        subject: row.get(8)?,
+                        body_text: row.get(9)?,
+                        reply_to_message_id: row.get(10)?,
+                        external_message_ref: row.get(11)?,
+                        created_at_ms: row.get(12)?,
+                    })
+                },
+            )
+            .map_err(|error| self.runtime_sql_error("Failed to query comms messages", error))?;
+        let mut result = Vec::new();
+        for row in rows {
+            result.push(row.map_err(|error| self.runtime_sql_error("Failed to read comms message row", error))?);
+        }
+        Ok(result)
+    }
+
+    pub fn get_comms_message(
+        &self,
+        workspace_id: &str,
+        thread_id: &str,
+        message_id: &str,
+    ) -> Result<Option<CommsMessageRecord>, PersistenceError> {
+        let connection = self.open_runtime_db()?;
+        connection
+            .query_row(
+                "
+                SELECT message_id, thread_id, channel, direction, from_account_ref, to_participants_json, cc_participants_json, bcc_participants_json, subject, body_text, reply_to_message_id, external_message_ref, created_at_ms
+                FROM comms_messages
+                WHERE workspace_id = ?1 AND thread_id = ?2 AND message_id = ?3
+                ",
+                params![workspace_id, thread_id, message_id],
+                |row| {
+                    let to_json: String = row.get(5)?;
+                    let cc_json: String = row.get(6)?;
+                    let bcc_json: String = row.get(7)?;
+                    Ok(CommsMessageRecord {
+                        message_id: row.get(0)?,
+                        thread_id: row.get(1)?,
+                        channel: row.get(2)?,
+                        direction: row.get(3)?,
+                        from_account_ref: row.get(4)?,
+                        to_participants: serde_json::from_str(&to_json).unwrap_or_else(|_| serde_json::json!([])),
+                        cc_participants: serde_json::from_str(&cc_json).unwrap_or_else(|_| serde_json::json!([])),
+                        bcc_participants: serde_json::from_str(&bcc_json).unwrap_or_else(|_| serde_json::json!([])),
+                        subject: row.get(8)?,
+                        body_text: row.get(9)?,
+                        reply_to_message_id: row.get(10)?,
+                        external_message_ref: row.get(11)?,
+                        created_at_ms: row.get(12)?,
+                    })
+                },
+            )
+            .optional()
+            .map_err(|error| self.runtime_sql_error("Failed to load comms message", error))
+    }
+
+    pub fn append_comms_message(
+        &self,
+        workspace_id: &str,
+        thread_id: &str,
+        direction: &str,
+        from_account_ref: &str,
+        to_participants: Option<&Value>,
+        cc_participants: Option<&Value>,
+        bcc_participants: Option<&Value>,
+        subject: Option<&str>,
+        body_text: &str,
+        reply_to_message_id: Option<&str>,
+    ) -> Result<CommsMessageRecord, PersistenceError> {
+        let mut connection = self.open_runtime_db()?;
+        let transaction = connection
+            .transaction()
+            .map_err(|error| self.runtime_sql_error("Failed to begin append_comms_message transaction", error))?;
+        let now = now_ms();
+        let message_id = format!("cmsg_{}", uuid_like_id());
+        let to_json = serde_json::to_string(to_participants.unwrap_or(&serde_json::json!([])))
+            .map_err(|error| PersistenceError::JsonSerialize {
+                context: "Failed to serialize comms message recipients",
+                source: error,
+            })?;
+        let cc_json = serde_json::to_string(cc_participants.unwrap_or(&serde_json::json!([])))
+            .map_err(|error| PersistenceError::JsonSerialize {
+                context: "Failed to serialize comms message cc recipients",
+                source: error,
+            })?;
+        let bcc_json = serde_json::to_string(bcc_participants.unwrap_or(&serde_json::json!([])))
+            .map_err(|error| PersistenceError::JsonSerialize {
+                context: "Failed to serialize comms message bcc recipients",
+                source: error,
+            })?;
+        transaction
+            .execute(
+                "
+                INSERT INTO comms_messages (
+                    workspace_id, thread_id, message_id, channel, direction, from_account_ref, to_participants_json, cc_participants_json, bcc_participants_json, subject, body_text, reply_to_message_id, external_message_ref, created_at_ms
+                )
+                SELECT ?1, ?2, ?3, channel, ?4, ?5, ?6, ?7, ?8, COALESCE(?9, ''), ?10, ?11, NULL, ?12
+                FROM comms_threads
+                WHERE workspace_id = ?1 AND thread_id = ?2
+                ",
+                params![
+                    workspace_id,
+                    thread_id,
+                    message_id,
+                    direction.trim(),
+                    from_account_ref.trim(),
+                    to_json,
+                    cc_json,
+                    bcc_json,
+                    subject.map(|value| value.trim()),
+                    body_text,
+                    reply_to_message_id.map(|value| value.trim()).filter(|value| !value.is_empty()),
+                    now
+                ],
+            )
+            .map_err(|error| self.runtime_sql_error("Failed to insert comms message", error))?;
+        transaction
+            .execute(
+                "
+                UPDATE comms_threads
+                SET
+                    message_count = message_count + 1,
+                    updated_at_ms = ?3,
+                    last_message_at_ms = ?3
+                WHERE workspace_id = ?1 AND thread_id = ?2
+                ",
+                params![workspace_id, thread_id, now],
+            )
+            .map_err(|error| self.runtime_sql_error("Failed to update comms thread counters", error))?;
+        transaction
+            .commit()
+            .map_err(|error| self.runtime_sql_error("Failed to commit append_comms_message transaction", error))?;
+
+        self.get_comms_message(workspace_id, thread_id, &message_id)?
+            .ok_or_else(|| PersistenceError::Sql {
+                context: "Comms message not found immediately after append",
+                source: rusqlite::Error::QueryReturnedNoRows,
+                path: Some(self.paths.runtime_db_path.clone()),
+            })
+    }
+
+    pub fn insert_comms_delivery_event(
+        &self,
+        workspace_id: &str,
+        message_id: &str,
+        thread_id: &str,
+        status: &str,
+        error_code: Option<&str>,
+        error_message: Option<&str>,
+    ) -> Result<(), PersistenceError> {
+        let connection = self.open_runtime_db()?;
+        connection
+            .execute(
+                "
+                INSERT INTO comms_delivery_events (
+                    workspace_id, delivery_event_id, message_id, thread_id, status, error_code, error_message, created_at_ms
+                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+                ",
+                params![
+                    workspace_id,
+                    format!("cde_{}", uuid_like_id()),
+                    message_id.trim(),
+                    thread_id.trim(),
+                    status.trim(),
+                    error_code.map(|value| value.trim()).filter(|value| !value.is_empty()),
+                    error_message.map(|value| value.trim()).filter(|value| !value.is_empty()),
+                    now_ms()
+                ],
+            )
+            .map_err(|error| self.runtime_sql_error("Failed to insert comms delivery event", error))?;
+        Ok(())
+    }
+
+    fn generate_unique_sandbox_sms_address(
+        &self,
+        workspace_id: &str,
+        operator_id: &str,
+        account_id: &str,
+    ) -> Result<String, PersistenceError> {
+        let connection = self.open_runtime_db()?;
+        let mut hasher = DefaultHasher::new();
+        workspace_id.hash(&mut hasher);
+        operator_id.hash(&mut hasher);
+        account_id.hash(&mut hasher);
+        let seed = hasher.finish();
+        for attempt in 0u64..10_000 {
+            let candidate = format!("+1555{:07}", ((seed + attempt) % 10_000_000) as u32);
+            let taken: Option<String> = connection
+                .query_row(
+                    "
+                    SELECT account_id
+                    FROM comms_accounts
+                    WHERE workspace_id = ?1
+                      AND channel = 'sms'
+                      AND address = ?2
+                      AND account_id <> ?3
+                    LIMIT 1
+                    ",
+                    params![workspace_id, candidate, account_id],
+                    |row| row.get(0),
+                )
+                .optional()
+                .map_err(|error| self.runtime_sql_error("Failed to validate sandbox sms address uniqueness", error))?;
+            if taken.is_none() {
+                return Ok(candidate);
+            }
+        }
+        Err(PersistenceError::Io {
+            context: "Failed to generate unique sandbox sms address",
+            source: std::io::Error::new(std::io::ErrorKind::Other, "sms address space exhausted"),
+            path: Some(self.paths.runtime_db_path.clone()),
+        })
+    }
+
     pub fn list_work_units(
         &self,
         workspace_id: &str,
@@ -857,6 +1722,17 @@ impl PersistenceStateStore {
             source,
             path: Some(self.paths.runtime_db_path.clone()),
         }
+    }
+}
+
+fn extract_sms_peer_number(participants: Option<&Value>) -> Option<String> {
+    let value = participants?;
+    let object = value.as_object()?;
+    let peer = object.get("peerNumber")?.as_str()?.trim().to_string();
+    if peer.is_empty() {
+        None
+    } else {
+        Some(peer)
     }
 }
 

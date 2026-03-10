@@ -87,10 +87,42 @@ impl PersistenceStateStore {
             let action = op.action.trim().to_ascii_lowercase();
             let target = op.target.trim().to_ascii_lowercase();
             match (action.as_str(), target.as_str()) {
+                ("read", "account") => {
+                    let account_id = selector_string(op.selector.as_ref(), "accountId")
+                        .ok_or_else(|| invalid_input("read account requires selector.accountId"))?;
+                    let account = self.get_comms_account(workspace_id, &account_id)?;
+                    op_results.push(CommsOpResult {
+                        action,
+                        target,
+                        status: "ok".to_string(),
+                        message: if account.is_some() {
+                            "account loaded".to_string()
+                        } else {
+                            "account not found".to_string()
+                        },
+                    });
+                    data.push(json!({ "account": account }));
+                }
+                ("read", "accounts") => {
+                    let operator_id = selector_string(op.selector.as_ref(), "operatorId");
+                    let channel = selector_string(op.selector.as_ref(), "channel");
+                    let accounts = self.list_comms_accounts(
+                        workspace_id,
+                        operator_id.as_deref(),
+                        channel.as_deref(),
+                    )?;
+                    op_results.push(CommsOpResult {
+                        action,
+                        target,
+                        status: "ok".to_string(),
+                        message: format!("loaded {} accounts", accounts.len()),
+                    });
+                    data.push(json!({ "accounts": accounts }));
+                }
                 ("read", "thread") => {
                     let thread_id = selector_string(op.selector.as_ref(), "threadId")
                         .ok_or_else(|| invalid_input("read thread requires selector.threadId"))?;
-                    let thread = self.get_thread(workspace_id, &thread_id)?;
+                    let thread = self.get_comms_thread(workspace_id, &thread_id)?;
                     op_results.push(CommsOpResult {
                         action,
                         target,
@@ -102,6 +134,40 @@ impl PersistenceStateStore {
                         },
                     });
                     data.push(json!({ "thread": thread }));
+                }
+                ("read", "threads") => {
+                    let channel = selector_string(op.selector.as_ref(), "channel");
+                    let account_id = selector_string(op.selector.as_ref(), "accountId");
+                    let folder = selector_string(op.selector.as_ref(), "folder");
+                    let search = selector_string(op.selector.as_ref(), "search");
+                    let limit = op
+                        .selector
+                        .as_ref()
+                        .and_then(|value| value.get("limit"))
+                        .and_then(|value| value.as_i64())
+                        .unwrap_or(200);
+                    let offset = op
+                        .selector
+                        .as_ref()
+                        .and_then(|value| value.get("offset"))
+                        .and_then(|value| value.as_i64())
+                        .unwrap_or(0);
+                    let threads = self.list_comms_threads(
+                        workspace_id,
+                        channel.as_deref(),
+                        account_id.as_deref(),
+                        folder.as_deref(),
+                        search.as_deref(),
+                        limit,
+                        offset,
+                    )?;
+                    op_results.push(CommsOpResult {
+                        action,
+                        target,
+                        status: "ok".to_string(),
+                        message: format!("loaded {} threads", threads.len()),
+                    });
+                    data.push(json!({ "threads": threads }));
                 }
                 ("read", "messages") => {
                     let thread_id = selector_string(op.selector.as_ref(), "threadId")
@@ -118,7 +184,7 @@ impl PersistenceStateStore {
                         .and_then(|value| value.get("offset"))
                         .and_then(|value| value.as_i64())
                         .unwrap_or(0);
-                    let messages = self.list_thread_messages(workspace_id, &thread_id, limit, offset)?;
+                    let messages = self.list_comms_messages(workspace_id, &thread_id, limit, offset)?;
                     op_results.push(CommsOpResult {
                         action,
                         target,
@@ -127,11 +193,73 @@ impl PersistenceStateStore {
                     });
                     data.push(json!({ "threadId": thread_id, "messages": messages }));
                 }
-                ("create", "thread") => {
+                ("read", "message") => {
+                    let thread_id = selector_string(op.selector.as_ref(), "threadId")
+                        .ok_or_else(|| invalid_input("read message requires selector.threadId"))?;
+                    let message_id = selector_string(op.selector.as_ref(), "messageId")
+                        .ok_or_else(|| invalid_input("read message requires selector.messageId"))?;
+                    let message = self.get_comms_message(workspace_id, &thread_id, &message_id)?;
+                    op_results.push(CommsOpResult {
+                        action,
+                        target,
+                        status: "ok".to_string(),
+                        message: if message.is_some() {
+                            "message loaded".to_string()
+                        } else {
+                            "message not found".to_string()
+                        },
+                    });
+                    data.push(json!({ "message": message }));
+                }
+                ("create", "account") => {
+                    let account_id = payload_string(op.payload.as_ref(), "accountId")
+                        .ok_or_else(|| invalid_input("create account requires payload.accountId"))?;
                     let operator_id = payload_string(op.payload.as_ref(), "operatorId")
-                        .ok_or_else(|| invalid_input("create thread requires payload.operatorId"))?;
+                        .ok_or_else(|| invalid_input("create account requires payload.operatorId"))?;
+                    let channel = payload_string(op.payload.as_ref(), "channel")
+                        .ok_or_else(|| invalid_input("create account requires payload.channel"))?;
+                    let address = payload_string(op.payload.as_ref(), "address")
+                        .ok_or_else(|| invalid_input("create account requires payload.address"))?;
+                    let display_name = payload_string(op.payload.as_ref(), "displayName")
+                        .unwrap_or_else(|| operator_id.clone());
+                    let account = self.upsert_comms_account(
+                        workspace_id,
+                        &account_id,
+                        &operator_id,
+                        &channel,
+                        &address,
+                        &display_name,
+                        Some("active"),
+                    )?;
+                    op_results.push(CommsOpResult {
+                        action,
+                        target,
+                        status: "ok".to_string(),
+                        message: "account upserted".to_string(),
+                    });
+                    data.push(json!({ "account": account }));
+                }
+                ("create", "thread") => {
+                    let account_id = payload_string(op.payload.as_ref(), "accountId")
+                        .ok_or_else(|| invalid_input("create thread requires payload.accountId"))?;
+                    let channel = payload_string(op.payload.as_ref(), "channel")
+                        .ok_or_else(|| invalid_input("create thread requires payload.channel"))?;
                     let title = payload_string(op.payload.as_ref(), "title");
-                    let thread = self.create_thread(workspace_id, &operator_id, title.as_deref())?;
+                    let subject = payload_string(op.payload.as_ref(), "subject");
+                    let folder = payload_string(op.payload.as_ref(), "folder");
+                    let participants = op
+                        .payload
+                        .as_ref()
+                        .and_then(|value| value.get("participants"));
+                    let thread = self.create_comms_thread(
+                        workspace_id,
+                        &channel,
+                        &account_id,
+                        title.as_deref(),
+                        subject.as_deref(),
+                        participants,
+                        folder.as_deref(),
+                    )?;
                     op_results.push(CommsOpResult {
                         action,
                         target,
@@ -143,11 +271,38 @@ impl PersistenceStateStore {
                 ("create", "message") => {
                     let thread_id = payload_string(op.payload.as_ref(), "threadId")
                         .ok_or_else(|| invalid_input("create message requires payload.threadId"))?;
-                    let role = payload_string(op.payload.as_ref(), "role")
-                        .unwrap_or_else(|| "assistant".to_string());
-                    let content = payload_string(op.payload.as_ref(), "content")
-                        .ok_or_else(|| invalid_input("create message requires payload.content"))?;
-                    let message = self.append_thread_message(workspace_id, &thread_id, &role, &content)?;
+                    let direction = payload_string(op.payload.as_ref(), "direction")
+                        .unwrap_or_else(|| "outbound".to_string());
+                    let from_account_ref = payload_string(op.payload.as_ref(), "fromAccountRef")
+                        .ok_or_else(|| invalid_input("create message requires payload.fromAccountRef"))?;
+                    let body_text = payload_string(op.payload.as_ref(), "bodyText")
+                        .ok_or_else(|| invalid_input("create message requires payload.bodyText"))?;
+                    let subject = payload_string(op.payload.as_ref(), "subject");
+                    let reply_to_message_id = payload_string(op.payload.as_ref(), "replyToMessageId");
+                    let to_participants = op
+                        .payload
+                        .as_ref()
+                        .and_then(|value| value.get("toParticipants"));
+                    let cc_participants = op
+                        .payload
+                        .as_ref()
+                        .and_then(|value| value.get("ccParticipants"));
+                    let bcc_participants = op
+                        .payload
+                        .as_ref()
+                        .and_then(|value| value.get("bccParticipants"));
+                    let message = self.append_comms_message(
+                        workspace_id,
+                        &thread_id,
+                        &direction,
+                        &from_account_ref,
+                        to_participants,
+                        cc_participants,
+                        bcc_participants,
+                        subject.as_deref(),
+                        &body_text,
+                        reply_to_message_id.as_deref(),
+                    )?;
                     op_results.push(CommsOpResult {
                         action,
                         target,
@@ -160,14 +315,16 @@ impl PersistenceStateStore {
                     let thread_id = selector_string(op.selector.as_ref(), "threadId")
                         .ok_or_else(|| invalid_input("edit thread requires selector.threadId"))?;
                     let title = payload_string(op.payload.as_ref(), "title");
-                    let summary = payload_string(op.payload.as_ref(), "summary");
+                    let subject = payload_string(op.payload.as_ref(), "subject");
                     let status = payload_string(op.payload.as_ref(), "status");
-                    let thread = self.update_thread(
+                    let folder = payload_string(op.payload.as_ref(), "folder");
+                    let thread = self.update_comms_thread(
                         workspace_id,
                         &thread_id,
                         title.as_deref(),
-                        summary.as_deref(),
+                        subject.as_deref(),
                         status.as_deref(),
+                        folder.as_deref(),
                     )?;
                     op_results.push(CommsOpResult {
                         action,
@@ -184,7 +341,7 @@ impl PersistenceStateStore {
                 ("delete", "thread") => {
                     let thread_id = selector_string(op.selector.as_ref(), "threadId")
                         .ok_or_else(|| invalid_input("delete thread requires selector.threadId"))?;
-                    self.delete_thread(workspace_id, &thread_id)?;
+                    self.delete_comms_thread(workspace_id, &thread_id)?;
                     op_results.push(CommsOpResult {
                         action,
                         target,
@@ -212,4 +369,3 @@ impl PersistenceStateStore {
         })
     }
 }
-

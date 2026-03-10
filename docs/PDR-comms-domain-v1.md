@@ -122,7 +122,7 @@ Fields:
 
 ## Adapter Architecture
 Single adapter interface behind domain operations:
-- `sandbox` adapter in V1 for all channels.
+- `internal` adapter in V1 for all channels.
 - Future adapters plug into same interface for external I/O.
 
 Adapter responsibilities:
@@ -135,6 +135,19 @@ Provider-agnostic chat mapping (locked):
 - Slack/Discord/Telegram/Signal/Messenger direct messages -> canonical `dm` thread.
 - Slack channels / Discord channels / Telegram groups / similar -> canonical `group` thread.
 - Multiple providers may be connected simultaneously; each adapter maps into the same canonical objects.
+
+Adapter naming contract (locked):
+- Chat uses `internal_chat_adapter` (production-capable in-app channel).
+- Email/SMS keep `sandbox_*_adapter` naming until real external delivery is enabled.
+- Use `provider_*_adapter` for external platform integrations.
+
+Examples:
+- `internal_chat_adapter`
+- `sandbox_email_adapter`
+- `sandbox_sms_adapter`
+- `provider_chat_adapter` (provider-specific variants under this family)
+- `provider_email_adapter`
+- `provider_sms_adapter`
 
 Canonical domain remains source of truth for UI and agent tooling.
 
@@ -262,6 +275,8 @@ Must log:
 - Inbound comms can emit valid `work_unit` triggers.
 - Domain works fully in sandbox mode without external provider dependencies.
 - Adapter seam exists so external provider integration can be added without schema rewrite.
+- Chat internal adapter is treated as production-valid transport for in-app operations.
+- Email/SMS sandbox adapters are simulation transport until provider adapters are enabled.
 
 ## Implementation Phases
 1. canonical schema and sandbox adapter

@@ -36,6 +36,13 @@ function RailIcon({ mode }: { mode: ViewMode }) {
           />
         </svg>
       );
+    case 'comms':
+      return (
+        <svg {...common}>
+          <rect x="4" y="6" width="16" height="12" rx="2" fill="none" stroke="currentColor" strokeWidth="1.6" />
+          <path d="m5.5 7.5 6.5 5 6.5-5" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+        </svg>
+      );
     case 'agent-cards':
       return (
         <svg {...common}>

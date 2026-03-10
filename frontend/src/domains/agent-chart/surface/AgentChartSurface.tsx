@@ -150,7 +150,13 @@ export function AgentChartSurface() {
     labels.set('scope_bucket:unassigned', 'Unassigned');
     return labels;
   }, [businessUnits, orgUnits, displayOperators]);
-  const handleTreeNodeClick = (next: NonNullable<SelectedNode>, options?: { shiftKey?: boolean }) => {
+  const handleTreeNodeClick = (next: SelectedNode, options?: { shiftKey?: boolean }) => {
+    if (!next) {
+      selection.setSelectedNode(null);
+      setSelectedNodeKeys(new Set());
+      selectionAnchorRef.current = null;
+      return;
+    }
     selection.setSelectedNode(next);
     const clickedKey = keyForSelectedNode(next);
     if (!options?.shiftKey || !selectionAnchorRef.current) {

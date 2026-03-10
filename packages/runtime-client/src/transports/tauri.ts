@@ -1,18 +1,27 @@
 import type { AgentSummary, RuntimeCapabilities } from '@agent-deck/schemas';
 import type {
   AppendThreadMessageInput,
+  AppendCommsMessageInput,
   AgentRuntimeClient,
+  CommsAccountRecord,
+  CommsMessageRecord,
+  CommsThreadRecord,
+  CreateCommsThreadInput,
   DispatchWorkUnitInput,
   DispatchWorkUnitResult,
   ChatThreadMessageRecord,
   ChatThreadSummary,
   CreateThreadInput,
+  ListCommsAccountsInput,
+  ListCommsThreadsInput,
   ListThreadsInput,
   LocalStorageMigrationStatus,
   OrgChartStatePayload,
   RuntimeRunEvent,
   StartRunInput,
   StartRunResponse,
+  UpdateCommsThreadInput,
+  UpsertCommsAccountInput,
   UpdateThreadInput,
   WorkUnitRecord
 } from '../types';
@@ -90,6 +99,46 @@ export class TauriTransport implements AgentRuntimeClient {
   async appendThreadMessage(input: AppendThreadMessageInput): Promise<ChatThreadMessageRecord> {
     const invoke = await this.getInvoke();
     return invoke<ChatThreadMessageRecord>('append_thread_message', { input });
+  }
+
+  async listCommsAccounts(input: ListCommsAccountsInput = {}): Promise<CommsAccountRecord[]> {
+    const invoke = await this.getInvoke();
+    return invoke<CommsAccountRecord[]>('list_comms_accounts', { input });
+  }
+
+  async upsertCommsAccount(input: UpsertCommsAccountInput): Promise<CommsAccountRecord> {
+    const invoke = await this.getInvoke();
+    return invoke<CommsAccountRecord>('upsert_comms_account', { input });
+  }
+
+  async listCommsThreads(input: ListCommsThreadsInput = {}): Promise<CommsThreadRecord[]> {
+    const invoke = await this.getInvoke();
+    return invoke<CommsThreadRecord[]>('list_comms_threads', { input });
+  }
+
+  async createCommsThread(input: CreateCommsThreadInput): Promise<CommsThreadRecord> {
+    const invoke = await this.getInvoke();
+    return invoke<CommsThreadRecord>('create_comms_thread', { input });
+  }
+
+  async updateCommsThread(threadId: string, input: UpdateCommsThreadInput): Promise<CommsThreadRecord> {
+    const invoke = await this.getInvoke();
+    return invoke<CommsThreadRecord>('update_comms_thread', { threadId, input });
+  }
+
+  async deleteCommsThread(threadId: string): Promise<void> {
+    const invoke = await this.getInvoke();
+    await invoke<void>('delete_comms_thread', { threadId });
+  }
+
+  async listCommsMessages(threadId: string, limit?: number, offset?: number): Promise<CommsMessageRecord[]> {
+    const invoke = await this.getInvoke();
+    return invoke<CommsMessageRecord[]>('list_comms_messages', { threadId, limit, offset });
+  }
+
+  async appendCommsMessage(input: AppendCommsMessageInput): Promise<CommsMessageRecord> {
+    const invoke = await this.getInvoke();
+    return invoke<CommsMessageRecord>('append_comms_message', { input });
   }
 
   async dispatchWorkUnit(input: DispatchWorkUnitInput): Promise<DispatchWorkUnitResult> {

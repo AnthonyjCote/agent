@@ -12,7 +12,7 @@
 
 import type { ReactNode } from 'react';
 
-export type ViewMode = 'chat-gui' | 'agent-cards' | 'agent-chart' | 'app-settings';
+export type ViewMode = 'chat-gui' | 'comms' | 'agent-cards' | 'agent-chart' | 'app-settings';
 
 export type ViewDefinition = {
   id: ViewMode;

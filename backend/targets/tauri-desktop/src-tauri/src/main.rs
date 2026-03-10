@@ -3,7 +3,9 @@
 use adapter::{desktop_capabilities, list_seed_agents, AgentSummary, RuntimeCapabilities};
 use agent_persistence::{
     bootstrap_workspace, OrgChartStateRecord, PersistenceHealthReport, PersistenceStateStore,
-    ThreadMessageRecord, ThreadRecord, WorkUnitRecord,
+    CommsDeliveryService, SendChatInput, SendEmailInput, SendSmsInput,
+    CommsAccountRecord, CommsMessageRecord, CommsThreadRecord, ThreadMessageRecord, ThreadRecord,
+    WorkUnitRecord,
 };
 use agent_desktop::runtime_service::{RuntimeService, StartRunInput};
 use serde::{Deserialize, Serialize};
@@ -119,6 +121,69 @@ struct AppendThreadMessageInput {
     thread_id: String,
     role: String,
     content: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ListCommsAccountsInput {
+    operator_id: Option<String>,
+    channel: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct UpsertCommsAccountInput {
+    account_id: String,
+    operator_id: String,
+    channel: String,
+    address: String,
+    display_name: String,
+    status: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ListCommsThreadsInput {
+    channel: Option<String>,
+    account_id: Option<String>,
+    folder: Option<String>,
+    search: Option<String>,
+    limit: Option<i64>,
+    offset: Option<i64>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct CreateCommsThreadInput {
+    channel: String,
+    account_id: String,
+    title: Option<String>,
+    subject: Option<String>,
+    participants: Option<serde_json::Value>,
+    folder: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct UpdateCommsThreadInput {
+    title: Option<String>,
+    subject: Option<String>,
+    state: Option<String>,
+    folder: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct AppendCommsMessageInput {
+    thread_id: String,
+    direction: Option<String>,
+    from_account_ref: String,
+    to_participants: Option<serde_json::Value>,
+    cc_participants: Option<serde_json::Value>,
+    bcc_participants: Option<serde_json::Value>,
+    subject: Option<String>,
+    body_text: String,
+    reply_to_message_id: Option<String>,
 }
 
 impl From<OrgChartStateRecord> for OrgChartStatePayload {
@@ -262,6 +327,217 @@ fn append_thread_message(
             input.thread_id.trim(),
             input.role.trim(),
             &input.content,
+        )
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn list_comms_accounts(
+    state_store: State<'_, Arc<PersistenceStateStore>>,
+    input: Option<ListCommsAccountsInput>,
+) -> Result<Vec<CommsAccountRecord>, String> {
+    let workspace_id = state_store.workspace_id().map_err(|error| error.to_string())?;
+    let input = input.unwrap_or(ListCommsAccountsInput {
+        operator_id: None,
+        channel: None,
+    });
+    state_store
+        .list_comms_accounts(
+            &workspace_id,
+            input.operator_id.as_deref(),
+            input.channel.as_deref(),
+        )
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn upsert_comms_account(
+    state_store: State<'_, Arc<PersistenceStateStore>>,
+    input: UpsertCommsAccountInput,
+) -> Result<CommsAccountRecord, String> {
+    let workspace_id = state_store.workspace_id().map_err(|error| error.to_string())?;
+    state_store
+        .upsert_comms_account(
+            &workspace_id,
+            input.account_id.trim(),
+            input.operator_id.trim(),
+            input.channel.trim(),
+            input.address.trim(),
+            input.display_name.trim(),
+            input.status.as_deref(),
+        )
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn list_comms_threads(
+    state_store: State<'_, Arc<PersistenceStateStore>>,
+    input: Option<ListCommsThreadsInput>,
+) -> Result<Vec<CommsThreadRecord>, String> {
+    let workspace_id = state_store.workspace_id().map_err(|error| error.to_string())?;
+    let input = input.unwrap_or(ListCommsThreadsInput {
+        channel: None,
+        account_id: None,
+        folder: None,
+        search: None,
+        limit: None,
+        offset: None,
+    });
+    state_store
+        .list_comms_threads(
+            &workspace_id,
+            input.channel.as_deref(),
+            input.account_id.as_deref(),
+            input.folder.as_deref(),
+            input.search.as_deref(),
+            input.limit.unwrap_or(200),
+            input.offset.unwrap_or(0),
+        )
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn create_comms_thread(
+    state_store: State<'_, Arc<PersistenceStateStore>>,
+    input: CreateCommsThreadInput,
+) -> Result<CommsThreadRecord, String> {
+    let workspace_id = state_store.workspace_id().map_err(|error| error.to_string())?;
+    state_store
+        .create_comms_thread(
+            &workspace_id,
+            input.channel.trim(),
+            input.account_id.trim(),
+            input.title.as_deref(),
+            input.subject.as_deref(),
+            input.participants.as_ref(),
+            input.folder.as_deref(),
+        )
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn update_comms_thread(
+    state_store: State<'_, Arc<PersistenceStateStore>>,
+    thread_id: String,
+    input: UpdateCommsThreadInput,
+) -> Result<CommsThreadRecord, String> {
+    let workspace_id = state_store.workspace_id().map_err(|error| error.to_string())?;
+    state_store
+        .update_comms_thread(
+            &workspace_id,
+            &thread_id,
+            input.title.as_deref(),
+            input.subject.as_deref(),
+            input.state.as_deref(),
+            input.folder.as_deref(),
+        )
+        .map_err(|error| error.to_string())?
+        .ok_or_else(|| "Comms thread not found.".to_string())
+}
+
+#[tauri::command]
+fn delete_comms_thread(
+    state_store: State<'_, Arc<PersistenceStateStore>>,
+    thread_id: String,
+) -> Result<(), String> {
+    let workspace_id = state_store.workspace_id().map_err(|error| error.to_string())?;
+    state_store
+        .delete_comms_thread(&workspace_id, &thread_id)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn list_comms_messages(
+    state_store: State<'_, Arc<PersistenceStateStore>>,
+    thread_id: String,
+    limit: Option<i64>,
+    offset: Option<i64>,
+) -> Result<Vec<CommsMessageRecord>, String> {
+    let workspace_id = state_store.workspace_id().map_err(|error| error.to_string())?;
+    state_store
+        .list_comms_messages(
+            &workspace_id,
+            &thread_id,
+            limit.unwrap_or(500),
+            offset.unwrap_or(0),
+        )
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn append_comms_message(
+    state_store: State<'_, Arc<PersistenceStateStore>>,
+    comms_delivery: State<'_, Arc<CommsDeliveryService>>,
+    input: AppendCommsMessageInput,
+) -> Result<CommsMessageRecord, String> {
+    let workspace_id = state_store.workspace_id().map_err(|error| error.to_string())?;
+    let direction = input.direction.as_deref().unwrap_or("outbound");
+    let thread = state_store
+        .get_comms_thread(&workspace_id, input.thread_id.trim())
+        .map_err(|error| error.to_string())?
+        .ok_or_else(|| "Comms thread not found.".to_string())?;
+
+    if thread.channel == "email" && direction.eq_ignore_ascii_case("outbound") {
+        return comms_delivery
+            .send_email(
+                &state_store,
+                &workspace_id,
+                SendEmailInput {
+                    thread_id: input.thread_id.trim().to_string(),
+                    from_account_ref: input.from_account_ref.trim().to_string(),
+                    to_participants: input.to_participants.clone(),
+                    cc_participants: input.cc_participants.clone(),
+                    bcc_participants: input.bcc_participants.clone(),
+                    subject: input.subject.clone(),
+                    body_text: input.body_text.clone(),
+                    reply_to_message_id: input.reply_to_message_id.clone(),
+                },
+            )
+            .map_err(|error| error.to_string());
+    }
+    if thread.channel == "sms" && direction.eq_ignore_ascii_case("outbound") {
+        return comms_delivery
+            .send_sms(
+                &state_store,
+                &workspace_id,
+                SendSmsInput {
+                    thread_id: input.thread_id.trim().to_string(),
+                    from_account_ref: input.from_account_ref.trim().to_string(),
+                    to_participants: input.to_participants.clone(),
+                    body_text: input.body_text.clone(),
+                    reply_to_message_id: input.reply_to_message_id.clone(),
+                },
+            )
+            .map_err(|error| error.to_string());
+    }
+    if thread.channel == "chat" && direction.eq_ignore_ascii_case("outbound") {
+        return comms_delivery
+            .send_chat(
+                &state_store,
+                &workspace_id,
+                SendChatInput {
+                    thread_id: input.thread_id.trim().to_string(),
+                    from_account_ref: input.from_account_ref.trim().to_string(),
+                    to_participants: input.to_participants.clone(),
+                    body_text: input.body_text.clone(),
+                    reply_to_message_id: input.reply_to_message_id.clone(),
+                },
+            )
+            .map_err(|error| error.to_string());
+    }
+
+    state_store
+        .append_comms_message(
+            &workspace_id,
+            input.thread_id.trim(),
+            direction,
+            input.from_account_ref.trim(),
+            input.to_participants.as_ref(),
+            input.cc_participants.as_ref(),
+            input.bcc_participants.as_ref(),
+            input.subject.as_deref(),
+            &input.body_text,
+            input.reply_to_message_id.as_deref(),
         )
         .map_err(|error| error.to_string())
 }
@@ -557,11 +833,13 @@ fn main() {
     let persistence_state_store = Arc::new(PersistenceStateStore::new(
         persistence_bootstrap.paths.clone(),
     ));
+    let comms_delivery = Arc::new(CommsDeliveryService::new_from_env());
 
     tauri::Builder::default()
         .manage(runtime)
         .manage(persistence_health)
         .manage(persistence_state_store)
+        .manage(comms_delivery)
         .invoke_handler(tauri::generate_handler![
             get_capabilities,
             list_agents,
@@ -578,6 +856,14 @@ fn main() {
             delete_thread,
             list_thread_messages,
             append_thread_message,
+            list_comms_accounts,
+            upsert_comms_account,
+            list_comms_threads,
+            create_comms_thread,
+            update_comms_thread,
+            delete_comms_thread,
+            list_comms_messages,
+            append_comms_message,
             list_work_units,
             dispatch_work_unit,
             start_run,

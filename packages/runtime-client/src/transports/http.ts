@@ -1,18 +1,27 @@
 import type { AgentSummary, RuntimeCapabilities } from '@agent-deck/schemas';
 import type {
   AppendThreadMessageInput,
+  AppendCommsMessageInput,
   AgentRuntimeClient,
+  CommsAccountRecord,
+  CommsMessageRecord,
+  CommsThreadRecord,
+  CreateCommsThreadInput,
   DispatchWorkUnitInput,
   DispatchWorkUnitResult,
   ChatThreadMessageRecord,
   ChatThreadSummary,
   CreateThreadInput,
+  ListCommsAccountsInput,
+  ListCommsThreadsInput,
   ListThreadsInput,
   LocalStorageMigrationStatus,
   OrgChartStatePayload,
   RuntimeRunEvent,
   StartRunInput,
   StartRunResponse,
+  UpdateCommsThreadInput,
+  UpsertCommsAccountInput,
   UpdateThreadInput,
   WorkUnitRecord
 } from '../types';
@@ -162,6 +171,103 @@ export class HttpTransport implements AgentRuntimeClient {
       throw new Error(`Failed to append thread message: ${response.status}`);
     }
     return (await response.json()) as ChatThreadMessageRecord;
+  }
+
+  async listCommsAccounts(input: ListCommsAccountsInput = {}): Promise<CommsAccountRecord[]> {
+    const params = new URLSearchParams();
+    if (input.operatorId) params.set('operatorId', input.operatorId);
+    if (input.channel) params.set('channel', input.channel);
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+    const response = await fetch(`${this.baseUrl}/comms/accounts${suffix}`);
+    if (!response.ok) {
+      throw new Error(`Failed to list comms accounts: ${response.status}`);
+    }
+    return (await response.json()) as CommsAccountRecord[];
+  }
+
+  async upsertCommsAccount(input: UpsertCommsAccountInput): Promise<CommsAccountRecord> {
+    const response = await fetch(`${this.baseUrl}/comms/accounts`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(input)
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to upsert comms account: ${response.status}`);
+    }
+    return (await response.json()) as CommsAccountRecord;
+  }
+
+  async listCommsThreads(input: ListCommsThreadsInput = {}): Promise<CommsThreadRecord[]> {
+    const params = new URLSearchParams();
+    if (input.channel) params.set('channel', input.channel);
+    if (input.accountId) params.set('accountId', input.accountId);
+    if (input.folder) params.set('folder', input.folder);
+    if (input.search) params.set('search', input.search);
+    if (typeof input.limit === 'number') params.set('limit', String(input.limit));
+    if (typeof input.offset === 'number') params.set('offset', String(input.offset));
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+    const response = await fetch(`${this.baseUrl}/comms/threads${suffix}`);
+    if (!response.ok) {
+      throw new Error(`Failed to list comms threads: ${response.status}`);
+    }
+    return (await response.json()) as CommsThreadRecord[];
+  }
+
+  async createCommsThread(input: CreateCommsThreadInput): Promise<CommsThreadRecord> {
+    const response = await fetch(`${this.baseUrl}/comms/threads`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(input)
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to create comms thread: ${response.status}`);
+    }
+    return (await response.json()) as CommsThreadRecord;
+  }
+
+  async updateCommsThread(threadId: string, input: UpdateCommsThreadInput): Promise<CommsThreadRecord> {
+    const response = await fetch(`${this.baseUrl}/comms/threads/${encodeURIComponent(threadId)}`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(input)
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to update comms thread: ${response.status}`);
+    }
+    return (await response.json()) as CommsThreadRecord;
+  }
+
+  async deleteCommsThread(threadId: string): Promise<void> {
+    const response = await fetch(`${this.baseUrl}/comms/threads/${encodeURIComponent(threadId)}`, {
+      method: 'DELETE'
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to delete comms thread: ${response.status}`);
+    }
+  }
+
+  async listCommsMessages(threadId: string, limit?: number, offset?: number): Promise<CommsMessageRecord[]> {
+    const params = new URLSearchParams();
+    if (typeof limit === 'number') params.set('limit', String(limit));
+    if (typeof offset === 'number') params.set('offset', String(offset));
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+    const response = await fetch(`${this.baseUrl}/comms/threads/${encodeURIComponent(threadId)}/messages${suffix}`);
+    if (!response.ok) {
+      throw new Error(`Failed to list comms messages: ${response.status}`);
+    }
+    return (await response.json()) as CommsMessageRecord[];
+  }
+
+  async appendCommsMessage(input: AppendCommsMessageInput): Promise<CommsMessageRecord> {
+    const response = await fetch(`${this.baseUrl}/comms/threads/${encodeURIComponent(input.threadId)}/messages`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(input)
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to append comms message: ${response.status}`);
+    }
+    return (await response.json()) as CommsMessageRecord;
   }
 
   async dispatchWorkUnit(input: DispatchWorkUnitInput): Promise<DispatchWorkUnitResult> {

@@ -1,0 +1,14 @@
+.comms-view {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-height: 0;
+  height: 100%;
+  background:
+    radial-gradient(circle at 85% -10%, color-mix(in srgb, var(--accent) 18%, transparent), transparent 36%),
+    radial-gradient(circle at -10% 120%, rgba(99, 128, 178, 0.1), transparent 38%);
+}
+
+.comms-view-channel-host {
+  min-height: 0;
+  height: 100%;
+}

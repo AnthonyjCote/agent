@@ -1,7 +1,9 @@
 use adapter::{list_seed_agents, server_capabilities, AgentSummary, RuntimeCapabilities};
 use agent_persistence::{
     bootstrap_workspace, OrgChartStateRecord, PersistenceHealthReport, PersistenceStateStore,
-    ThreadMessageRecord, ThreadRecord, WorkUnitRecord,
+    CommsDeliveryService, SendChatInput, SendEmailInput, SendSmsInput,
+    CommsAccountRecord, CommsMessageRecord, CommsThreadRecord, ThreadMessageRecord, ThreadRecord,
+    WorkUnitRecord,
 };
 use agent_core::models::{
     channels::{ChannelEnvelope, ChannelKind},
@@ -31,6 +33,7 @@ struct AppState {
     runtime: Arc<RuntimeService>,
     persistence_health: Arc<PersistenceHealthReport>,
     state_store: Arc<PersistenceStateStore>,
+    comms_delivery: Arc<CommsDeliveryService>,
     workspace_id: String,
 }
 
@@ -387,6 +390,275 @@ async fn append_thread_message(
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
+struct ListCommsAccountsQuery {
+    operator_id: Option<String>,
+    channel: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct UpsertCommsAccountPayload {
+    account_id: String,
+    operator_id: String,
+    channel: String,
+    address: String,
+    display_name: String,
+    status: Option<String>,
+}
+
+async fn list_comms_accounts(
+    State(state): State<AppState>,
+    axum::extract::Query(query): axum::extract::Query<ListCommsAccountsQuery>,
+) -> Result<Json<Vec<CommsAccountRecord>>, (axum::http::StatusCode, String)> {
+    let rows = state
+        .state_store
+        .list_comms_accounts(
+            &state.workspace_id,
+            query.operator_id.as_deref(),
+            query.channel.as_deref(),
+        )
+        .map_err(internal_error)?;
+    Ok(Json(rows))
+}
+
+async fn upsert_comms_account(
+    State(state): State<AppState>,
+    Json(payload): Json<UpsertCommsAccountPayload>,
+) -> Result<Json<CommsAccountRecord>, (axum::http::StatusCode, String)> {
+    let record = state
+        .state_store
+        .upsert_comms_account(
+            &state.workspace_id,
+            payload.account_id.trim(),
+            payload.operator_id.trim(),
+            payload.channel.trim(),
+            payload.address.trim(),
+            payload.display_name.trim(),
+            payload.status.as_deref(),
+        )
+        .map_err(internal_error)?;
+    Ok(Json(record))
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ListCommsThreadsQuery {
+    channel: Option<String>,
+    account_id: Option<String>,
+    folder: Option<String>,
+    search: Option<String>,
+    limit: Option<i64>,
+    offset: Option<i64>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct CreateCommsThreadPayload {
+    channel: String,
+    account_id: String,
+    title: Option<String>,
+    subject: Option<String>,
+    participants: Option<serde_json::Value>,
+    folder: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct UpdateCommsThreadPayload {
+    title: Option<String>,
+    subject: Option<String>,
+    state: Option<String>,
+    folder: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ListCommsMessagesQuery {
+    limit: Option<i64>,
+    offset: Option<i64>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct AppendCommsMessagePayload {
+    direction: Option<String>,
+    from_account_ref: String,
+    to_participants: Option<serde_json::Value>,
+    cc_participants: Option<serde_json::Value>,
+    bcc_participants: Option<serde_json::Value>,
+    subject: Option<String>,
+    body_text: String,
+    reply_to_message_id: Option<String>,
+}
+
+async fn list_comms_threads(
+    State(state): State<AppState>,
+    axum::extract::Query(query): axum::extract::Query<ListCommsThreadsQuery>,
+) -> Result<Json<Vec<CommsThreadRecord>>, (axum::http::StatusCode, String)> {
+    let rows = state
+        .state_store
+        .list_comms_threads(
+            &state.workspace_id,
+            query.channel.as_deref(),
+            query.account_id.as_deref(),
+            query.folder.as_deref(),
+            query.search.as_deref(),
+            query.limit.unwrap_or(200),
+            query.offset.unwrap_or(0),
+        )
+        .map_err(internal_error)?;
+    Ok(Json(rows))
+}
+
+async fn create_comms_thread(
+    State(state): State<AppState>,
+    Json(payload): Json<CreateCommsThreadPayload>,
+) -> Result<Json<CommsThreadRecord>, (axum::http::StatusCode, String)> {
+    let row = state
+        .state_store
+        .create_comms_thread(
+            &state.workspace_id,
+            payload.channel.trim(),
+            payload.account_id.trim(),
+            payload.title.as_deref(),
+            payload.subject.as_deref(),
+            payload.participants.as_ref(),
+            payload.folder.as_deref(),
+        )
+        .map_err(internal_error)?;
+    Ok(Json(row))
+}
+
+async fn update_comms_thread(
+    State(state): State<AppState>,
+    Path(thread_id): Path<String>,
+    Json(payload): Json<UpdateCommsThreadPayload>,
+) -> Result<Json<CommsThreadRecord>, (axum::http::StatusCode, String)> {
+    let row = state
+        .state_store
+        .update_comms_thread(
+            &state.workspace_id,
+            &thread_id,
+            payload.title.as_deref(),
+            payload.subject.as_deref(),
+            payload.state.as_deref(),
+            payload.folder.as_deref(),
+        )
+        .map_err(internal_error)?
+        .ok_or((axum::http::StatusCode::NOT_FOUND, "Comms thread not found.".to_string()))?;
+    Ok(Json(row))
+}
+
+async fn delete_comms_thread(
+    State(state): State<AppState>,
+    Path(thread_id): Path<String>,
+) -> Result<axum::http::StatusCode, (axum::http::StatusCode, String)> {
+    state
+        .state_store
+        .delete_comms_thread(&state.workspace_id, &thread_id)
+        .map_err(internal_error)?;
+    Ok(axum::http::StatusCode::NO_CONTENT)
+}
+
+async fn list_comms_messages(
+    State(state): State<AppState>,
+    Path(thread_id): Path<String>,
+    axum::extract::Query(query): axum::extract::Query<ListCommsMessagesQuery>,
+) -> Result<Json<Vec<CommsMessageRecord>>, (axum::http::StatusCode, String)> {
+    let rows = state
+        .state_store
+        .list_comms_messages(
+            &state.workspace_id,
+            &thread_id,
+            query.limit.unwrap_or(500),
+            query.offset.unwrap_or(0),
+        )
+        .map_err(internal_error)?;
+    Ok(Json(rows))
+}
+
+async fn append_comms_message(
+    State(state): State<AppState>,
+    Path(thread_id): Path<String>,
+    Json(payload): Json<AppendCommsMessagePayload>,
+) -> Result<Json<CommsMessageRecord>, (axum::http::StatusCode, String)> {
+    let direction = payload.direction.as_deref().unwrap_or("outbound");
+    let thread = state
+        .state_store
+        .get_comms_thread(&state.workspace_id, &thread_id)
+        .map_err(internal_error)?
+        .ok_or((axum::http::StatusCode::NOT_FOUND, "Comms thread not found.".to_string()))?;
+
+    let row = if thread.channel == "email" && direction.eq_ignore_ascii_case("outbound") {
+        state
+            .comms_delivery
+            .send_email(
+                &state.state_store,
+                &state.workspace_id,
+                SendEmailInput {
+                    thread_id: thread_id.clone(),
+                    from_account_ref: payload.from_account_ref.trim().to_string(),
+                    to_participants: payload.to_participants.clone(),
+                    cc_participants: payload.cc_participants.clone(),
+                    bcc_participants: payload.bcc_participants.clone(),
+                    subject: payload.subject.clone(),
+                    body_text: payload.body_text.clone(),
+                    reply_to_message_id: payload.reply_to_message_id.clone(),
+                },
+            )
+            .map_err(internal_error)?
+    } else if thread.channel == "sms" && direction.eq_ignore_ascii_case("outbound") {
+        state
+            .comms_delivery
+            .send_sms(
+                &state.state_store,
+                &state.workspace_id,
+                SendSmsInput {
+                    thread_id: thread_id.clone(),
+                    from_account_ref: payload.from_account_ref.trim().to_string(),
+                    to_participants: payload.to_participants.clone(),
+                    body_text: payload.body_text.clone(),
+                    reply_to_message_id: payload.reply_to_message_id.clone(),
+                },
+            )
+            .map_err(internal_error)?
+    } else if thread.channel == "chat" && direction.eq_ignore_ascii_case("outbound") {
+        state
+            .comms_delivery
+            .send_chat(
+                &state.state_store,
+                &state.workspace_id,
+                SendChatInput {
+                    thread_id: thread_id.clone(),
+                    from_account_ref: payload.from_account_ref.trim().to_string(),
+                    to_participants: payload.to_participants.clone(),
+                    body_text: payload.body_text.clone(),
+                    reply_to_message_id: payload.reply_to_message_id.clone(),
+                },
+            )
+            .map_err(internal_error)?
+    } else {
+        state
+            .state_store
+            .append_comms_message(
+                &state.workspace_id,
+                &thread_id,
+                direction,
+                payload.from_account_ref.trim(),
+                payload.to_participants.as_ref(),
+                payload.cc_participants.as_ref(),
+                payload.bcc_participants.as_ref(),
+                payload.subject.as_deref(),
+                &payload.body_text,
+                payload.reply_to_message_id.as_deref(),
+            )
+            .map_err(internal_error)?
+    };
+    Ok(Json(row))
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct DispatchWorkUnitInput {
     work_unit: serde_json::Value,
     #[serde(default)]
@@ -623,6 +895,7 @@ async fn main() {
     let app_state = AppState {
         runtime: Arc::new(RuntimeService::new(runtime_store, workspace_id.clone())),
         persistence_health: Arc::new(persistence_bootstrap.health),
+        comms_delivery: Arc::new(CommsDeliveryService::new_from_env()),
         workspace_id,
         state_store,
     };
@@ -652,6 +925,16 @@ async fn main() {
         .route(
             "/threads/{thread_id}/messages",
             get(list_thread_messages).post(append_thread_message),
+        )
+        .route("/comms/accounts", get(list_comms_accounts).post(upsert_comms_account))
+        .route("/comms/threads", get(list_comms_threads).post(create_comms_thread))
+        .route(
+            "/comms/threads/{thread_id}",
+            patch(update_comms_thread).delete(delete_comms_thread),
+        )
+        .route(
+            "/comms/threads/{thread_id}/messages",
+            get(list_comms_messages).post(append_comms_message),
         )
         .route("/runs", post(start_run))
         .route("/runs/{run_id}/events", get(run_events))

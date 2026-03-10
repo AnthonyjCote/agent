@@ -1,0 +1,53 @@
+.read-email-modal {
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  min-height: 0;
+}
+
+.read-email-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 650;
+}
+
+.read-email-actions {
+  display: inline-flex;
+  gap: 8px;
+}
+
+.read-email-meta {
+  display: grid;
+  gap: 6px;
+  padding: 12px 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--border-subtle) 88%, transparent);
+}
+
+.read-email-meta-row {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr);
+  gap: 8px;
+}
+
+.read-email-meta-row span {
+  font-size: 11px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.read-email-meta-row strong {
+  font-size: 13px;
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
+.read-email-body {
+  min-height: 0;
+  overflow: auto;
+  padding-top: 14px;
+}
+
+.read-email-body p {
+  margin: 0;
+  white-space: pre-wrap;
+  line-height: 1.58;
+}

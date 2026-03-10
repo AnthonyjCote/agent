@@ -12,7 +12,7 @@ use crate::{
 };
 
 const CORE_SCHEMA_VERSION: u32 = 1;
-const RUNTIME_SCHEMA_VERSION: u32 = 2;
+const RUNTIME_SCHEMA_VERSION: u32 = 3;
 const KNOWLEDGE_SCHEMA_VERSION: u32 = 1;
 
 #[derive(Debug, Clone, Copy)]
@@ -355,6 +355,99 @@ fn apply_migration(
             )
             .map_err(|error| PersistenceError::Sql {
                 context: "Failed to apply runtime schema migration (work units)",
+                source: error,
+                path: Some(db_path.to_path_buf()),
+            })?,
+        (DatabaseKind::Runtime, 3) => transaction
+            .execute_batch(
+                "
+                CREATE TABLE IF NOT EXISTS comms_accounts (
+                    workspace_id TEXT NOT NULL,
+                    account_id TEXT NOT NULL,
+                    operator_id TEXT NOT NULL,
+                    channel TEXT NOT NULL,
+                    address TEXT NOT NULL,
+                    display_name TEXT NOT NULL,
+                    status TEXT NOT NULL DEFAULT 'active',
+                    provider TEXT NOT NULL DEFAULT 'sandbox',
+                    provider_config_ref TEXT,
+                    created_at_ms INTEGER NOT NULL,
+                    updated_at_ms INTEGER NOT NULL,
+                    PRIMARY KEY (workspace_id, account_id)
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_comms_accounts_workspace_operator_channel
+                ON comms_accounts (workspace_id, operator_id, channel);
+
+                CREATE TABLE IF NOT EXISTS comms_threads (
+                    workspace_id TEXT NOT NULL,
+                    thread_id TEXT NOT NULL,
+                    channel TEXT NOT NULL,
+                    account_id TEXT NOT NULL,
+                    title TEXT NOT NULL,
+                    subject TEXT NOT NULL DEFAULT '',
+                    thread_key TEXT NOT NULL DEFAULT '',
+                    participants_json TEXT NOT NULL DEFAULT '[]',
+                    state TEXT NOT NULL DEFAULT 'open',
+                    folder TEXT NOT NULL DEFAULT 'inbox',
+                    message_count INTEGER NOT NULL DEFAULT 0,
+                    created_at_ms INTEGER NOT NULL,
+                    updated_at_ms INTEGER NOT NULL,
+                    last_message_at_ms INTEGER NOT NULL,
+                    PRIMARY KEY (workspace_id, thread_id)
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_comms_threads_workspace_account_channel_updated
+                ON comms_threads (workspace_id, account_id, channel, updated_at_ms DESC);
+
+                CREATE TABLE IF NOT EXISTS comms_messages (
+                    workspace_id TEXT NOT NULL,
+                    thread_id TEXT NOT NULL,
+                    message_id TEXT NOT NULL,
+                    channel TEXT NOT NULL,
+                    direction TEXT NOT NULL,
+                    from_account_ref TEXT NOT NULL,
+                    to_participants_json TEXT NOT NULL DEFAULT '[]',
+                    cc_participants_json TEXT NOT NULL DEFAULT '[]',
+                    bcc_participants_json TEXT NOT NULL DEFAULT '[]',
+                    subject TEXT NOT NULL DEFAULT '',
+                    body_text TEXT NOT NULL,
+                    reply_to_message_id TEXT,
+                    external_message_ref TEXT,
+                    created_at_ms INTEGER NOT NULL,
+                    PRIMARY KEY (workspace_id, thread_id, message_id)
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_comms_messages_workspace_thread_created
+                ON comms_messages (workspace_id, thread_id, created_at_ms ASC);
+
+                CREATE TABLE IF NOT EXISTS comms_participants (
+                    workspace_id TEXT NOT NULL,
+                    participant_id TEXT NOT NULL,
+                    kind TEXT NOT NULL,
+                    name TEXT NOT NULL,
+                    address TEXT NOT NULL,
+                    operator_id TEXT,
+                    created_at_ms INTEGER NOT NULL,
+                    updated_at_ms INTEGER NOT NULL,
+                    PRIMARY KEY (workspace_id, participant_id)
+                );
+
+                CREATE TABLE IF NOT EXISTS comms_delivery_events (
+                    workspace_id TEXT NOT NULL,
+                    delivery_event_id TEXT NOT NULL,
+                    message_id TEXT NOT NULL,
+                    thread_id TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    error_code TEXT,
+                    error_message TEXT,
+                    created_at_ms INTEGER NOT NULL,
+                    PRIMARY KEY (workspace_id, delivery_event_id)
+                );
+                ",
+            )
+            .map_err(|error| PersistenceError::Sql {
+                context: "Failed to apply runtime schema migration (comms)",
                 source: error,
                 path: Some(db_path.to_path_buf()),
             })?,

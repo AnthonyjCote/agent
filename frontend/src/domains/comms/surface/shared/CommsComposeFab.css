@@ -1,0 +1,27 @@
+.comms-compose-fab {
+  position: absolute;
+  right: 20px;
+  bottom: 20px;
+  width: 52px;
+  height: 52px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, #83a9ff 62%, var(--border-strong));
+  background: linear-gradient(180deg, #2e66d0 0%, #224da2 100%);
+  color: #f4f8ff;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow:
+    0 10px 22px rgba(7, 13, 24, 0.52),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  display: inline-grid;
+  place-items: center;
+}
+
+.comms-compose-fab:hover {
+  transform: translateY(-1px);
+}
+
+.comms-compose-fab svg {
+  width: 22px;
+  height: 22px;
+}

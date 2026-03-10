@@ -58,6 +58,104 @@ export interface ChatThreadMessageRecord {
   createdAtMs: number;
 }
 
+export type CommsChannel = 'email' | 'chat' | 'sms';
+
+export interface CommsAccountRecord {
+  accountId: string;
+  operatorId: string;
+  channel: string;
+  address: string;
+  displayName: string;
+  status: string;
+  provider: string;
+  providerConfigRef?: string;
+  createdAtMs: number;
+  updatedAtMs: number;
+}
+
+export interface CommsThreadRecord {
+  threadId: string;
+  channel: string;
+  accountId: string;
+  title: string;
+  subject: string;
+  threadKey: string;
+  participants: unknown;
+  state: string;
+  folder: string;
+  messageCount: number;
+  createdAtMs: number;
+  updatedAtMs: number;
+  lastMessageAtMs: number;
+}
+
+export interface CommsMessageRecord {
+  messageId: string;
+  threadId: string;
+  channel: string;
+  direction: string;
+  fromAccountRef: string;
+  toParticipants: unknown;
+  ccParticipants: unknown;
+  bccParticipants: unknown;
+  subject: string;
+  bodyText: string;
+  replyToMessageId?: string;
+  externalMessageRef?: string;
+  createdAtMs: number;
+}
+
+export interface ListCommsAccountsInput {
+  operatorId?: string;
+  channel?: CommsChannel;
+}
+
+export interface UpsertCommsAccountInput {
+  accountId: string;
+  operatorId: string;
+  channel: CommsChannel;
+  address: string;
+  displayName: string;
+  status?: string;
+}
+
+export interface ListCommsThreadsInput {
+  channel?: CommsChannel;
+  accountId?: string;
+  folder?: string;
+  search?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export interface CreateCommsThreadInput {
+  channel: CommsChannel;
+  accountId: string;
+  title?: string;
+  subject?: string;
+  participants?: unknown;
+  folder?: string;
+}
+
+export interface UpdateCommsThreadInput {
+  title?: string;
+  subject?: string;
+  state?: string;
+  folder?: string;
+}
+
+export interface AppendCommsMessageInput {
+  threadId: string;
+  direction?: string;
+  fromAccountRef: string;
+  toParticipants?: unknown;
+  ccParticipants?: unknown;
+  bccParticipants?: unknown;
+  subject?: string;
+  bodyText: string;
+  replyToMessageId?: string;
+}
+
 export interface ListThreadsInput {
   operatorId?: string;
   status?: ThreadStatus;
@@ -181,6 +279,14 @@ export interface AgentRuntimeClient {
   deleteThread(threadId: string): Promise<void>;
   listThreadMessages(threadId: string, limit?: number, offset?: number): Promise<ChatThreadMessageRecord[]>;
   appendThreadMessage(input: AppendThreadMessageInput): Promise<ChatThreadMessageRecord>;
+  listCommsAccounts(input?: ListCommsAccountsInput): Promise<CommsAccountRecord[]>;
+  upsertCommsAccount(input: UpsertCommsAccountInput): Promise<CommsAccountRecord>;
+  listCommsThreads(input?: ListCommsThreadsInput): Promise<CommsThreadRecord[]>;
+  createCommsThread(input: CreateCommsThreadInput): Promise<CommsThreadRecord>;
+  updateCommsThread(threadId: string, input: UpdateCommsThreadInput): Promise<CommsThreadRecord>;
+  deleteCommsThread(threadId: string): Promise<void>;
+  listCommsMessages(threadId: string, limit?: number, offset?: number): Promise<CommsMessageRecord[]>;
+  appendCommsMessage(input: AppendCommsMessageInput): Promise<CommsMessageRecord>;
   dispatchWorkUnit(input: DispatchWorkUnitInput): Promise<DispatchWorkUnitResult>;
   listWorkUnits(status?: string, limit?: number, offset?: number): Promise<WorkUnitRecord[]>;
   startRun(input: StartRunInput): Promise<StartRunResponse>;

@@ -1,0 +1,72 @@
+.compose-sms-contacts-modal {
+  display: grid;
+  gap: 12px;
+}
+
+.compose-sms-contacts-header h2 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.compose-sms-contacts-header p {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.compose-sms-contacts-list {
+  display: grid;
+  gap: 8px;
+  max-height: 420px;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.compose-sms-contact-item {
+  width: 100%;
+  border: 1px solid color-mix(in srgb, var(--border-strong) 78%, transparent);
+  border-radius: 12px;
+  background: linear-gradient(180deg, #171f2d 0%, #121926 100%);
+  padding: 10px 11px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  text-align: left;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.compose-sms-contact-item:hover {
+  border-color: color-mix(in srgb, #88a8ee 56%, var(--border-strong));
+}
+
+.compose-sms-contact-copy {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.compose-sms-contact-copy strong {
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.compose-sms-contact-copy span {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.compose-sms-contact-copy em {
+  font-size: 11px;
+  color: color-mix(in srgb, var(--text-muted) 86%, #d5def0);
+  font-style: normal;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

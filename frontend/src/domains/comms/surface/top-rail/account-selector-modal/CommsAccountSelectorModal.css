@@ -1,0 +1,68 @@
+.comms-account-selector {
+  display: grid;
+  gap: 12px;
+}
+
+.comms-account-selector-header h2 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.comms-account-selector-header p {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.comms-account-selector-list {
+  display: grid;
+  gap: 8px;
+  max-height: 420px;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.comms-account-selector-item {
+  width: 100%;
+  border: 1px solid color-mix(in srgb, var(--border-strong) 78%, transparent);
+  border-radius: 12px;
+  background: linear-gradient(180deg, #171f2d 0%, #121926 100%);
+  padding: 10px 11px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  text-align: left;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.comms-account-selector-item:hover {
+  border-color: color-mix(in srgb, #7e9fea 52%, var(--border-strong));
+}
+
+.comms-account-selector-item.is-active {
+  border-color: color-mix(in srgb, #8fb0ff 68%, var(--border-strong));
+  background: linear-gradient(180deg, #23324a 0%, #1b283e 100%);
+}
+
+.comms-account-selector-item-copy {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.comms-account-selector-item-copy strong {
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.comms-account-selector-item-copy span {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
