@@ -100,3 +100,22 @@ Prevent `backend/crates/agent_core/src/runtime/engine.rs` from becoming a monoli
 ### 2026-03-10
 - Locked decision to segment runtime engine across dedicated modules listed above.
 - Locked decision to keep `engine.rs` as compatibility façade during migration.
+- Implemented rename/split:
+  - `engine.rs` is now a thin compatibility wrapper.
+  - main execution logic moved into `runtime/agent_run_executor.rs`.
+- Current follow-up segmentation needed inside `agent_run_executor.rs`:
+  1. `runtime/run_context.rs`
+  Responsibilities:
+  request metadata extraction, normalized run context construction.
+  2. `runtime/prefetch_gate.rs`
+  Responsibilities:
+  prefetch resolution and clarification short-circuit behavior.
+  3. `runtime/deep_step.rs`
+  Responsibilities:
+  single deep-stage inference turn execution and parsed output handoff.
+  4. `runtime/tool_step.rs`
+  Responsibilities:
+  tool-call execution path, allowed-tool checks, tool result/error eventing, tool/work log updates.
+  5. `runtime/finalize.rs`
+  Responsibilities:
+  final response extraction/normalization, blocks emission, run completion event.

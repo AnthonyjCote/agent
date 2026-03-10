@@ -1,6 +1,12 @@
+pub mod concurrency;
+pub mod context;
+pub mod events;
 pub mod engine;
-pub mod memory_trace_store;
-pub mod mock_inference;
-pub mod run_loop;
-pub mod side_effect_guard;
-pub mod thread_lock;
+pub mod execution;
+pub mod logging;
+pub mod parsing;
+pub mod prompt;
+pub mod routing;
+pub mod streaming;
+pub mod testing;
+pub mod tracing;
