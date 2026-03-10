@@ -353,7 +353,10 @@ export function CommsChatSurface({
                 const senderTitle = message.direction === 'outbound' ? undefined : senderContact?.title;
                 const showAvatar = message.direction !== 'outbound' && (activeThreadMeta.kind ?? 'group') === 'group';
                 return (
-                  <div key={message.messageId} className={`comms-chat-message-row ${message.direction === 'outbound' ? 'outbound' : 'inbound'}`}>
+                  <div
+                    key={message.messageId}
+                    className={`comms-chat-message-row ${message.direction === 'outbound' ? 'outbound' : 'inbound'} ${showAvatar ? 'has-avatar' : ''}`}
+                  >
                     {showAvatar ? (
                       <div className="comms-chat-message-avatar">
                         <AgentAvatar
@@ -364,7 +367,9 @@ export function CommsChatSurface({
                       </div>
                     ) : null}
                     <div className={`comms-chat-message-stack ${message.direction === 'outbound' ? 'outbound' : 'inbound'}`}>
-                      <article className={`comms-chat-message ${message.direction === 'outbound' ? 'outbound' : 'inbound'}`}>
+                      <article
+                        className={`comms-chat-message ${message.direction === 'outbound' ? 'outbound' : 'inbound'} ${showAvatar ? 'has-tail' : ''}`}
+                      >
                         <div className={`comms-chat-message-meta ${message.direction === 'outbound' ? 'outbound' : 'inbound'}`}>
                           <strong>{senderLabel}</strong>
                           {senderTitle ? <span>{senderTitle}</span> : null}

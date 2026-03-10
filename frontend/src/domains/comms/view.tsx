@@ -6,6 +6,7 @@ import { useAgentManifestStore, useOrgChartStore } from '../../shared/config';
 import './view.css';
 
 const COMMS_ACTIVE_OPERATOR_STORAGE_KEY = 'agent-deck.comms.active-operator-id';
+const COMMS_ACTIVE_CHANNEL_STORAGE_KEY = 'agent-deck.comms.active-channel';
 
 function getStoredCommsActiveOperatorId(): string | null {
   if (typeof window === 'undefined') {
@@ -13,6 +14,14 @@ function getStoredCommsActiveOperatorId(): string | null {
   }
   const value = window.localStorage.getItem(COMMS_ACTIVE_OPERATOR_STORAGE_KEY);
   return value && value.trim().length > 0 ? value : null;
+}
+
+function getStoredCommsChannel(): CommsChannel {
+  if (typeof window === 'undefined') {
+    return 'email';
+  }
+  const value = window.localStorage.getItem(COMMS_ACTIVE_CHANNEL_STORAGE_KEY);
+  return value === 'email' || value === 'chat' || value === 'sms' ? value : 'email';
 }
 
 function normalizeLocalPart(value: string): string {
@@ -44,7 +53,7 @@ function buildOperatorEmailAddress(operatorName: string, businessUnitName: strin
 }
 
 export function CommsView() {
-  const [channel, setChannel] = useState<CommsChannel>('email');
+  const [channel, setChannel] = useState<CommsChannel>(() => getStoredCommsChannel());
   const newThreadNonce = 0;
   const [selectorOpen, setSelectorOpen] = useState(false);
   const [activeOperatorId, setActiveOperatorId] = useState<string | null>(() => getStoredCommsActiveOperatorId());
@@ -75,7 +84,6 @@ export function CommsView() {
 
   useEffect(() => {
     if (displayOperators.length === 0) {
-      setActiveOperatorId(null);
       return;
     }
     if (!activeOperatorId || !displayOperators.some((operator) => operator.id === activeOperatorId)) {
@@ -93,6 +101,13 @@ export function CommsView() {
     }
     window.localStorage.setItem(COMMS_ACTIVE_OPERATOR_STORAGE_KEY, activeOperatorId);
   }, [activeOperatorId]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    window.localStorage.setItem(COMMS_ACTIVE_CHANNEL_STORAGE_KEY, channel);
+  }, [channel]);
 
   const activeOperator = useMemo(
     () => displayOperators.find((operator) => operator.id === activeOperatorId) ?? null,
