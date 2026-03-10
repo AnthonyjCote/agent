@@ -14,38 +14,38 @@ Keep production behavior stable while migrating.
 - [ ] Freeze tool manifest contracts for this refactor window.
 
 ## Phase 1: Shared Dispatch Wiring
-- [ ] Create shared app-tool dispatcher module in `agent_core` (single entrypoint for app tools).
-- [ ] Route `agent_server` runtime service to shared dispatcher.
-- [ ] Route `agent_desktop` runtime service to shared dispatcher.
+- [x] Create shared app-tool dispatcher module in `agent_core` (single entrypoint for app tools).
+- [x] Route `agent_server` runtime service to shared dispatcher.
+- [x] Route `agent_desktop` runtime service to shared dispatcher.
 - [ ] Verify no behavior change in manual smoke tests.
 
 ## Phase 2: Define Domain Ports
-- [ ] Add `ports.rs` in `app_domains/org` for org read/create/update operations.
-- [ ] Add `ports.rs` in `app_domains/comms` for accounts/threads/messages/delivery operations.
-- [ ] Add shared domain errors in `app_domains/core` where needed.
-- [ ] Ensure trait signatures cover current v2 tool capabilities.
+- [x] Add `ports.rs` in `app_domains/org` for org read/create/update operations.
+- [x] Add `ports.rs` in `app_domains/comms` for accounts/threads/messages/delivery operations.
+- [x] Add shared domain errors in `app_domains/core` where needed.
+- [x] Ensure trait signatures cover current v2 tool capabilities.
 
 ## Phase 3: Persistence Adapter Extraction
-- [ ] Implement `app_domains/org` ports in `app_persistence`.
-- [ ] Implement `app_domains/comms` ports in `app_persistence`.
+- [x] Implement `app_domains/org` ports in `app_persistence`.
+- [x] Implement `app_domains/comms` ports in `app_persistence`.
 - [ ] Keep all SQL/file operations in persistence implementations.
 - [ ] Remove direct tool-envelope shaping from persistence adapter code.
 
 ## Phase 4: Org Tool Consolidation
-- [ ] Add `agent_core/src/tools/org_manage_entities_v2/input.rs`.
-- [ ] Add `agent_core/src/tools/org_manage_entities_v2/output.rs`.
-- [ ] Add `agent_core/src/tools/org_manage_entities_v2/handler.rs`.
+- [x] Add `agent_core/src/tools/org_manage_entities_v2/input.rs`.
+- [x] Add `agent_core/src/tools/org_manage_entities_v2/output.rs`.
+- [x] Add `agent_core/src/tools/org_manage_entities_v2/handler.rs`.
 - [ ] Move org action orchestration into `app_domains/org/service`.
-- [ ] Update tool registry/dispatcher to call new org handler.
+- [x] Update tool registry/dispatcher to call new org handler.
 - [ ] Compare output parity against Phase 0 snapshots.
 
 ## Phase 5: Comms Tool Consolidation
-- [ ] Add `agent_core/src/tools/comms_tool/input.rs`.
-- [ ] Add `agent_core/src/tools/comms_tool/output.rs`.
-- [ ] Add `agent_core/src/tools/comms_tool/handler.rs`.
+- [x] Add `agent_core/src/tools/comms_tool/input.rs`.
+- [x] Add `agent_core/src/tools/comms_tool/output.rs`.
+- [x] Add `agent_core/src/tools/comms_tool/handler.rs`.
 - [ ] Move comms action orchestration into `app_domains/comms/service`.
 - [ ] Move comms delivery policy into `app_domains/comms` (adapter calls persistence port).
-- [ ] Update tool registry/dispatcher to call new comms handler.
+- [x] Update tool registry/dispatcher to call new comms handler.
 - [ ] Compare output parity against Phase 0 snapshots.
 
 ## Phase 6: Legacy Path Removal

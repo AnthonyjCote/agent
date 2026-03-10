@@ -1,9 +1,17 @@
 # PDR (Temp): Tool Architecture Consolidation v1
 
 ## Status
-- Proposed (execution-ready)
+- In Progress
 - Date: 2026-03-10
 - Owner: Runtime/Tools
+
+## Progress (2026-03-10)
+- Shared app-tool dispatcher added in `agent_core` (`tools/app_dispatch.rs`).
+- Server and desktop runtime services now delegate to shared dispatch path.
+- Tool modules scaffolded for both app tools:
+  - `org_manage_entities_v2/{input,output,handler}.rs`
+  - `comms_tool/{input,output,handler}.rs`
+- Legacy orchestration remains in `app_persistence` and is pending migration into `app_domains`.
 
 ## Problem
 Tool behavior is currently split across crates with weak discoverability:

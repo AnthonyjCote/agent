@@ -1,15 +1,15 @@
 use std::{collections::HashMap, sync::Mutex};
 
-use adapter::gemini::model_inference::GeminiCliModelInference;
+use adapter::{app_tool_backend::PersistentAppToolBackend, gemini::model_inference::GeminiCliModelInference};
 use app_persistence::PersistenceStateStore;
 use agent_core::{
     models::{
         blocks::MessageBlock,
         channels::{ChannelEnvelope, ChannelKind},
         run::{RunEvent, RunRequest},
-        tool::ToolOutputEnvelope,
     },
     runtime::engine::execute_run_once_with_tools,
+    tools::app_dispatch::execute_app_tool_by_id,
 };
 
 const MAX_THREAD_MESSAGES: usize = 80;
@@ -110,43 +110,10 @@ impl RuntimeService {
             }
         };
 
-        let state_store = self.state_store.clone();
-        let workspace_id_for_tools = self.workspace_id.clone();
+        let app_tool_backend = PersistentAppToolBackend::new(self.state_store.clone(), self.workspace_id.clone());
         let events = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            let mut tool_executor = |tool_name: &str, args: &serde_json::Value| -> Result<Option<ToolOutputEnvelope>, agent_core::models::run::RunError> {
-                match tool_name {
-                    "org_manage_entities_v2" => {
-                        let output = state_store
-                            .execute_org_manage_entities_v2(&workspace_id_for_tools, args)
-                            .map_err(|error| agent_core::models::run::RunError {
-                                code: "org_manage_tool_failed".to_string(),
-                                message: error.to_string(),
-                                retryable: false,
-                            })?;
-                        Ok(Some(ToolOutputEnvelope {
-                            summary: output.summary,
-                            structured_data: Some(output.structured_data),
-                            artifacts: Vec::new(),
-                            errors: Vec::new(),
-                        }))
-                    }
-                    "comms_tool" => {
-                        let output = state_store
-                            .execute_comms_tool(&workspace_id_for_tools, args)
-                            .map_err(|error| agent_core::models::run::RunError {
-                                code: "comms_tool_failed".to_string(),
-                                message: error.to_string(),
-                                retryable: false,
-                            })?;
-                        Ok(Some(ToolOutputEnvelope {
-                            summary: output.summary,
-                            structured_data: Some(output.structured_data),
-                            artifacts: Vec::new(),
-                            errors: Vec::new(),
-                        }))
-                    }
-                    _ => Ok(None),
-                }
+            let mut tool_executor = |tool_name: &str, args: &serde_json::Value| {
+                execute_app_tool_by_id(&app_tool_backend, tool_name, args)
             };
             execute_run_once_with_tools(request, &self.inference, &mut stream_event, Some(&mut tool_executor))
         }))

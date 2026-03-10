@@ -1,3 +1,4 @@
+pub mod app_tool_backend;
 pub mod gemini;
 pub mod provider_adapter;
 

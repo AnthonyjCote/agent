@@ -4,6 +4,9 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+app_domain_comms = { path = "../app_domains/comms" }
+app_domain_org = { path = "../app_domains/org" }
+app_domains_core = { path = "../app_domains/core" }
 app_persistence = { path = "../app_persistence" }
 agent_core = { path = "../agent_core" }
 serde = { version = "1", features = ["derive"] }

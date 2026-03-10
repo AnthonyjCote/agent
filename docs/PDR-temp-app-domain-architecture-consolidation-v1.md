@@ -1,9 +1,18 @@
 # PDR (Temp): App Domain Architecture Consolidation v1
 
 ## Status
-- Proposed (execution-ready)
+- In Progress
 - Date: 2026-03-10
 - Owner: Domain Architecture
+
+## Progress (2026-03-10)
+- Added domain port contracts:
+  - `app_domains/org/src/ports.rs`
+  - `app_domains/comms/src/ports.rs`
+- Added `app_persistence` adapter implementations for domain ports:
+  - `app_persistence/src/domain_ports.rs`
+- Runtime shared app-tool backend now uses domain ports through persistence adapters.
+- Remaining work: move org/comms business orchestration from `app_persistence` into `app_domains` service modules.
 
 ## Context
 We now have dedicated domain crates scaffolded:

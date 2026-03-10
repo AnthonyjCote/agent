@@ -7,6 +7,9 @@ name = "adapter"
 version = "0.1.0"
 dependencies = [
  "agent_core",
+ "app_domain_comms",
+ "app_domain_org",
+ "app_domains_core",
  "app_persistence",
  "serde",
  "serde_json",
@@ -106,6 +109,7 @@ version = "0.1.0"
 dependencies = [
  "app_domains_core",
  "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -114,6 +118,7 @@ version = "0.1.0"
 dependencies = [
  "app_domains_core",
  "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -127,6 +132,9 @@ dependencies = [
 name = "app_persistence"
 version = "0.1.0"
 dependencies = [
+ "app_domain_comms",
+ "app_domain_org",
+ "app_domains_core",
  "rusqlite",
  "serde",
  "serde_json",

@@ -1,3 +1,4 @@
+pub mod app_dispatch;
 pub mod registry;
 pub mod shared;
 pub mod toolbox;
