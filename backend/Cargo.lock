@@ -110,6 +110,29 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f202df86484c868dbad7eaa557ef785d5c66295e41b460ef922eca0723b842c"
 
 [[package]]
+name = "app_domain_comms"
+version = "0.1.0"
+dependencies = [
+ "app_domains_core",
+ "serde",
+]
+
+[[package]]
+name = "app_domain_org"
+version = "0.1.0"
+dependencies = [
+ "app_domains_core",
+ "serde",
+]
+
+[[package]]
+name = "app_domains_core"
+version = "0.1.0"
+dependencies = [
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "atk"
 version = "0.18.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"

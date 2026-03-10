@@ -1,0 +1,8 @@
+[package]
+name = "app_domain_org"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+app_domains_core = { path = "../core" }
+serde = { version = "1", features = ["derive"] }

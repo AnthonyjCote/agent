@@ -1,6 +1,9 @@
 [workspace]
 resolver = "2"
 members = [
+  "crates/app_domains/core",
+  "crates/app_domains/org",
+  "crates/app_domains/comms",
   "crates/agent_persistence",
   "crates/agent_core",
   "crates/adapter",
