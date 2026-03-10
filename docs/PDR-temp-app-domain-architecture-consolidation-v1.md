@@ -11,7 +11,7 @@ We now have dedicated domain crates scaffolded:
 - `crates/app_domains/org`
 - `crates/app_domains/comms`
 
-The codebase still carries domain behavior in `agent_persistence` and dispatch glue in runtime services. We need a stable ownership model before adding CRM, tasks, PM, ERP, and future domains.
+The codebase still carries domain behavior in `app_persistence` and dispatch glue in runtime services. We need a stable ownership model before adding CRM, tasks, PM, ERP, and future domains.
 
 ## Decision
 Use domain crates as the canonical home for business logic and workflow rules.
@@ -25,7 +25,7 @@ Use domain crates as the canonical home for business logic and workflow rules.
 - domain models
 - repository trait contracts
 
-`agent_persistence` owns:
+`app_persistence` owns:
 - storage adapters implementing domain repository traits
 - SQL/file persistence and transaction boundaries
 - state mapping and record storage concerns
@@ -53,13 +53,13 @@ Shared cross-domain primitives remain in `app_domains/core`.
 ## Dependency Direction
 - `agent_core` -> `app_domains/*`
 - `app_domains/*` -> `app_domains/core`
-- `agent_persistence` -> `app_domains/*` (to implement ports)
-- `agent_server`/`agent_desktop` -> `agent_core` + `agent_persistence`
+- `app_persistence` -> `app_domains/*` (to implement ports)
+- `agent_server`/`agent_desktop` -> `agent_core` + `app_persistence`
 
 Disallowed:
 - `app_domains/*` depending on `agent_core`
 - `app_domains/*` depending on `agent_server`/`agent_desktop`
-- business rules in `agent_persistence`
+- business rules in `app_persistence`
 
 ## Initial Scope (Now)
 - Consolidate `org` and `comms` business logic into `app_domains/org` and `app_domains/comms`.
@@ -88,7 +88,7 @@ Disallowed:
 - [ ] Add `ports.rs` traits to `app_domains/org` and `app_domains/comms`.
 - [ ] Move org business orchestration from persistence into `app_domains/org`.
 - [ ] Move comms business orchestration from persistence into `app_domains/comms`.
-- [ ] Implement domain ports in `agent_persistence`.
+- [ ] Implement domain ports in `app_persistence`.
 - [ ] Update tool handlers in `agent_core` to call domain services.
 - [ ] Remove legacy business logic from persistence after parity validation.
 - [ ] Update crate READMEs and architecture docs.

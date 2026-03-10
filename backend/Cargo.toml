@@ -4,7 +4,7 @@ members = [
   "crates/app_domains/core",
   "crates/app_domains/org",
   "crates/app_domains/comms",
-  "crates/agent_persistence",
+  "crates/app_persistence",
   "crates/agent_core",
   "crates/adapter",
   "crates/agent_desktop",

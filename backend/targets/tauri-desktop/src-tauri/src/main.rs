@@ -1,7 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use adapter::{desktop_capabilities, list_seed_agents, AgentSummary, RuntimeCapabilities};
-use agent_persistence::{
+use app_persistence::{
     bootstrap_workspace, OrgChartStateRecord, PersistenceHealthReport, PersistenceStateStore,
     CommsDeliveryService, SendChatInput, SendEmailInput, SendSmsInput,
     CommsAccountRecord, CommsMessageRecord, CommsThreadRecord, ThreadMessageRecord, ThreadRecord,

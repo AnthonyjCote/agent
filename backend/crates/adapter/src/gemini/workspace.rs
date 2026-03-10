@@ -3,7 +3,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use agent_persistence::bootstrap_workspace;
+use app_persistence::bootstrap_workspace;
 use agent_core::models::run::RunError;
 use serde_json::{Map, Value};
 
@@ -34,7 +34,7 @@ pub fn ensure_workspace_context() -> Result<PathBuf, RunError> {
     Ok(workspace_dir)
 }
 
-fn map_persistence_error(error: agent_persistence::PersistenceError) -> RunError {
+fn map_persistence_error(error: app_persistence::PersistenceError) -> RunError {
     RunError {
         code: "persistence_bootstrap_failed".to_string(),
         message: error.to_string(),

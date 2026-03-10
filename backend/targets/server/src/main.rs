@@ -1,5 +1,5 @@
 use adapter::{list_seed_agents, server_capabilities, AgentSummary, RuntimeCapabilities};
-use agent_persistence::{
+use app_persistence::{
     bootstrap_workspace, OrgChartStateRecord, PersistenceHealthReport, PersistenceStateStore,
     CommsDeliveryService, SendChatInput, SendEmailInput, SendSmsInput,
     CommsAccountRecord, CommsMessageRecord, CommsThreadRecord, ThreadMessageRecord, ThreadRecord,
@@ -245,7 +245,7 @@ async fn save_org_chart_state(
     Ok(axum::http::StatusCode::NO_CONTENT)
 }
 
-fn internal_error(error: agent_persistence::PersistenceError) -> (axum::http::StatusCode, String) {
+fn internal_error(error: app_persistence::PersistenceError) -> (axum::http::StatusCode, String) {
     (axum::http::StatusCode::INTERNAL_SERVER_ERROR, error.to_string())
 }
 

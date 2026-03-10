@@ -9,7 +9,7 @@
 Tool behavior is currently split across crates with weak discoverability:
 - Tool manifests live in `agent_core/src/tools/...`.
 - Runtime dispatch glue lives in `agent_server` and `agent_desktop`.
-- Tool orchestration + business behavior are mixed inside `agent_persistence` (`org_tool.rs`, `comms_tool.rs`, `comms_delivery.rs`).
+- Tool orchestration + business behavior are mixed inside `app_persistence` (`org_tool.rs`, `comms_tool.rs`, `comms_delivery.rs`).
 
 Result:
 - Tool changes require edits across unrelated modules.
@@ -27,7 +27,7 @@ Adopt a strict 3-layer tool boundary:
 - Owns business/use-case logic.
 - No model prompt text and no runtime transport wiring.
 
-3. `agent_persistence`
+3. `app_persistence`
 - Owns persistence adapters only (DB/files/repository implementations).
 - No tool contract or tool envelope shaping.
 
@@ -48,21 +48,21 @@ For each app tool (example: `org_manage_entities_v2`, `comms_tool`):
 `crates/app_domains/<domain>/`
 - domain models
 - services/use-cases
-- repository traits (implemented by `agent_persistence`)
+- repository traits (implemented by `app_persistence`)
 
-`agent_persistence`
+`app_persistence`
 - repository impls + SQL/file adapters
 - transaction boundaries
 - state mapping
 
 ## Specific Moves
 
-Move out of `agent_persistence`:
+Move out of `app_persistence`:
 - `org_tool.rs` tool-layer parsing/orchestration/output shaping -> `agent_core/tools/org_manage_entities_v2` + `app_domains/org`
 - `comms_tool.rs` tool-layer parsing/orchestration/output shaping -> `agent_core/tools/comms_tool` + `app_domains/comms`
 - `comms_delivery.rs` behavior/routing policy -> `app_domains/comms` (persistence calls remain via repository adapter)
 
-Keep in `agent_persistence`:
+Keep in `app_persistence`:
 - `state.rs`, `sqlite.rs`, `workspace.rs`, `error.rs`, `health.rs`
 
 ## Non-Goals
@@ -79,22 +79,22 @@ Keep in `agent_persistence`:
 ### Phase 2: Org Tool Consolidation
 - Add `input.rs`, `handler.rs`, `output.rs` under `agent_core/tools/org_manage_entities_v2`.
 - Move org business logic into `app_domains/org`.
-- Leave storage adapters in `agent_persistence`.
+- Leave storage adapters in `app_persistence`.
 
 ### Phase 3: Comms Tool Consolidation
 - Add `input.rs`, `handler.rs`, `output.rs` under `agent_core/tools/comms_tool`.
 - Move comms business logic into `app_domains/comms`.
-- Keep persistence adapters in `agent_persistence`.
+- Keep persistence adapters in `app_persistence`.
 
 ### Phase 4: Cleanup
-- Delete legacy tool orchestration from `agent_persistence`.
+- Delete legacy tool orchestration from `app_persistence`.
 - Keep compatibility wrappers only if strictly needed, then remove.
 - Update READMEs and code maps.
 
 ## Acceptance Criteria
 - Tool entrypoint is discoverable under `agent_core/src/tools/<tool>/`.
 - Runtime services have no per-tool business branching.
-- `agent_persistence` no longer owns tool orchestration/business behavior.
+- `app_persistence` no longer owns tool orchestration/business behavior.
 - Tool behavior is parity-equivalent for org + comms.
 - Server and desktop builds pass.
 
@@ -115,7 +115,7 @@ Keep in `agent_persistence`:
 - [ ] Move org business rules into `app_domains/org`.
 - [ ] Extract comms tool handler/input/output into `agent_core/tools/comms_tool`.
 - [ ] Move comms business rules into `app_domains/comms`.
-- [ ] Shrink `agent_persistence` to storage adapters.
+- [ ] Shrink `app_persistence` to storage adapters.
 - [ ] Remove legacy glue and update READMEs.
 - [ ] Validate parity + build server/desktop.
 

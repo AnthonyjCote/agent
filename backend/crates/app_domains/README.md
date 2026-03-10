@@ -8,6 +8,6 @@ Current crates:
 - `comms`: communications domain service layer.
 
 Boundary rule:
-- Keep persistence/storage mechanics in `agent_persistence`.
+- Keep persistence/storage mechanics in `app_persistence`.
 - Keep runtime orchestration in `agent_core`.
 - Put business rules/use-case logic for app domains here.

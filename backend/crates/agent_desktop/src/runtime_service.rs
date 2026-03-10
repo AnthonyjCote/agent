@@ -1,7 +1,7 @@
 use std::{collections::HashMap, sync::Mutex};
 
 use adapter::gemini::model_inference::GeminiCliModelInference;
-use agent_persistence::PersistenceStateStore;
+use app_persistence::PersistenceStateStore;
 use agent_core::{
     models::{
         blocks::MessageBlock,

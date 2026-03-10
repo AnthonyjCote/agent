@@ -4,7 +4,7 @@
 Refactor org/comms tool stack into:
 - `agent_core/tools/*` for tool handler logic
 - `app_domains/*` for business logic
-- `agent_persistence` for storage adapters only
+- `app_persistence` for storage adapters only
 
 Keep production behavior stable while migrating.
 
@@ -26,8 +26,8 @@ Keep production behavior stable while migrating.
 - [ ] Ensure trait signatures cover current v2 tool capabilities.
 
 ## Phase 3: Persistence Adapter Extraction
-- [ ] Implement `app_domains/org` ports in `agent_persistence`.
-- [ ] Implement `app_domains/comms` ports in `agent_persistence`.
+- [ ] Implement `app_domains/org` ports in `app_persistence`.
+- [ ] Implement `app_domains/comms` ports in `app_persistence`.
 - [ ] Keep all SQL/file operations in persistence implementations.
 - [ ] Remove direct tool-envelope shaping from persistence adapter code.
 
