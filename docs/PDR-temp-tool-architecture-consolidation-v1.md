@@ -6,106 +6,118 @@
 - Owner: Runtime/Tools
 
 ## Problem
-Tool behavior is currently spread across multiple crates in a way that is functional but hard to navigate:
-- Model-facing manifests live in `agent_core/src/tools/...`.
-- Runtime dispatch glue lives in `agent_server` and `agent_desktop` runtime services.
-- Most business/tool action logic for app tools lives in `agent_persistence`.
+Tool behavior is currently split across crates with weak discoverability:
+- Tool manifests live in `agent_core/src/tools/...`.
+- Runtime dispatch glue lives in `agent_server` and `agent_desktop`.
+- Tool orchestration + business behavior are mixed inside `agent_persistence` (`org_tool.rs`, `comms_tool.rs`, `comms_delivery.rs`).
 
 Result:
-- Discoverability is poor.
-- Tool changes require touching too many unrelated files.
-- Runtime services contain logic that should be thin wiring only.
+- Tool changes require edits across unrelated modules.
+- Runtime services are thicker than they should be.
+- Persistence crate is carrying app-domain behavior.
 
 ## Decision
-Adopt a clear boundary:
+Adopt a strict 3-layer tool boundary:
 
-1. `agent_core/src/tools/<tool>/` owns model-facing tool contract + tool execution handler orchestration.
-2. `agent_persistence` owns persistence/domain services only (DB/files/queries/mutations), not tool contract or prompt-shaping behavior.
-3. `agent_server` and `agent_desktop` runtime services are thin adapters that delegate to shared tool execution wiring.
+1. `agent_core/src/tools/<tool>/`
+- Owns model-facing tool contract and execution handler.
+- Parses tool input, validates shape, calls domain service, shapes output envelope.
 
-This keeps tool code co-located without turning `agent_core` into a storage monolith.
+2. `crates/app_domains/<domain>/`
+- Owns business/use-case logic.
+- No model prompt text and no runtime transport wiring.
+
+3. `agent_persistence`
+- Owns persistence adapters only (DB/files/repository implementations).
+- No tool contract or tool envelope shaping.
+
+`agent_server` and `agent_desktop` runtime services stay thin: delegate tool execution to shared dispatch.
 
 ## Target Structure
 
 For each app tool (example: `org_manage_entities_v2`, `comms_tool`):
 
 `agent_core/src/tools/<tool>/`
-- `manifest.rs` (tool metadata + instructions)
-- `input.rs` (strict parse/validation + normalized request shape)
-- `handler.rs` (action routing/orchestration)
-- `output.rs` (normalized envelope shaping)
+- `manifest.rs`
+- `input.rs`
+- `handler.rs`
+- `output.rs`
 - `mod.rs`
+- optional: `actions/`, `prefetch.rs`
 
-Optional for complex tools:
-- `actions/` for per-action modules
-- `prefetch.rs` (fast-ack prefetch resolvers)
+`crates/app_domains/<domain>/`
+- domain models
+- services/use-cases
+- repository traits (implemented by `agent_persistence`)
 
 `agent_persistence`
-- Domain repositories/services only:
-  - read/write functions
-  - transactional boundaries
-  - name-ref resolution helpers
-  - schema models
+- repository impls + SQL/file adapters
+- transaction boundaries
+- state mapping
 
-`agent_server` / `agent_desktop`
-- Tool adapter map only
-- No business-rule branching
-- No per-tool data shaping logic
+## Specific Moves
+
+Move out of `agent_persistence`:
+- `org_tool.rs` tool-layer parsing/orchestration/output shaping -> `agent_core/tools/org_manage_entities_v2` + `app_domains/org`
+- `comms_tool.rs` tool-layer parsing/orchestration/output shaping -> `agent_core/tools/comms_tool` + `app_domains/comms`
+- `comms_delivery.rs` behavior/routing policy -> `app_domains/comms` (persistence calls remain via repository adapter)
+
+Keep in `agent_persistence`:
+- `state.rs`, `sqlite.rs`, `workspace.rs`, `error.rs`, `health.rs`
 
 ## Non-Goals
-- No database migration in this PDR.
-- No tool contract redesign in this PDR.
-- No behavior change to agent-visible functionality except where needed to preserve parity.
+- No tool contract redesign in this pass.
+- No provider adapter overhaul in this pass.
+- No behavior changes beyond parity-preserving refactor.
 
 ## Migration Plan
 
-### Phase 1: Wiring Foundation
-- Create shared app-tool dispatcher in `agent_core` (or a shared runtime adapter module) callable by both server and desktop.
-- Replace duplicated `match tool_name` blocks in runtime services with delegation.
+### Phase 1: Shared Dispatch Foundation
+- Add shared app-tool dispatcher callable by both server and desktop runtimes.
+- Replace per-runtime `match tool_name` branching with delegation.
 
-### Phase 2: Org Tool Extraction
-- Move `org_manage_entities_v2` tool-layer logic (parse/normalize/response shaping) into `agent_core/src/tools/org_manage_entities_v2/`.
-- Keep persistence operations in `agent_persistence` as callable domain methods.
-- Preserve external tool contract exactly.
+### Phase 2: Org Tool Consolidation
+- Add `input.rs`, `handler.rs`, `output.rs` under `agent_core/tools/org_manage_entities_v2`.
+- Move org business logic into `app_domains/org`.
+- Leave storage adapters in `agent_persistence`.
 
-### Phase 3: Comms Tool Extraction
-- Repeat for `comms_tool`.
-- Keep transport adapters and persistence calls in domain/persistence layers.
+### Phase 3: Comms Tool Consolidation
+- Add `input.rs`, `handler.rs`, `output.rs` under `agent_core/tools/comms_tool`.
+- Move comms business logic into `app_domains/comms`.
+- Keep persistence adapters in `agent_persistence`.
 
-### Phase 4: Cleanup + Guardrails
-- Remove dead glue code from runtime services.
-- Add module READMEs where needed.
-- Add tests for:
-  - input parse failures
-  - action routing
-  - output envelope shape parity
+### Phase 4: Cleanup
+- Delete legacy tool orchestration from `agent_persistence`.
+- Keep compatibility wrappers only if strictly needed, then remove.
+- Update READMEs and code maps.
 
 ## Acceptance Criteria
-- Tool entrypoint for each app tool is discoverable under `agent_core/src/tools/<tool>/`.
-- `agent_server` and `agent_desktop` contain no per-tool business logic beyond adapter delegation.
-- `agent_persistence` does not include model-facing prompt/tool instruction text.
-- Existing tool behavior remains functionally equivalent for `org_manage_entities_v2` and `comms_tool`.
-- Build passes for desktop + server targets.
+- Tool entrypoint is discoverable under `agent_core/src/tools/<tool>/`.
+- Runtime services have no per-tool business branching.
+- `agent_persistence` no longer owns tool orchestration/business behavior.
+- Tool behavior is parity-equivalent for org + comms.
+- Server and desktop builds pass.
 
 ## Risks
-- Accidental behavior drift while moving parsing/validation.
-- Temporary duplication during migration window.
+- Behavior drift while moving parsing/normalization.
+- Short-term duplication during migration.
 
 ## Mitigations
-- Move one tool at a time with parity checks.
-- Keep response envelope snapshots for before/after comparison.
-- Stage changes behind thin adapter wrappers first, then remove old paths.
+- Migrate one tool at a time with parity checks.
+- Snapshot before/after tool envelopes for regression checks.
+- Keep rollback path by preserving old implementation behind a temporary adapter until parity is confirmed.
 
 ## Implementation Checklist
-- [ ] Add shared app-tool dispatch adapter used by both runtimes.
-- [ ] Refactor server runtime service to use shared adapter.
-- [ ] Refactor desktop runtime service to use shared adapter.
-- [ ] Extract `org_manage_entities_v2` tool-layer modules into `agent_core/src/tools/org_manage_entities_v2/`.
-- [ ] Extract `comms_tool` tool-layer modules into `agent_core/src/tools/comms_tool/`.
-- [ ] Remove duplicated/legacy per-runtime tool glue.
-- [ ] Add/refresh READMEs for touched tool folders.
-- [ ] Validate parity with existing tool tests/manual checks.
-- [ ] Build-check server + desktop targets.
+- [ ] Add shared app-tool dispatch adapter.
+- [ ] Refactor server runtime service to delegate app tools.
+- [ ] Refactor desktop runtime service to delegate app tools.
+- [ ] Extract org tool handler/input/output into `agent_core/tools/org_manage_entities_v2`.
+- [ ] Move org business rules into `app_domains/org`.
+- [ ] Extract comms tool handler/input/output into `agent_core/tools/comms_tool`.
+- [ ] Move comms business rules into `app_domains/comms`.
+- [ ] Shrink `agent_persistence` to storage adapters.
+- [ ] Remove legacy glue and update READMEs.
+- [ ] Validate parity + build server/desktop.
 
 ## Rollback
-If regressions occur, restore previous runtime-service dispatch path and re-enable existing `agent_persistence` tool entrypoints while keeping new modules disabled.
+If regression appears, route dispatcher back to legacy path while retaining new modules, then fix parity gaps and re-enable.
