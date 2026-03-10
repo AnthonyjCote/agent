@@ -1,11 +1,22 @@
 use app_domains_core::{errors::DomainError, DomainResult};
 
-use crate::models::{BusinessUnitSummary, OperatorSummary, OrgUnitSummary};
+use crate::{
+    models::{BusinessUnitSummary, OperatorSummary, OrgUnitSummary},
+    ports::{OrgToolExecutionOutput, OrgToolPort},
+};
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct OrgDomainService;
 
 impl OrgDomainService {
+    pub fn execute_tool_request(
+        &self,
+        port: &dyn OrgToolPort,
+        args: &serde_json::Value,
+    ) -> DomainResult<OrgToolExecutionOutput> {
+        port.execute_org_manage_entities_v2(args)
+    }
+
     pub fn validate_business_unit_name(&self, value: &str) -> DomainResult<String> {
         let trimmed = value.trim();
         if trimmed.is_empty() {

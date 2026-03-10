@@ -1,11 +1,22 @@
 use app_domains_core::{errors::DomainError, DomainResult};
 
-use crate::models::{CommsChannel, OutboundMessageDraft};
+use crate::{
+    models::{CommsChannel, OutboundMessageDraft},
+    ports::{CommsToolExecutionOutput, CommsToolPort},
+};
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct CommsDomainService;
 
 impl CommsDomainService {
+    pub fn execute_tool_request(
+        &self,
+        port: &dyn CommsToolPort,
+        args: &serde_json::Value,
+    ) -> DomainResult<CommsToolExecutionOutput> {
+        port.execute_comms_tool(args)
+    }
+
     pub fn build_outbound_draft(
         &self,
         channel: CommsChannel,

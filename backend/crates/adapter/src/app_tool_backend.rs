@@ -1,5 +1,5 @@
-use app_domain_comms::ports::CommsToolPort;
-use app_domain_org::ports::OrgToolPort;
+use app_domain_comms::CommsDomainService;
+use app_domain_org::OrgDomainService;
 use app_domains_core::errors::DomainError;
 use app_persistence::{PersistenceCommsToolPort, PersistenceOrgToolPort, PersistenceStateStore};
 use agent_core::{
@@ -11,6 +11,8 @@ use agent_core::{
 pub struct PersistentAppToolBackend {
     org_port: PersistenceOrgToolPort,
     comms_port: PersistenceCommsToolPort,
+    org_domain: OrgDomainService,
+    comms_domain: CommsDomainService,
 }
 
 impl PersistentAppToolBackend {
@@ -20,6 +22,8 @@ impl PersistentAppToolBackend {
         Self {
             org_port,
             comms_port,
+            org_domain: OrgDomainService::default(),
+            comms_domain: CommsDomainService::default(),
         }
     }
 
@@ -46,8 +50,8 @@ impl AppToolBackend for PersistentAppToolBackend {
         args: &serde_json::Value,
     ) -> Result<AppToolExecutionOutput, RunError> {
         let output = self
-            .org_port
-            .execute_org_manage_entities_v2(args)
+            .org_domain
+            .execute_tool_request(&self.org_port, args)
             .map_err(Self::map_org_error)?;
         Ok(AppToolExecutionOutput {
             summary: output.summary,
@@ -60,8 +64,8 @@ impl AppToolBackend for PersistentAppToolBackend {
         args: &serde_json::Value,
     ) -> Result<AppToolExecutionOutput, RunError> {
         let output = self
-            .comms_port
-            .execute_comms_tool(args)
+            .comms_domain
+            .execute_tool_request(&self.comms_port, args)
             .map_err(Self::map_comms_error)?;
         Ok(AppToolExecutionOutput {
             summary: output.summary,

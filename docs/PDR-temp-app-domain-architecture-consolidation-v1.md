@@ -11,7 +11,7 @@
   - `app_domains/comms/src/ports.rs`
 - Added `app_persistence` adapter implementations for domain ports:
   - `app_persistence/src/domain_ports.rs`
-- Runtime shared app-tool backend now uses domain ports through persistence adapters.
+- Runtime shared app-tool backend now uses domain service entrypoints and domain ports through persistence adapters.
 - Remaining work: move org/comms business orchestration from `app_persistence` into `app_domains` service modules.
 
 ## Context

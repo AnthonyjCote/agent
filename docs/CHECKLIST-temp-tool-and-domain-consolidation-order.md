@@ -55,9 +55,9 @@ Keep production behavior stable while migrating.
 - [ ] Ensure runtime services contain no per-tool business branching.
 
 ## Phase 7: Documentation + Navigation
-- [ ] Update `docs/PDR-temp-tool-architecture-consolidation-v1.md` status/progress.
-- [ ] Update `docs/PDR-temp-app-domain-architecture-consolidation-v1.md` status/progress.
-- [ ] Add/refresh READMEs in:
+- [x] Update `docs/PDR-temp-tool-architecture-consolidation-v1.md` status/progress.
+- [x] Update `docs/PDR-temp-app-domain-architecture-consolidation-v1.md` status/progress.
+- [x] Add/refresh READMEs in:
   - `agent_core/src/tools/org_manage_entities_v2/`
   - `agent_core/src/tools/comms_tool/`
   - `crates/app_domains/org/`
