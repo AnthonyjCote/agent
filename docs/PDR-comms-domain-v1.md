@@ -107,9 +107,13 @@ Fields:
 - UI modeled after familiar mail clients.
 
 ### Chat
-- Supports direct and group conversation threads.
+- Provider-agnostic core model is locked to:
+  - `dm` (1:1 direct message)
+  - `group` (1:many conversation)
 - Message stream style; no folder-centric model.
 - Optional mention metadata in `message` extension payload.
+- Avoid provider-specific primitives in canonical schema (for example `server`, `guild`, `workspace`) as first-class fields.
+- Provider-specific constructs must map into canonical `thread` + participant metadata, not redefine core model.
 
 ### SMS
 - Thread per counterpart or group-like simulation.
@@ -126,6 +130,11 @@ Adapter responsibilities:
 - delivery status mapping
 - provider error normalization
 - optional provider-side id mapping
+
+Provider-agnostic chat mapping (locked):
+- Slack/Discord/Telegram/Signal/Messenger direct messages -> canonical `dm` thread.
+- Slack channels / Discord channels / Telegram groups / similar -> canonical `group` thread.
+- Multiple providers may be connected simultaneously; each adapter maps into the same canonical objects.
 
 Canonical domain remains source of truth for UI and agent tooling.
 
@@ -198,9 +207,24 @@ Top-level tabs:
 - Threaded message reading and composing
 
 ### Chat Tab
-- Left: direct/group thread list
-- Right: live-style chat history and composer
-- Operator and group context cues
+- Left: top bar actions + two grouped thread sections.
+- Top bar actions (locked):
+  - `New DM` icon action
+  - `New Group` icon action
+- Left sections (locked):
+  - `Direct Messages` (threads where active operator is a participant and `thread_kind=dm`)
+  - `Group Messages` (threads where active operator is a participant and `thread_kind=group`)
+- Right: live-style chat history and composer.
+- Operator/group context cues.
+
+Creation flows (locked):
+- `New DM` opens modal:
+  - single target participant selector
+  - creates or reuses deterministic 1:1 DM thread for that participant pair
+- `New Group` opens modal:
+  - group name
+  - participant multi-select
+  - creates new group thread with memberships
 
 ### SMS Tab
 - Left: SMS thread list
@@ -231,6 +255,8 @@ Must log:
 
 ## Acceptance Criteria
 - Email/Chat/SMS tabs are functional and internally consistent.
+- Chat UI supports two explicit creation paths (`New DM`, `New Group`) with modal flows.
+- Chat left column is grouped into `Direct Messages` and `Group Messages` for active operator participation context.
 - Operators can send/read/reply in sandbox across channels.
 - Agents can perform comms actions via `comms_manage_v1`.
 - Inbound comms can emit valid `work_unit` triggers.
