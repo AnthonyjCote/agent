@@ -1,6 +1,6 @@
 use crate::{models::run::RunError, models::tool::ToolOutputEnvelope};
 
-use super::weather_open_meteo::{
+use super::deprecated::weather_open_meteo::{
     execute::execute_weather,
     input::{parse_weather_args, parse_weather_input},
 };
