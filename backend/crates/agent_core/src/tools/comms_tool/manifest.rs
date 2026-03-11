@@ -33,8 +33,9 @@ notes:\n\
 - Keep one batched ops request when multiple comms actions are needed.\n\
 - IDs are supported for precise thread/message selection.\n\
 - Name refs may also be used where selector semantics allow.\n\
+- Sender identity is always scoped to current operator at runtime.\n\
+- Do not provide sender account IDs or fromAccountRef for outbound sends; sender is injected deterministically.\n\
 - UI should display this tool as `Comms Tool`.\n\
 - In this build, `atomic=true` is not yet supported for comms_tool.",
     }
 }
-

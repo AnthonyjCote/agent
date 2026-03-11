@@ -505,7 +505,7 @@ export function useChatGuiState(runtimeClient: AgentRuntimeClient) {
     }
   };
   const resolveAllowedToolIds = (toolsPolicyRef?: string): string[] => {
-    const defaultTools = ['weather_open_meteo', 'org_manage_entities_v2', 'comms_tool'];
+    const defaultTools = ['org_manage_entities_v2', 'comms_tool'];
     if (toolsPolicyRef === 'policy_default') {
       return defaultTools;
     }

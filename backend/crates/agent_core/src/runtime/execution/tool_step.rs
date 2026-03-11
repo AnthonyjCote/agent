@@ -142,6 +142,7 @@ pub(crate) fn execute_tool_calls_step(
                     run_id: run_id.to_string(),
                     call_id: call_id.clone(),
                     tool_name: call.tool.clone(),
+                    args: Some(call.args.clone()),
                     lifecycle: SideEffectLifecycleState::Failed,
                 },
             );
@@ -189,6 +190,7 @@ pub(crate) fn execute_tool_calls_step(
                 run_id: run_id.to_string(),
                 call_id: call_id.clone(),
                 tool_name: call.tool.clone(),
+                args: Some(call.args.clone()),
                 lifecycle: SideEffectLifecycleState::Proposed,
             },
         );
@@ -199,6 +201,7 @@ pub(crate) fn execute_tool_calls_step(
                 run_id: run_id.to_string(),
                 call_id: call_id.clone(),
                 tool_name: call.tool.clone(),
+                args: Some(call.args.clone()),
                 lifecycle: SideEffectLifecycleState::Dispatched,
             },
         );
@@ -217,6 +220,7 @@ pub(crate) fn execute_tool_calls_step(
                         run_id: run_id.to_string(),
                         call_id: call_id.clone(),
                         tool_name: call.tool.clone(),
+                        args: Some(call.args.clone()),
                         lifecycle: SideEffectLifecycleState::Completed,
                     },
                 );
@@ -255,6 +259,7 @@ pub(crate) fn execute_tool_calls_step(
                         run_id: run_id.to_string(),
                         call_id: call_id.clone(),
                         tool_name: call.tool.clone(),
+                        args: Some(call.args.clone()),
                         lifecycle: SideEffectLifecycleState::Failed,
                     },
                 );
@@ -302,6 +307,7 @@ pub(crate) fn execute_tool_calls_step(
                         run_id: run_id.to_string(),
                         call_id: call_id.clone(),
                         tool_name: call.tool.clone(),
+                        args: Some(call.args.clone()),
                         lifecycle: SideEffectLifecycleState::Failed,
                     },
                 );

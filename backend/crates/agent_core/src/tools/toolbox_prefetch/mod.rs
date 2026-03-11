@@ -156,7 +156,7 @@ pub fn resolve_prefetch(
             clarification_prompt: resolved.clarification_question.clone(),
         });
         resolution.detail_blocks.push(format!(
-            "tool: comms_tool\nintent: message_send\nmethod: {}\nmethod-specific send contract:\n- Use only {} destination fields from resolved prefetch matches.\n- Do not use other channel fields.\n- Use this comms_tool args pattern:\n{}\n",
+            "tool: comms_tool\nintent: message_send\nmethod: {}\nmethod-specific send contract:\n- Sender identity is auto-enforced from current operator.\n- Do not provide sender account IDs or sender addresses; runtime injects sender deterministically.\n- Use only {} destination fields from resolved prefetch matches.\n- Do not use other channel fields.\n- Use this comms_tool args pattern:\n{}\n",
             method.as_str(),
             method.field_label(),
             method.send_args_hint()

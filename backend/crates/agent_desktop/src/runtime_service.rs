@@ -1,6 +1,7 @@
 use std::{collections::HashMap, sync::Mutex};
 
 use adapter::{app_tool_backend::PersistentAppToolBackend, gemini::model_inference::GeminiCliModelInference};
+use app_persistence::CommsThreadRecord;
 use app_persistence::PersistenceStateStore;
 use agent_core::{
     models::{
@@ -110,10 +111,23 @@ impl RuntimeService {
             }
         };
 
+        let agent_id_for_tools = request.agent_id.clone();
+        let workspace_id_for_tools = self.workspace_id.clone();
+        let state_store_for_tools = self.state_store.clone();
         let app_tool_backend = PersistentAppToolBackend::new(self.state_store.clone(), self.workspace_id.clone());
         let events = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             let mut tool_executor = |tool_name: &str, args: &serde_json::Value| {
-                execute_app_tool_by_id(&app_tool_backend, tool_name, args)
+                let normalized_args = if tool_name == "comms_tool" {
+                    enforce_comms_sender_scope(
+                        &state_store_for_tools,
+                        &workspace_id_for_tools,
+                        &agent_id_for_tools,
+                        args,
+                    )?
+                } else {
+                    args.clone()
+                };
+                execute_app_tool_by_id(&app_tool_backend, tool_name, &normalized_args)
             };
             execute_run_once_with_tools(request, &self.inference, &mut stream_event, Some(&mut tool_executor))
         }))
@@ -249,6 +263,330 @@ impl RuntimeService {
             history.drain(0..overflow);
         }
     }
+}
+
+fn enforce_comms_sender_scope(
+    state_store: &PersistenceStateStore,
+    workspace_id: &str,
+    operator_id: &str,
+    args: &serde_json::Value,
+) -> Result<serde_json::Value, agent_core::models::run::RunError> {
+    let mut normalized = args.clone();
+    let Some(ops) = normalized.get_mut("ops").and_then(|value| value.as_array_mut()) else {
+        return Ok(normalized);
+    };
+    let ops_snapshot = ops.clone();
+
+    for (index, op) in ops.iter_mut().enumerate() {
+        let action = op
+            .get("action")
+            .and_then(|value| value.as_str())
+            .unwrap_or("")
+            .trim()
+            .to_ascii_lowercase();
+        let target = op
+            .get("target")
+            .and_then(|value| value.as_str())
+            .unwrap_or("")
+            .trim()
+            .to_ascii_lowercase();
+        if action != "create" {
+            continue;
+        }
+
+        if target == "thread" {
+            let Some(payload) = op.get_mut("payload").and_then(|value| value.as_object_mut()) else {
+                continue;
+            };
+            let channel_value = payload
+                .get("channel")
+                .and_then(|value| value.as_str())
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(|value| value.to_string())
+                .or_else(|| infer_channel_for_thread_op(&ops_snapshot, index, payload));
+            let Some(channel) = channel_value else {
+                continue;
+            };
+            payload.insert(
+                "channel".to_string(),
+                serde_json::Value::String(channel.clone()),
+            );
+            let account = resolve_operator_account_by_channel(
+                state_store,
+                workspace_id,
+                operator_id,
+                &channel,
+            )?;
+            payload.insert(
+                "accountId".to_string(),
+                serde_json::Value::String(account.account_id),
+            );
+            continue;
+        }
+
+        if target == "message" {
+            let Some(payload) = op.get_mut("payload").and_then(|value| value.as_object_mut()) else {
+                continue;
+            };
+
+            let channel = if let Some(value) = payload
+                .get("channel")
+                .and_then(|value| value.as_str())
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+            {
+                Some(value.to_string())
+            } else if let Some(thread_id) = payload
+                .get("threadId")
+                .and_then(|value| value.as_str())
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+            {
+                let thread = state_store
+                    .get_comms_thread(workspace_id, thread_id)
+                    .map_err(|error| agent_core::models::run::RunError {
+                        code: "tool_invalid_args".to_string(),
+                        message: format!(
+                            "comms_tool sender enforcement failed while loading thread {}: {}",
+                            thread_id, error
+                        ),
+                        retryable: false,
+                    })?
+                    .ok_or_else(|| agent_core::models::run::RunError {
+                        code: "tool_invalid_args".to_string(),
+                        message: format!(
+                            "comms_tool create message requires a valid payload.threadId when payload.channel is not provided (thread not found: {})",
+                            thread_id
+                        ),
+                        retryable: false,
+                    })?;
+                Some(thread.channel)
+            } else {
+                None
+            };
+
+            let Some(channel) = channel else {
+                return Err(agent_core::models::run::RunError {
+                    code: "tool_invalid_args".to_string(),
+                    message: "comms_tool create message requires payload.threadId or payload.channel so sender can be auto-resolved from current operator.".to_string(),
+                    retryable: false,
+                });
+            };
+
+            let account = resolve_operator_account_by_channel(
+                state_store,
+                workspace_id,
+                operator_id,
+                &channel,
+            )?;
+            payload.insert(
+                "fromAccountRef".to_string(),
+                serde_json::Value::String(account.address.clone()),
+            );
+
+            if let Some(thread_id) = payload
+                .get("threadId")
+                .and_then(|value| value.as_str())
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+            {
+                let normalized_thread_id = normalize_message_thread_for_sender(
+                    state_store,
+                    workspace_id,
+                    thread_id,
+                    &account.account_id,
+                )?;
+                if normalized_thread_id != thread_id {
+                    payload.insert(
+                        "threadId".to_string(),
+                        serde_json::Value::String(normalized_thread_id),
+                    );
+                }
+            }
+        }
+    }
+
+    Ok(normalized)
+}
+
+fn resolve_operator_account_by_channel(
+    state_store: &PersistenceStateStore,
+    workspace_id: &str,
+    operator_id: &str,
+    channel: &str,
+) -> Result<app_persistence::CommsAccountRecord, agent_core::models::run::RunError> {
+    let accounts = state_store
+        .list_comms_accounts(workspace_id, Some(operator_id), Some(channel))
+        .map_err(|error| agent_core::models::run::RunError {
+            code: "tool_invalid_args".to_string(),
+            message: format!(
+                "comms_tool sender enforcement failed while loading {} account for current operator: {}",
+                channel, error
+            ),
+            retryable: false,
+        })?;
+    accounts
+        .into_iter()
+        .next()
+        .ok_or_else(|| agent_core::models::run::RunError {
+            code: "tool_invalid_args".to_string(),
+            message: format!(
+                "Current operator has no {} account configured. Cannot send via comms_tool on that channel.",
+                channel
+            ),
+            retryable: false,
+        })
+}
+
+fn normalize_message_thread_for_sender(
+    state_store: &PersistenceStateStore,
+    workspace_id: &str,
+    thread_id: &str,
+    expected_account_id: &str,
+) -> Result<String, agent_core::models::run::RunError> {
+    let Some(thread) = state_store
+        .get_comms_thread(workspace_id, thread_id)
+        .map_err(|error| agent_core::models::run::RunError {
+            code: "tool_invalid_args".to_string(),
+            message: format!(
+                "comms_tool sender enforcement failed while validating thread {}: {}",
+                thread_id, error
+            ),
+            retryable: false,
+        })?
+    else {
+        return Ok(thread_id.to_string());
+    };
+    verify_thread_owner_or_remap(state_store, workspace_id, thread, expected_account_id)
+}
+
+fn verify_thread_owner_or_remap(
+    state_store: &PersistenceStateStore,
+    workspace_id: &str,
+    thread: CommsThreadRecord,
+    expected_account_id: &str,
+) -> Result<String, agent_core::models::run::RunError> {
+    if thread.account_id != expected_account_id {
+        if !thread.thread_key.trim().is_empty() {
+            let remapped = state_store
+                .find_latest_comms_thread_by_thread_key(
+                    workspace_id,
+                    &thread.channel,
+                    expected_account_id,
+                    &thread.thread_key,
+                )
+                .map_err(|error| agent_core::models::run::RunError {
+                    code: "tool_invalid_args".to_string(),
+                    message: format!(
+                        "comms_tool sender enforcement failed while remapping thread {}: {}",
+                        thread.thread_id, error
+                    ),
+                    retryable: false,
+                })?;
+            if let Some(value) = remapped {
+                return Ok(value.thread_id);
+            }
+        }
+        return Err(agent_core::models::run::RunError {
+            code: "tool_permission_denied".to_string(),
+            message: "comms_tool rejected outbound send: target thread is not owned by current operator sender account.".to_string(),
+            retryable: false,
+        });
+    }
+    Ok(thread.thread_id)
+}
+
+fn infer_channel_for_thread_op(
+    ops_snapshot: &[serde_json::Value],
+    current_index: usize,
+    thread_payload: &serde_json::Map<String, serde_json::Value>,
+) -> Option<String> {
+    if thread_payload
+        .get("subject")
+        .and_then(|value| value.as_str())
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .is_some()
+    {
+        return Some("email".to_string());
+    }
+    if thread_payload
+        .get("participants")
+        .and_then(|value| value.get("peerNumber"))
+        .and_then(|value| value.as_str())
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .is_some()
+    {
+        return Some("sms".to_string());
+    }
+    if thread_payload
+        .get("participants")
+        .and_then(|value| value.get("kind"))
+        .and_then(|value| value.as_str())
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .is_some()
+    {
+        return Some("chat".to_string());
+    }
+
+    for value in ops_snapshot.iter().skip(current_index + 1) {
+        let action = value
+            .get("action")
+            .and_then(|raw| raw.as_str())
+            .unwrap_or("")
+            .trim()
+            .to_ascii_lowercase();
+        let target = value
+            .get("target")
+            .and_then(|raw| raw.as_str())
+            .unwrap_or("")
+            .trim()
+            .to_ascii_lowercase();
+        if action != "create" || target != "message" {
+            continue;
+        }
+        let Some(payload) = value.get("payload").and_then(|raw| raw.as_object()) else {
+            continue;
+        };
+        if let Some(channel) = payload
+            .get("channel")
+            .and_then(|raw| raw.as_str())
+            .map(str::trim)
+            .filter(|raw| !raw.is_empty())
+        {
+            return Some(channel.to_string());
+        }
+        if payload
+            .get("subject")
+            .and_then(|raw| raw.as_str())
+            .map(str::trim)
+            .filter(|raw| !raw.is_empty())
+            .is_some()
+        {
+            return Some("email".to_string());
+        }
+        if let Some(first_recipient) = payload
+            .get("toParticipants")
+            .and_then(|raw| raw.as_array())
+            .and_then(|items| items.first())
+            .and_then(|item| item.as_str())
+            .map(str::trim)
+            .filter(|raw| !raw.is_empty())
+        {
+            if first_recipient.contains('@') {
+                return Some("email".to_string());
+            }
+            if first_recipient.starts_with('+') {
+                return Some("sms".to_string());
+            }
+            return Some("chat".to_string());
+        }
+    }
+
+    None
 }
 
 fn extract_assistant_text(events: &[RunEvent]) -> Option<String> {

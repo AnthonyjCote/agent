@@ -80,12 +80,16 @@ pub enum RunEvent {
         run_id: String,
         call_id: String,
         tool_name: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        args: Option<serde_json::Value>,
         lifecycle: SideEffectLifecycleState,
     },
     ToolResult {
         run_id: String,
         call_id: String,
         tool_name: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        args: Option<serde_json::Value>,
         lifecycle: SideEffectLifecycleState,
     },
     DebugToolResult {

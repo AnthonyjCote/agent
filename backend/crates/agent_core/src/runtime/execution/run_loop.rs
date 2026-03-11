@@ -59,6 +59,7 @@ impl<'a, M: ModelInferencePort, T: TraceStorePort> RunLoop<'a, M, T> {
                                 run_id: request.run_id.clone(),
                                 call_id: "none".to_string(),
                                 tool_name: "none".to_string(),
+                                args: None,
                                 lifecycle: SideEffectLifecycleState::Acknowledged,
                             });
                         }
