@@ -2,7 +2,7 @@ use app_domain_comms::{
     ports::{CommsToolExecutionOutput, CommsToolPort, CommsToolStore},
     CommsDomainService,
 };
-use app_domain_org::ports::{OrgToolExecutionOutput, OrgToolPort};
+use app_domain_org::ports::{OrgChartStateRecord as DomainOrgChartStateRecord, OrgToolStore};
 use app_domains_core::{errors::DomainError, DomainResult};
 
 use crate::PersistenceStateStore;
@@ -22,19 +22,44 @@ impl PersistenceOrgToolPort {
     }
 }
 
-impl OrgToolPort for PersistenceOrgToolPort {
-    fn execute_org_manage_entities_v2(
-        &self,
-        args: &serde_json::Value,
-    ) -> DomainResult<OrgToolExecutionOutput> {
-        let output = self
+impl OrgToolStore for PersistenceOrgToolPort {
+    fn load_org_chart_state(&self) -> DomainResult<Option<DomainOrgChartStateRecord>> {
+        let state = self
             .store
-            .execute_org_manage_entities_v2(&self.workspace_id, args)
+            .get_org_chart_state(&self.workspace_id)
             .map_err(|error| DomainError::Internal(error.to_string()))?;
-        Ok(OrgToolExecutionOutput {
-            summary: output.summary,
-            structured_data: output.structured_data,
-        })
+        Ok(state.map(|value| DomainOrgChartStateRecord {
+            snapshot: value.snapshot,
+            activity_events: value.activity_events,
+            command_history: value.command_history,
+            history_cursor: value.history_cursor,
+        }))
+    }
+
+    fn save_org_chart_state(&self, state: &DomainOrgChartStateRecord) -> DomainResult<()> {
+        self.store
+            .save_org_chart_state(
+                &self.workspace_id,
+                &crate::state::OrgChartStateRecord {
+                    snapshot: state.snapshot.clone(),
+                    activity_events: state.activity_events.clone(),
+                    command_history: state.command_history.clone(),
+                    history_cursor: state.history_cursor,
+                },
+            )
+            .map_err(|error| DomainError::Internal(error.to_string()))
+    }
+
+    fn list_agent_manifests(&self) -> DomainResult<Vec<serde_json::Value>> {
+        self.store
+            .list_agent_manifests(&self.workspace_id)
+            .map_err(|error| DomainError::Internal(error.to_string()))
+    }
+
+    fn replace_agent_manifests(&self, manifests: &[serde_json::Value]) -> DomainResult<()> {
+        self.store
+            .replace_agent_manifests(&self.workspace_id, manifests)
+            .map_err(|error| DomainError::Internal(error.to_string()))
     }
 }
 

@@ -6,5 +6,6 @@ Current modules:
 - `models.rs`: domain-level summaries/types.
 - `ports.rs`: persistence-facing trait contracts.
 - `service.rs`: org domain entrypoints and rule helpers.
+- `tool_orchestration.rs`: org tool read/create/update orchestration logic.
 
 This crate should own org business orchestration, while persistence adapters live in `app_persistence`.

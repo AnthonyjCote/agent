@@ -13,7 +13,9 @@
   - `app_persistence/src/domain_ports.rs`
 - Runtime shared app-tool backend now uses domain service entrypoints and domain ports through persistence adapters.
 - Comms business orchestration moved to `app_domains/comms/service` with `app_persistence` as storage adapter.
-- Remaining work: move org business orchestration from `app_persistence` into `app_domains/org` service modules.
+- Org business orchestration moved to `app_domains/org/tool_orchestration` and exposed via `app_domains/org/service`.
+- `app_persistence/org_tool.rs` and `app_persistence/comms_tool.rs` now run as thin wrappers into domain services.
+- Remaining work: parity snapshots/manual validation and moving comms delivery policy module into `app_domains/comms`.
 
 ## Context
 We now have dedicated domain crates scaffolded:

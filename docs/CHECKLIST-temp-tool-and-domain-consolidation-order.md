@@ -35,7 +35,7 @@ Keep production behavior stable while migrating.
 - [x] Add `agent_core/src/tools/org_manage_entities_v2/input.rs`.
 - [x] Add `agent_core/src/tools/org_manage_entities_v2/output.rs`.
 - [x] Add `agent_core/src/tools/org_manage_entities_v2/handler.rs`.
-- [ ] Move org action orchestration into `app_domains/org/service`.
+- [x] Move org action orchestration into `app_domains/org/service`.
 - [x] Update tool registry/dispatcher to call new org handler.
 - [ ] Compare output parity against Phase 0 snapshots.
 
@@ -49,7 +49,7 @@ Keep production behavior stable while migrating.
 - [ ] Compare output parity against Phase 0 snapshots.
 
 ## Phase 6: Legacy Path Removal
-- [ ] Remove `execute_org_manage_entities_v*` tool orchestration methods from persistence (keep adapter methods only).
+- [x] Remove `execute_org_manage_entities_v*` tool orchestration methods from persistence (keep adapter methods only).
 - [x] Remove `execute_comms_tool` orchestration from persistence (keep adapter methods only).
 - [ ] Delete obsolete helper code tied only to old tool path.
 - [ ] Ensure runtime services contain no per-tool business branching.

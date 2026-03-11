@@ -12,7 +12,8 @@
   - `org_manage_entities_v2/{input,output,handler}.rs`
   - `comms_tool/{input,output,handler}.rs`
 - `comms_tool` orchestration moved into `app_domains/comms/service` with thin wrapper in `app_persistence`.
-- `org_manage_entities_v2` orchestration remains in `app_persistence` and is pending migration into `app_domains/org`.
+- `org_manage_entities_v2` orchestration moved into `app_domains/org/tool_orchestration` with thin wrapper in `app_persistence`.
+- Shared dispatch + runtime adapters now route through tool handlers -> domain services -> persistence adapters.
 
 ## Problem
 Tool behavior is currently split across crates with weak discoverability:

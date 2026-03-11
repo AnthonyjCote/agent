@@ -7,6 +7,17 @@ pub struct OrgToolExecutionOutput {
     pub structured_data: Value,
 }
 
-pub trait OrgToolPort {
-    fn execute_org_manage_entities_v2(&self, args: &Value) -> DomainResult<OrgToolExecutionOutput>;
+#[derive(Debug, Clone)]
+pub struct OrgChartStateRecord {
+    pub snapshot: Value,
+    pub activity_events: Value,
+    pub command_history: Value,
+    pub history_cursor: i64,
+}
+
+pub trait OrgToolStore {
+    fn load_org_chart_state(&self) -> DomainResult<Option<OrgChartStateRecord>>;
+    fn save_org_chart_state(&self, state: &OrgChartStateRecord) -> DomainResult<()>;
+    fn list_agent_manifests(&self) -> DomainResult<Vec<Value>>;
+    fn replace_agent_manifests(&self, manifests: &[Value]) -> DomainResult<()>;
 }
