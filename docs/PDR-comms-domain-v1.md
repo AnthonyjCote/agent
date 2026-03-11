@@ -18,6 +18,7 @@ All channels share the same core objects and dispatch/tooling contracts.
 ## Goals (V1)
 - Human-usable comms UI for Email, Chat, SMS.
 - Per-operator inbox/outbox behavior across channels.
+- Message read/unread state with explicit user controls in Email UI.
 - Threaded conversations with realistic channel semantics.
 - Agent-accessible comms tool for read/send/reply actions.
 - Trigger hooks that emit `work_unit` automation tasks from inbound messages.
@@ -97,6 +98,15 @@ Fields:
 - `name`
 - `address`
 - `operator_name_ref` (optional)
+
+### 6. `message_state` (or equivalent message-level fields)
+Read-state tracking for user-visible inbox management.
+
+Fields:
+- `message_id`
+- `is_read` (boolean)
+- `read_at` (timestamp, optional)
+- `updated_at`
 
 ## Channel Behavior Matrix
 
@@ -248,6 +258,9 @@ Creation flows (locked):
 - Each operator has channel-scoped accounts/inboxes.
 - Human and agent operators use same comms model.
 - Tool policy controls who can send/read on behalf of whom.
+- V1 default for agent tooling: mailbox reads are self-scoped to active operator context.
+- Agents should not supply self IDs for inbox reads; runtime resolves scope from active run identity.
+- Cross-operator mailbox reads require explicit delegated/admin policy (future).
 
 ## Observability and Audit
 Must log:
@@ -271,7 +284,9 @@ Must log:
 - Chat UI supports two explicit creation paths (`New DM`, `New Group`) with modal flows.
 - Chat left column is grouped into `Direct Messages` and `Group Messages` for active operator participation context.
 - Operators can send/read/reply in sandbox across channels.
+- Email UI supports `mark read` and `mark unread`, persisted and reflected in thread/message views.
 - Agents can perform comms actions via `comms_manage_v1`.
+- Agents can check their own inbox/messages without specifying self IDs and cannot read other operators by default.
 - Inbound comms can emit valid `work_unit` triggers.
 - Domain works fully in sandbox mode without external provider dependencies.
 - Adapter seam exists so external provider integration can be added without schema rewrite.

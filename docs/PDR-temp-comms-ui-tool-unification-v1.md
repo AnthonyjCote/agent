@@ -34,6 +34,15 @@ Unify Comms behavior so manual UI sends and agent tool sends use the exact same 
 - Tool lifecycle events must include full normalized args and sender resolution metadata.
 - Failures must include actionable context (`resolvedOperatorId`, `channel`, account/thread resolution details).
 
+6. Agent reads are self-scoped:
+- Agent `comms_tool` reads are scoped to the current active operator mailbox context.
+- Agents do not specify self IDs to read their own messages.
+- Cross-operator mailbox reads are disallowed in V1 unless explicit delegated/admin policy is added.
+
+7. Message read-state parity:
+- UI and tool paths must share the same read/unread semantics.
+- Read-state changes must be persisted and visible consistently across sessions and surfaces.
+
 ## Target Architecture
 ### A) Canonical Domain API
 - Introduce/standardize one send contract in comms domain, e.g.:
@@ -139,6 +148,15 @@ Notes:
 1. If a UI send succeeds, equivalent tool send with same channel/recipient/content must succeed.
 2. Folder/thread outcomes (`sent`, `inbox`, delivery event logs) must match across initiation source.
 3. Resolution and validation errors must be identical across UI and tool paths.
+4. UI read/unread toggles must update canonical message state and be reflected in tool reads.
+
+## UI Read/Unread Controls (Locked for V1)
+- Email UI supports:
+  - `mark read`
+  - `mark unread`
+- Actions are user-controlled and persist to canonical comms state.
+- Read/unread state must survive reload/restart and be reflected in list/detail views.
+- Tool reads should expose read-state so agents can prioritize unread follow-ups in their own inbox context.
 
 ## Observability Requirements
 - `tool_use` and `tool_result` carry normalized args.
@@ -163,7 +181,10 @@ Notes:
 - [ ] Add deterministic account auto-provision policy hook for missing channel accounts.
 - [ ] Enforce thread/account ownership guardrails uniformly.
 - [ ] Expand debug event payloads with normalized args + sender resolution metadata.
+- [ ] Enforce self-scoped mailbox reads for agent tool queries (no cross-account reads by default).
+- [ ] Add message read-state persistence (`read/unread`) and UI controls (`mark read`, `mark unread`).
 - [ ] Add parity tests: UI send vs tool send equivalence by channel.
+- [ ] Add parity tests: UI read/unread actions reflected in comms tool read results.
 - [ ] Add adapter contract tests proving provider swap without contract changes.
 
 ## Acceptance Criteria
@@ -171,3 +192,5 @@ Notes:
 2. Same recipient/content from UI and tool produce equivalent persisted outcomes.
 3. Debug log shows full tool args and sender/channel/thread resolution details.
 4. Swapping transport adapter does not change UI or agent tool contract.
+5. Agents can check only their own mailbox context by default and can read unread/recent messages reliably.
+6. Users can mark email messages read/unread in UI, and state remains consistent after reload.

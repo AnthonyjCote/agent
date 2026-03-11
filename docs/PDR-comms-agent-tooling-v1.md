@@ -12,6 +12,7 @@ Define a clean, deterministic comms tool contract for agents so they can reliabl
 ## Goals
 - One-call recipient discovery for common tasks.
 - Deterministic sending (no silent best-guess delivery).
+- Deterministic self-scoped reads (agent checks only its own inboxes by default).
 - Compact model payloads with optional returned fields.
 - Provider-agnostic design compatible with current internal/sandbox adapters and future real providers.
 
@@ -28,6 +29,30 @@ Define a clean, deterministic comms tool contract for agents so they can reliabl
   - `edit`
   - `delete`
 - Batched ops remain supported through `ops[]`.
+
+## Mailbox Scope Rules (Locked)
+- Agent mailbox reads are always scoped to the current active operator identity in run context.
+- Agents must not provide their own account/operator IDs for reads or writes.
+- Agents must not read other operators' inboxes via `comms_tool` unless an explicit delegated/admin policy is introduced later.
+- Runtime enforces mailbox scoping for read and write actions the same way sender identity is enforced for sends.
+- Model-facing instructions must describe reads as “check your inbox/messages” with no self-ID requirements.
+
+## Message Read Query Direction (V1)
+For message checking tasks, agent guidance should use one consistent read style under `ops[]`:
+- `action: "read"`
+- `target: "threads"` and/or `target: "messages"`
+- `selector` supports channel/folder/search filters.
+
+Preferred selector fields for check/reply workflows:
+- `channel` (`email|sms|chat`)
+- `folder` (`inbox|sent|archive|trash` where applicable)
+- `search`
+- `limit`
+- `offset`
+
+Important:
+- Legacy/freeform shapes like `action: "read_threads"` or `params: {...}` are invalid and should be normalized or rejected with clear errors.
+- Tool detail instructions must include exact valid examples for checking inbox and reading thread messages.
 
 ## Fast-Ack Prefetch Integration
 Shared fast-ack prefetch contract is defined in:
@@ -105,6 +130,7 @@ Agent pattern:
   - ambiguity status
   - selected recipient(s)
   - blocked-send reason when unresolved
+  - read-scope enforcement status for mailbox queries
 
 ## Implementation Notes
 - Keep IDs internal for deterministic backend operations.
