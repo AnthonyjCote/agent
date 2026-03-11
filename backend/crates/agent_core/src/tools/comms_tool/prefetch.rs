@@ -75,6 +75,25 @@ pub struct CommsPrefetchResult {
     pub clarification_question: Option<String>,
 }
 
+#[derive(Debug, Clone)]
+pub struct CandidateThread {
+    pub thread_id: String,
+    pub subject: String,
+    pub from: String,
+    pub state: String,
+    pub last_message_at_ms: i64,
+}
+
+#[derive(Debug, Clone)]
+pub struct MessageCheckPrefetchResult {
+    pub method: MessageMethod,
+    pub folder: String,
+    pub query: String,
+    pub candidates: Vec<CandidateThread>,
+    pub recommended_thread_id: Option<String>,
+    pub prefetched_messages: Vec<serde_json::Value>,
+}
+
 fn parse_directory_operators_from_org_output(output: &ToolOutputEnvelope) -> Vec<DirectoryOperator> {
     let mut out = Vec::new();
     let Some(structured) = output.structured_data.as_ref() else {
@@ -172,6 +191,50 @@ fn parse_directory_accounts_from_comms_output(output: &ToolOutputEnvelope) -> Ve
     out
 }
 
+fn parse_operator_directory_from_comms_output(output: &ToolOutputEnvelope) -> Vec<ResolvedRecipient> {
+    let mut out = Vec::new();
+    let Some(structured) = output.structured_data.as_ref() else {
+        return out;
+    };
+    let Some(data_items) = structured.get("data").and_then(|value| value.as_array()) else {
+        return out;
+    };
+    for item in data_items {
+        let Some(matches) = item.get("matches").and_then(|value| value.as_array()) else {
+            continue;
+        };
+        for value in matches {
+            let name = value
+                .get("name")
+                .and_then(|raw| raw.as_str())
+                .unwrap_or("")
+                .trim()
+                .to_string();
+            let title = value
+                .get("title")
+                .and_then(|raw| raw.as_str())
+                .unwrap_or("Operator")
+                .trim()
+                .to_string();
+            let destination = value
+                .get("address")
+                .and_then(|raw| raw.as_str())
+                .unwrap_or("")
+                .trim()
+                .to_string();
+            if name.is_empty() || destination.is_empty() {
+                continue;
+            }
+            out.push(ResolvedRecipient {
+                name,
+                title,
+                destination,
+            });
+        }
+    }
+    out
+}
+
 fn run_tool_call_for_prefetch(
     tool_name: &str,
     args: &serde_json::Value,
@@ -184,41 +247,184 @@ fn run_tool_call_for_prefetch(
     }
 }
 
+fn parse_threads_from_comms_output(output: &ToolOutputEnvelope) -> Vec<CandidateThread> {
+    let mut out = Vec::new();
+    let Some(structured) = output.structured_data.as_ref() else {
+        return out;
+    };
+    let Some(data_items) = structured.get("data").and_then(|value| value.as_array()) else {
+        return out;
+    };
+    for item in data_items {
+        let Some(threads) = item.get("threads").and_then(|value| value.as_array()) else {
+            continue;
+        };
+        for thread in threads {
+            let thread_id = thread
+                .get("threadId")
+                .and_then(|value| value.as_str())
+                .unwrap_or("")
+                .trim()
+                .to_string();
+            if thread_id.is_empty() {
+                continue;
+            }
+            let subject = thread
+                .get("subject")
+                .and_then(|value| value.as_str())
+                .unwrap_or("")
+                .trim()
+                .to_string();
+            let from = thread
+                .get("participants")
+                .and_then(|value| value.get("from"))
+                .and_then(|value| value.as_str())
+                .unwrap_or("")
+                .trim()
+                .to_string();
+            let state = thread
+                .get("state")
+                .and_then(|value| value.as_str())
+                .unwrap_or("")
+                .trim()
+                .to_string();
+            let last_message_at_ms = thread
+                .get("lastMessageAtMs")
+                .and_then(|value| value.as_i64())
+                .unwrap_or_default();
+            out.push(CandidateThread {
+                thread_id,
+                subject,
+                from,
+                state,
+                last_message_at_ms,
+            });
+        }
+    }
+    out
+}
+
+fn parse_messages_from_comms_output(output: &ToolOutputEnvelope) -> Vec<serde_json::Value> {
+    let Some(structured) = output.structured_data.as_ref() else {
+        return Vec::new();
+    };
+    let Some(data_items) = structured.get("data").and_then(|value| value.as_array()) else {
+        return Vec::new();
+    };
+    for item in data_items {
+        if let Some(messages) = item.get("messages").and_then(|value| value.as_array()) {
+            return messages.clone();
+        }
+    }
+    Vec::new()
+}
+
 pub fn resolve_message_send_prefetch_from_tools(
     method: MessageMethod,
     recipient_ref: &str,
     executor: &mut dyn FnMut(&str, &serde_json::Value) -> Result<Option<ToolOutputEnvelope>, RunError>,
 ) -> CommsPrefetchResult {
-    let org_snapshot_args = serde_json::json!({
-        "action": "read",
-        "items": [{"target": "snapshot"}]
-    });
-    let comms_accounts_args = serde_json::json!({
+    let recipient_query = recipient_ref.trim();
+    let comms_directory_args = serde_json::json!({
         "ops": [
             {
                 "action": "read",
-                "target": "accounts",
+                "target": "operator_directory",
                 "selector": {
-                    "channel": method.as_str()
+                    "channel": method.as_str(),
+                    "query": if recipient_query.is_empty() { serde_json::Value::Null } else { serde_json::Value::String(recipient_query.to_string()) },
+                    "name": if recipient_query.is_empty() { serde_json::Value::Null } else { serde_json::Value::String(recipient_query.to_string()) },
+                    "title": if recipient_query.is_empty() { serde_json::Value::Null } else { serde_json::Value::String(recipient_query.to_string()) },
+                    "limit": 8
                 }
             }
         ]
     });
 
-    // v1 source set: operator directory + comms accounts.
-    // Extension hook: merge CRM contact directory candidates here in a later revision.
-    let operators = run_tool_call_for_prefetch("org_manage_entities_v2", &org_snapshot_args, executor)
+    let candidates = run_tool_call_for_prefetch("comms_tool", &comms_directory_args, executor)
         .ok()
         .and_then(|value| value)
-        .map(|value| parse_directory_operators_from_org_output(&value))
-        .unwrap_or_default();
-    let accounts = run_tool_call_for_prefetch("comms_tool", &comms_accounts_args, executor)
-        .ok()
-        .and_then(|value| value)
-        .map(|value| parse_directory_accounts_from_comms_output(&value))
+        .map(|value| parse_operator_directory_from_comms_output(&value))
         .unwrap_or_default();
 
-    resolve_message_send_prefetch(method, recipient_ref, &operators, &accounts)
+    CommsPrefetchResult {
+        method,
+        recipient_ref: recipient_ref.trim().to_string(),
+        candidates: candidates.into_iter().take(5).collect(),
+        clarification_question: None,
+    }
+}
+
+pub fn resolve_message_check_prefetch_from_tools(
+    method: MessageMethod,
+    folder: &str,
+    query: &str,
+    from_participant: Option<&str>,
+    to_participant: Option<&str>,
+    subject_contains: Option<&str>,
+    state: Option<&str>,
+    executor: &mut dyn FnMut(&str, &serde_json::Value) -> Result<Option<ToolOutputEnvelope>, RunError>,
+) -> MessageCheckPrefetchResult {
+    let read_threads_args = serde_json::json!({
+        "ops": [
+            {
+                "action": "read",
+                "target": "threads",
+                "selector": {
+                    "channel": method.as_str(),
+                    "folder": folder,
+                    "search": if query.trim().is_empty() { serde_json::Value::Null } else { serde_json::Value::String(query.trim().to_string()) },
+                    "fromParticipant": from_participant,
+                    "toParticipant": to_participant,
+                    "subjectContains": subject_contains,
+                    "state": state,
+                    "limit": 20
+                }
+            }
+        ]
+    });
+
+    let candidates = run_tool_call_for_prefetch("comms_tool", &read_threads_args, executor)
+        .ok()
+        .and_then(|value| value)
+        .map(|value| parse_threads_from_comms_output(&value))
+        .unwrap_or_default();
+
+    let recommended_thread_id = if candidates.len() == 1 {
+        Some(candidates[0].thread_id.clone())
+    } else {
+        None
+    };
+    let prefetched_messages = if let Some(thread_id) = recommended_thread_id.as_deref() {
+        let read_messages_args = serde_json::json!({
+            "ops": [
+                {
+                    "action": "read",
+                    "target": "messages",
+                    "selector": {
+                        "threadId": thread_id,
+                        "limit": 50
+                    }
+                }
+            ]
+        });
+        run_tool_call_for_prefetch("comms_tool", &read_messages_args, executor)
+            .ok()
+            .and_then(|value| value)
+            .map(|value| parse_messages_from_comms_output(&value))
+            .unwrap_or_default()
+    } else {
+        Vec::new()
+    };
+
+    MessageCheckPrefetchResult {
+        method,
+        folder: folder.trim().to_string(),
+        query: query.trim().to_string(),
+        candidates,
+        recommended_thread_id,
+        prefetched_messages,
+    }
 }
 
 fn normalize(value: &str) -> String {
@@ -298,38 +504,10 @@ pub fn resolve_message_send_prefetch(
     ranked.sort_by(|a, b| b.0.cmp(&a.0).then_with(|| a.1.name.cmp(&b.1.name)));
     let candidates = ranked.into_iter().map(|(_, value)| value).take(5).collect::<Vec<_>>();
 
-    let clarification_question = if recipient_ref.trim().is_empty() {
-        Some(format!(
-            "Which recipient should I use for the {} message?",
-            method.as_str()
-        ))
-    } else if candidates.is_empty() {
-        Some(format!(
-            "I couldn't find a {} contact match for \"{}\". Who should I send it to?",
-            method.as_str(),
-            recipient_ref.trim()
-        ))
-    } else if candidates.len() > 1 {
-        let options = candidates
-            .iter()
-            .take(3)
-            .map(|candidate| format!("{} ({})", candidate.name, candidate.title))
-            .collect::<Vec<_>>()
-            .join(", ");
-        Some(format!(
-            "I found multiple {} matches for \"{}\": {}. Which one should I use?",
-            method.as_str(),
-            recipient_ref.trim(),
-            options
-        ))
-    } else {
-        None
-    };
-
     CommsPrefetchResult {
         method,
         recipient_ref: recipient_ref.trim().to_string(),
         candidates,
-        clarification_question,
+        clarification_question: None,
     }
 }

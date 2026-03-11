@@ -3,7 +3,8 @@ use serde::{Deserialize, Serialize};
 use crate::{
     models::{run::RunError, tool::ToolOutputEnvelope},
     tools::comms_tool::prefetch::{
-        resolve_message_send_prefetch_from_tools, MessageMethod,
+        resolve_message_check_prefetch_from_tools, resolve_message_send_prefetch_from_tools,
+        MessageMethod,
     },
 };
 
@@ -96,17 +97,16 @@ pub fn resolve_prefetch(
                 .and_then(|value| value.as_str())
                 .and_then(MessageMethod::parse);
             let Some(method) = method else {
-                let question = "Which channel should I check: email, sms, or chat?".to_string();
                 resolution.packets.push(PrefetchPacket {
                     tool: "comms_tool".to_string(),
                     intent: "message_check".to_string(),
                     status: "missing_input".to_string(),
                     resolved_data: None,
-                    clarification_prompt: Some(question.clone()),
+                    clarification_prompt: None,
                 });
-                if resolution.clarification_prompt.is_none() {
-                    resolution.clarification_prompt = Some(question);
-                }
+                resolution.work_log_entries.push(
+                    "Prefetch comms_tool/message_check missing required arg: method".to_string(),
+                );
                 continue;
             };
             let folder = spec
@@ -122,6 +122,74 @@ pub fn resolve_prefetch(
                 .and_then(|value| value.as_str())
                 .map(str::trim)
                 .unwrap_or("");
+            let from_participant = spec
+                .args
+                .get("from_participant")
+                .and_then(|value| value.as_str())
+                .map(str::trim)
+                .filter(|value| !value.is_empty());
+            let to_participant = spec
+                .args
+                .get("to_participant")
+                .and_then(|value| value.as_str())
+                .map(str::trim)
+                .filter(|value| !value.is_empty());
+            let subject_contains = spec
+                .args
+                .get("subject_contains")
+                .and_then(|value| value.as_str())
+                .map(str::trim)
+                .filter(|value| !value.is_empty());
+            let state = spec
+                .args
+                .get("state")
+                .and_then(|value| value.as_str())
+                .map(str::trim)
+                .filter(|value| !value.is_empty());
+            let resolved = resolve_message_check_prefetch_from_tools(
+                method.clone(),
+                folder,
+                query,
+                from_participant,
+                to_participant,
+                subject_contains,
+                state,
+                executor,
+            );
+            let candidate_threads = resolved
+                .candidates
+                .iter()
+                .take(10)
+                .map(|thread| {
+                    serde_json::json!({
+                        "threadId": thread.thread_id,
+                        "subject": thread.subject,
+                        "from": thread.from,
+                        "state": thread.state,
+                        "lastMessageAtMs": thread.last_message_at_ms
+                    })
+                })
+                .collect::<Vec<_>>();
+            resolution.packets.push(PrefetchPacket {
+                tool: "comms_tool".to_string(),
+                intent: "message_check".to_string(),
+                status: "resolved".to_string(),
+                resolved_data: Some(serde_json::json!({
+                    "method": resolved.method.as_str(),
+                    "folder": resolved.folder,
+                    "query": resolved.query,
+                    "filters": {
+                        "fromParticipant": from_participant,
+                        "toParticipant": to_participant,
+                        "subjectContains": subject_contains,
+                        "state": state
+                    },
+                    "candidateThreads": candidate_threads,
+                    "recommendedThreadId": resolved.recommended_thread_id,
+                    "prefetchedMessages": resolved.prefetched_messages
+                })),
+                clarification_prompt: None,
+            });
             let read_threads_hint = if query.is_empty() {
                 format!(
                     "{{\"ops\":[{{\"action\":\"read\",\"target\":\"threads\",\"selector\":{{\"channel\":\"{}\",\"folder\":\"{}\",\"limit\":20}}}}]}}",
@@ -136,36 +204,33 @@ pub fn resolve_prefetch(
                     query.replace('\"', "'")
                 )
             };
-            resolution.packets.push(PrefetchPacket {
-                tool: "comms_tool".to_string(),
-                intent: "message_check".to_string(),
-                status: "resolved".to_string(),
-                resolved_data: Some(serde_json::json!({
-                    "method": method.as_str(),
-                    "folder": folder,
-                    "query": query,
-                })),
-                clarification_prompt: None,
-            });
+            let direct_action_line = if resolved.recommended_thread_id.is_some() {
+                "- Fast-path available: one clear thread match was pre-opened and messages were prefetched. Act directly on `prefetchedMessages` unless a fresh re-read is necessary.\n"
+            } else {
+                ""
+            };
             resolution.detail_blocks.push(format!(
-                "tool: comms_tool\nintent: message_check\nmethod: {}\nmethod-specific read contract:\n- Read scope is auto-enforced to current operator mailbox.\n- Do not pass sender IDs, operator IDs, or other operator references.\n- Start by reading threads, then read messages from a returned threadId if needed.\n- Use this comms_tool args pattern (threads):\n{}\n- Use this comms_tool args pattern (messages):\n{{\"ops\":[{{\"action\":\"read\",\"target\":\"messages\",\"selector\":{{\"threadId\":\"<thread_id>\",\"limit\":50}}}}]}}\n",
+                "tool: comms_tool\nintent: message_check\nmethod: {}\nmethod-specific read contract:\n- Read scope is auto-enforced to current operator mailbox.\n- Do not pass sender IDs, operator IDs, or other operator references.\n- For higher-precision prefetch, provide structured filters in prefetch args when available: from_participant, to_participant, subject_contains, state.\n- Start by reading threads, then read messages from a returned threadId if needed.\n{}- Use this comms_tool args pattern (threads):\n{}\n- Use this comms_tool args pattern (messages):\n{{\"ops\":[{{\"action\":\"read\",\"target\":\"messages\",\"selector\":{{\"threadId\":\"<thread_id>\",\"limit\":50}}}}]}}\n",
                 method.as_str(),
+                direct_action_line,
                 read_threads_hint
             ));
             resolution.work_log_entries.push(format!(
-                "Prefetch comms_tool/message_check method={} folder={} query={}",
+                "Prefetch comms_tool/message_check method={} folder={} query={} candidates={} fast_path={}",
                 method.as_str(),
                 folder,
-                if query.is_empty() { "(none)" } else { query }
+                if query.is_empty() { "(none)" } else { query },
+                resolved.candidates.len(),
+                resolved.recommended_thread_id.is_some()
             ));
             continue;
         }
 
-        let method = spec
-            .args
-            .get("method")
-            .and_then(|value| value.as_str())
-            .and_then(MessageMethod::parse);
+            let method = spec
+                .args
+                .get("method")
+                .and_then(|value| value.as_str())
+                .and_then(MessageMethod::parse);
         let recipient_ref = spec
             .args
             .get("recipient_ref")
@@ -174,32 +239,30 @@ pub fn resolve_prefetch(
             .unwrap_or("");
 
         let Some(method) = method else {
-            let question = "Which contact method should I use for this message: email, sms, or chat?".to_string();
             resolution.packets.push(PrefetchPacket {
                 tool: "comms_tool".to_string(),
                 intent: "message_send".to_string(),
                 status: "missing_input".to_string(),
                 resolved_data: None,
-                clarification_prompt: Some(question.clone()),
+                clarification_prompt: None,
             });
-            if resolution.clarification_prompt.is_none() {
-                resolution.clarification_prompt = Some(question);
-            }
+            resolution.work_log_entries.push(
+                "Prefetch comms_tool/message_send missing required arg: method".to_string(),
+            );
             continue;
         };
 
         if recipient_ref.is_empty() {
-            let question = format!("Who should I contact via {}?", method.as_str());
             resolution.packets.push(PrefetchPacket {
                 tool: "comms_tool".to_string(),
                 intent: "message_send".to_string(),
                 status: "missing_input".to_string(),
                 resolved_data: None,
-                clarification_prompt: Some(question.clone()),
+                clarification_prompt: None,
             });
-            if resolution.clarification_prompt.is_none() {
-                resolution.clarification_prompt = Some(question);
-            }
+            resolution.work_log_entries.push(
+                "Prefetch comms_tool/message_send missing required arg: recipient_ref".to_string(),
+            );
             continue;
         }
 
@@ -215,7 +278,9 @@ pub fn resolve_prefetch(
                 })
             })
             .collect::<Vec<_>>();
-        let status = if resolved.clarification_question.is_some() {
+        let status = if candidate_data.is_empty() {
+            "unresolved"
+        } else if candidate_data.len() > 1 {
             "ambiguous"
         } else {
             "resolved"
@@ -229,7 +294,7 @@ pub fn resolve_prefetch(
                 "recipientRef": resolved.recipient_ref,
                 "matches": candidate_data
             })),
-            clarification_prompt: resolved.clarification_question.clone(),
+            clarification_prompt: None,
         });
         resolution.detail_blocks.push(format!(
             "tool: comms_tool\nintent: message_send\nmethod: {}\nmethod-specific send contract:\n- Sender identity is auto-enforced from current operator.\n- Do not provide sender account IDs or sender addresses; runtime injects sender deterministically.\n- Use exactly one-step send: one `create message` op only (do not create thread first).\n- Use the exact resolved {} destination from prefetch matches; do not substitute or invent another recipient.\n- Do not use other channel fields.\n- Use this comms_tool args pattern:\n{}\n",
@@ -243,9 +308,6 @@ pub fn resolve_prefetch(
             recipient_ref,
             resolved.candidates.len()
         ));
-        if resolution.clarification_prompt.is_none() {
-            resolution.clarification_prompt = resolved.clarification_question;
-        }
     }
 
     resolution

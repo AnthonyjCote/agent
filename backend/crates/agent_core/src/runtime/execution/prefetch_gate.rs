@@ -1,5 +1,5 @@
 use crate::{
-    models::{blocks::MessageBlock, run::{RunError, RunEvent, RunUsage}, tool::ToolOutputEnvelope},
+    models::{run::{RunError, RunEvent}, tool::ToolOutputEnvelope},
     runtime::{
         context::run_context::RunContext,
         events::event_writer::append_event,
@@ -49,40 +49,6 @@ pub(crate) fn run_prefetch_gate(
             &context.allowed_tool_ids,
             executor,
         );
-    }
-
-    if let Some(question) = prefetch_resolution.clarification_prompt.clone() {
-        append_event(
-            trace_store,
-            on_event,
-            RunEvent::ModelDelta {
-                run_id: context.run_id.clone(),
-                phase: "ack_stage".to_string(),
-                text: question.clone(),
-            },
-        );
-        append_event(
-            trace_store,
-            on_event,
-            RunEvent::BlocksProduced {
-                run_id: context.run_id.clone(),
-                blocks: vec![MessageBlock::AssistantText { text: question }],
-            },
-        );
-        append_event(
-            trace_store,
-            on_event,
-            RunEvent::RunCompleted {
-                run_id: context.run_id.clone(),
-                usage: Some(RunUsage {
-                    prompt_tokens: 0,
-                    completion_tokens: 0,
-                    pruned_tokens: 0,
-                    latency_ms: 0,
-                }),
-            },
-        );
-        return Err(Some(trace_store.snapshot()));
     }
 
     let mut static_prefetch_tool_ids = ack_envelope.prefetch_tools.clone();

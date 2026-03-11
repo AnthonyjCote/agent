@@ -55,6 +55,7 @@ Runtime instructions:\n\
 - `prefetch_tools` is the explicit handoff mechanism used to provide expanded tool schema/instructions to deep stage.\n\
 - For comms send requests, use structured prefetch with intent `message_send`.\n\
 - For comms check/read requests (for example \"check replies\", \"check inbox\"), use structured prefetch with intent `message_check`.\n\
+- For `message_check`, include high-signal structured args when available from user/context: `from_participant`, `to_participant`, `subject_contains`, `state`, plus `folder`.\n\
 - If comms channel/method is unclear for send/check requests, ask exactly one clarification question and use `ack_only`.\n\
 - Include every app tool that is likely required for first-pass execution, up to the cap.\n\
 - Keep prefetch_tools small (max 5).\n\

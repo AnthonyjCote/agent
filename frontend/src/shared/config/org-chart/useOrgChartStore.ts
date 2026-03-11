@@ -21,7 +21,7 @@ import {
   type PropsWithChildren
 } from 'react';
 import { useRuntimeClient } from '../../../app/runtime/RuntimeProvider';
-import { loadAgentManifests } from '../agents/agent-storage';
+import { AGENT_MANIFESTS_CHANGED_EVENT, loadAgentManifests } from '../agents/agent-storage';
 import type { AgentManifest } from '../agents';
 import {
   canRedoOrgCommand,
@@ -67,6 +67,7 @@ function syncOperatorsFromAgents(
   manifests: AgentManifest[],
   options?: { createMissingOperators?: boolean }
 ): OrgChartData {
+  const SYSTEM_UNASSIGNED_ORG_UNIT_DESCRIPTION = 'System bucket for unassigned operators.';
   const createMissingOperators = options?.createMissingOperators ?? false;
   let next = current;
   let changed = false;
@@ -76,27 +77,71 @@ function syncOperatorsFromAgents(
     changed = true;
   };
 
-  if (manifests.length > 0 && next.snapshot.orgUnits.length === 0) {
+  const ensureUnassignedOperatorsOrgUnit = (shouldCreate: boolean): OrgUnitId | null => {
+    if (!shouldCreate) {
+      return null;
+    }
+    const byName = next.snapshot.orgUnits.find((unit) => {
+      const name = unit.name.trim().toLowerCase();
+      return (
+        name === 'unassigned operators' ||
+        unit.shortDescription.trim() === SYSTEM_UNASSIGNED_ORG_UNIT_DESCRIPTION
+      );
+    }
+    );
+    if (byName) {
+      if (byName.parentOrgUnitId !== null || byName.businessUnitId !== null) {
+        apply({
+          kind: 'move_org_unit',
+          nodeId: byName.id,
+          newParentId: null
+        });
+        apply({
+          kind: 'assign_org_unit_business_unit',
+          orgUnitId: byName.id,
+          businessUnitId: null
+        });
+      }
+      return byName.id;
+    }
+
     apply({
       kind: 'create_org_unit',
       parentId: null,
       payload: {
         name: 'Unassigned Operators',
-        shortDescription: 'Default org unit for imported agents.'
+        shortDescription: SYSTEM_UNASSIGNED_ORG_UNIT_DESCRIPTION,
+        rootBusinessUnitId: null
       }
     });
-  }
-
-  const defaultOrgUnitId = next.snapshot.orgUnits[0]?.id;
-  if (manifests.length > 0 && !defaultOrgUnitId) {
-    return next;
-  }
+    return (
+      next.snapshot.orgUnits.find((unit) => unit.name.trim().toLowerCase() === 'unassigned operators')?.id ??
+      null
+    );
+  };
 
   const bySourceAgentId = new Map(
     next.snapshot.operators
       .filter((operator) => typeof operator.sourceAgentId === 'string' && operator.sourceAgentId.length > 0)
       .map((operator) => [operator.sourceAgentId as string, operator])
   );
+  const missingManifests = manifests.filter((manifest) => !bySourceAgentId.has(manifest.agentId));
+  if (missingManifests.length === 0) {
+    const systemUnassigned = next.snapshot.orgUnits.find(
+      (unit) => unit.shortDescription.trim() === SYSTEM_UNASSIGNED_ORG_UNIT_DESCRIPTION
+    );
+    if (systemUnassigned) {
+      const hasOperators = next.snapshot.operators.some((operator) => operator.orgUnitId === systemUnassigned.id);
+      const hasChildren = next.snapshot.orgUnits.some((unit) => unit.parentOrgUnitId === systemUnassigned.id);
+      if (!hasOperators && !hasChildren) {
+        apply({ kind: 'delete_org_unit', nodeId: systemUnassigned.id });
+      }
+    }
+  }
+  const defaultOrgUnitId = ensureUnassignedOperatorsOrgUnit(createMissingOperators && missingManifests.length > 0);
+  if (missingManifests.length > 0 && !defaultOrgUnitId) {
+    return changed ? next : current;
+  }
   const manifestIds = new Set(manifests.map((manifest) => manifest.agentId));
 
   manifests.forEach((manifest: AgentManifest) => {
@@ -208,27 +253,39 @@ function useOrgChartStoreState(): OrgChartStoreValue {
   useEffect(() => {
     let cancelled = false;
 
+    const loadRuntimeAgentManifests = async (): Promise<AgentManifest[]> => {
+      try {
+        return await runtimeClient.listAgentManifests();
+      } catch {
+        return loadAgentManifests();
+      }
+    };
+
     const hydrate = async () => {
       try {
         const remote = await runtimeClient.getOrgChartState();
         if (remote) {
+          const manifests = await loadRuntimeAgentManifests();
           const next = {
             snapshot: remote.snapshot as OrgChartData['snapshot'],
             activityEvents: [],
             commandHistory: [],
             historyCursor: -1
           } satisfies OrgChartData;
+          const synced = syncOperatorsFromAgents(next, manifests, {
+            createMissingOperators: true
+          });
           if (!cancelled) {
-            setData(next);
+            setData(synced);
             setHydrated(true);
           }
           return;
         }
 
         const legacy = loadOrgChartData();
-        const manifests = loadAgentManifests();
+        const manifests = await loadRuntimeAgentManifests();
         const migrated = syncOperatorsFromAgents(legacy, manifests, {
-          createMissingOperators: legacy.snapshot.operators.length === 0
+          createMissingOperators: true
         });
         await runtimeClient.saveOrgChartState(buildPersistedOrgChartState(migrated));
         await runtimeClient.completeLocalStorageMigration().catch(() => undefined);
@@ -241,7 +298,7 @@ function useOrgChartStoreState(): OrgChartStoreValue {
           const legacy = loadOrgChartData();
           setData(
             syncOperatorsFromAgents(legacy, loadAgentManifests(), {
-              createMissingOperators: legacy.snapshot.operators.length === 0
+              createMissingOperators: true
             })
           );
           setHydrated(true);
@@ -254,6 +311,35 @@ function useOrgChartStoreState(): OrgChartStoreValue {
       cancelled = true;
     };
   }, [runtimeClient]);
+
+  useEffect(() => {
+    if (!hydrated) {
+      return;
+    }
+    const onAgentManifestsChanged = () => {
+      void runtimeClient
+        .listAgentManifests()
+        .then((manifests) => {
+          setData((current) =>
+            syncOperatorsFromAgents(current, manifests, {
+              createMissingOperators: true
+            })
+          );
+        })
+        .catch(() => {
+          const manifests = loadAgentManifests();
+          setData((current) =>
+            syncOperatorsFromAgents(current, manifests, {
+              createMissingOperators: true
+            })
+          );
+        });
+    };
+    window.addEventListener(AGENT_MANIFESTS_CHANGED_EVENT, onAgentManifestsChanged);
+    return () => {
+      window.removeEventListener(AGENT_MANIFESTS_CHANGED_EVENT, onAgentManifestsChanged);
+    };
+  }, [hydrated]);
 
   useEffect(() => {
     if (!hydrated) {

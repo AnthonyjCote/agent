@@ -97,6 +97,54 @@ impl PersistenceCommsToolPort {
             _ => Vec::new(),
         }
     }
+
+    fn normalized(value: &str) -> String {
+        value
+            .trim()
+            .to_ascii_lowercase()
+            .chars()
+            .map(|ch| if ch.is_ascii_alphanumeric() { ch } else { ' ' })
+            .collect::<String>()
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ")
+    }
+
+    fn edit_distance_at_most_two(a: &str, b: &str) -> bool {
+        if a.is_empty() || b.is_empty() {
+            return false;
+        }
+        let a_chars = a.chars().collect::<Vec<_>>();
+        let b_chars = b.chars().collect::<Vec<_>>();
+        if a_chars.len().abs_diff(b_chars.len()) > 2 {
+            return false;
+        }
+        let mut prev = (0..=b_chars.len()).collect::<Vec<_>>();
+        let mut curr = vec![0usize; b_chars.len() + 1];
+        for i in 1..=a_chars.len() {
+            curr[0] = i;
+            for j in 1..=b_chars.len() {
+                let cost = if a_chars[i - 1] == b_chars[j - 1] { 0 } else { 1 };
+                curr[j] = (prev[j] + 1).min(curr[j - 1] + 1).min(prev[j - 1] + cost);
+            }
+            std::mem::swap(&mut prev, &mut curr);
+        }
+        prev[b_chars.len()] <= 2
+    }
+
+    fn fuzzy_match(haystack: &str, needle: &str) -> bool {
+        let h = Self::normalized(haystack);
+        let n = Self::normalized(needle);
+        if h.is_empty() || n.is_empty() {
+            return false;
+        }
+        if h.contains(&n) || n.contains(&h) {
+            return true;
+        }
+        h.split_whitespace().any(|token| {
+            token.starts_with(&n) || n.starts_with(token) || Self::edit_distance_at_most_two(token, &n)
+        })
+    }
 }
 
 impl CommsToolStore for PersistenceCommsToolPort {
@@ -119,6 +167,103 @@ impl CommsToolStore for PersistenceCommsToolPort {
             .into_iter()
             .map(Self::to_json)
             .collect()
+    }
+
+    fn list_operator_directory(
+        &self,
+        channel: Option<&str>,
+        query: Option<&str>,
+        name: Option<&str>,
+        title: Option<&str>,
+        limit: i64,
+    ) -> DomainResult<Vec<serde_json::Value>> {
+        let accounts = self
+            .store
+            .list_comms_accounts(&self.workspace_id, None, channel)
+            .map_err(|error| DomainError::Internal(error.to_string()))?;
+        let snapshot = self
+            .store
+            .get_org_chart_state(&self.workspace_id)
+            .map_err(|error| DomainError::Internal(error.to_string()))?;
+        let operators = snapshot
+            .as_ref()
+            .and_then(|state| state.snapshot.get("snapshot"))
+            .and_then(|value| value.get("operators"))
+            .and_then(|value| value.as_array())
+            .cloned()
+            .unwrap_or_default();
+        let mut operator_index = std::collections::HashMap::<String, (String, String)>::new();
+        for operator in operators {
+            let operator_id = operator
+                .get("id")
+                .and_then(|value| value.as_str())
+                .unwrap_or("")
+                .trim()
+                .to_string();
+            if operator_id.is_empty() {
+                continue;
+            }
+            let operator_name = operator
+                .get("name")
+                .and_then(|value| value.as_str())
+                .unwrap_or("")
+                .trim()
+                .to_string();
+            let operator_title = operator
+                .get("title")
+                .and_then(|value| value.as_str())
+                .unwrap_or("Operator")
+                .trim()
+                .to_string();
+            operator_index.insert(operator_id, (operator_name, operator_title));
+        }
+
+        let query_filter = query.map(str::trim).filter(|value| !value.is_empty());
+        let name_filter = name.map(str::trim).filter(|value| !value.is_empty());
+        let title_filter = title.map(str::trim).filter(|value| !value.is_empty());
+        let mut rows = Vec::new();
+        for account in accounts {
+            let (operator_name, operator_title) = operator_index
+                .get(&account.operator_id)
+                .cloned()
+                .unwrap_or_else(|| {
+                    let fallback_name = account
+                        .display_name
+                        .split('(')
+                        .next()
+                        .unwrap_or(&account.display_name)
+                        .trim()
+                        .to_string();
+                    (fallback_name, "Operator".to_string())
+                });
+
+            if let Some(filter) = name_filter {
+                if !Self::fuzzy_match(&operator_name, filter) {
+                    continue;
+                }
+            }
+            if let Some(filter) = title_filter {
+                if !Self::fuzzy_match(&operator_title, filter) {
+                    continue;
+                }
+            }
+            if let Some(filter) = query_filter {
+                let combined = format!("{} {} {}", operator_name, operator_title, account.address);
+                if !Self::fuzzy_match(&combined, filter) {
+                    continue;
+                }
+            }
+
+            rows.push(serde_json::json!({
+                "operatorId": account.operator_id,
+                "name": operator_name,
+                "title": operator_title,
+                "channel": account.channel,
+                "address": account.address,
+                "displayName": account.display_name
+            }));
+        }
+        Ok(rows.into_iter().take(limit.max(1) as usize).collect())
     }
 
     fn get_thread(&self, thread_id: &str) -> DomainResult<Option<serde_json::Value>> {

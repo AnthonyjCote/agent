@@ -14,6 +14,14 @@ pub trait CommsToolPort {
 pub trait CommsToolStore {
     fn get_account(&self, account_id: &str) -> DomainResult<Option<Value>>;
     fn list_accounts(&self, operator_id: Option<&str>, channel: Option<&str>) -> DomainResult<Vec<Value>>;
+    fn list_operator_directory(
+        &self,
+        channel: Option<&str>,
+        query: Option<&str>,
+        name: Option<&str>,
+        title: Option<&str>,
+        limit: i64,
+    ) -> DomainResult<Vec<Value>>;
     fn get_thread(&self, thread_id: &str) -> DomainResult<Option<Value>>;
     fn list_threads(
         &self,

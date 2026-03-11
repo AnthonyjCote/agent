@@ -21,7 +21,7 @@ type DndFacade = {
 type OrgHierarchyTreeProps = {
   selectedNode: SelectedNode;
   selectedNodeKeys: Set<string>;
-  onNodeClick: (next: SelectedNode, options?: { shiftKey?: boolean }) => void;
+  onNodeClick: (next: SelectedNode, options?: { shiftKey?: boolean; appendKey?: boolean }) => void;
   operators: Operator[];
   orgUnits: OrgUnit[];
   businessUnits: Array<{ id: string; logoDataUrl: string }>;
@@ -91,7 +91,12 @@ export function OrgHierarchyTree(props: OrgHierarchyTreeProps) {
         <button
           type="button"
           className={`agent-chart-tree-row operator${selected ? ' active' : ''}${dragState.isTarget && dragState.placement === 'inside' ? ' drop-inside' : ''}${dragState.isSource ? ' drag-source-hidden' : ''}`}
-          onClick={(event) => onNodeClick({ kind: 'operator', id: operator.id }, { shiftKey: event.shiftKey })}
+          onClick={(event) =>
+            onNodeClick(
+              { kind: 'operator', id: operator.id },
+              { shiftKey: event.shiftKey, appendKey: event.metaKey || event.ctrlKey }
+            )
+          }
           ref={(nodeRef) => dnd.setRowRef('operator', operator.id, nodeRef)}
           onPointerDown={(event) => dnd.beginRowDragCandidate(event, { kind: 'operator', id: operator.id })}
         >
@@ -149,7 +154,12 @@ export function OrgHierarchyTree(props: OrgHierarchyTreeProps) {
         <button
           type="button"
           className={`agent-chart-tree-row org${selected ? ' active' : ''}${beforeClass}${afterClass}${insideClass}${sourceClass}`}
-          onClick={(event) => onNodeClick({ kind: 'org_unit', id: node.unit.id }, { shiftKey: event.shiftKey })}
+          onClick={(event) =>
+            onNodeClick(
+              { kind: 'org_unit', id: node.unit.id },
+              { shiftKey: event.shiftKey, appendKey: event.metaKey || event.ctrlKey }
+            )
+          }
           ref={(nodeRef) => dnd.setRowRef('org_unit', node.unit.id, nodeRef)}
           onPointerDown={(event) => dnd.beginRowDragCandidate(event, { kind: 'org_unit', id: node.unit.id })}
         >
@@ -204,7 +214,12 @@ export function OrgHierarchyTree(props: OrgHierarchyTreeProps) {
           type="button"
           className={`agent-chart-business-unit-row${selected ? ' active' : ''}${dragState.isTarget && dragState.placement === 'inside' ? ' drop-inside' : ''}`}
           style={{ paddingLeft: `${12 + depth * 18}px` }}
-          onClick={(event) => onNodeClick({ kind: 'business_unit', id: node.id }, { shiftKey: event.shiftKey })}
+          onClick={(event) =>
+            onNodeClick(
+              { kind: 'business_unit', id: node.id },
+              { shiftKey: event.shiftKey, appendKey: event.metaKey || event.ctrlKey }
+            )
+          }
           ref={(nodeRef) => dnd.setRowRef('business_unit', node.id, nodeRef)}
         >
           <span className="agent-chart-row-card">
@@ -254,7 +269,12 @@ export function OrgHierarchyTree(props: OrgHierarchyTreeProps) {
           type="button"
           className={`agent-chart-business-unit-row${selected ? ' active' : ''}${dragState.isTarget && dragState.placement === 'inside' ? ' drop-inside' : ''}`}
           style={{ paddingLeft: '12px' }}
-          onClick={(event) => onNodeClick({ kind: 'scope_bucket', scope }, { shiftKey: event.shiftKey })}
+          onClick={(event) =>
+            onNodeClick(
+              { kind: 'scope_bucket', scope },
+              { shiftKey: event.shiftKey, appendKey: event.metaKey || event.ctrlKey }
+            )
+          }
           ref={(nodeRef) => dnd.setRowRef('scope_bucket', scope, nodeRef)}
         >
           <span className="agent-chart-row-card">

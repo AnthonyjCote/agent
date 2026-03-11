@@ -39,6 +39,19 @@ function keyForSelectedNode(node: NonNullable<SelectedNode>): TreeNodeKey {
   return `${node.kind}:${node.id}`;
 }
 
+function selectedNodeFromKey(key: TreeNodeKey): SelectedNode {
+  if (key === 'scope_bucket:unassigned') {
+    return { kind: 'scope_bucket', scope: 'unassigned' };
+  }
+  if (key.startsWith('business_unit:')) {
+    return { kind: 'business_unit', id: key.slice('business_unit:'.length) };
+  }
+  if (key.startsWith('org_unit:')) {
+    return { kind: 'org_unit', id: key.slice('org_unit:'.length) };
+  }
+  return { kind: 'operator', id: key.slice('operator:'.length) };
+}
+
 export function AgentChartSurface() {
   const { businessUnits, orgUnits, operators, execute, canUndo, canRedo, undo, redo, getOrgUnitById, getOperatorById } =
     useOrgChartStore();
@@ -150,15 +163,36 @@ export function AgentChartSurface() {
     labels.set('scope_bucket:unassigned', 'Unassigned');
     return labels;
   }, [businessUnits, orgUnits, displayOperators]);
-  const handleTreeNodeClick = (next: SelectedNode, options?: { shiftKey?: boolean }) => {
+  const handleTreeNodeClick = (next: SelectedNode, options?: { shiftKey?: boolean; appendKey?: boolean }) => {
     if (!next) {
       selection.setSelectedNode(null);
       setSelectedNodeKeys(new Set());
       selectionAnchorRef.current = null;
       return;
     }
-    selection.setSelectedNode(next);
     const clickedKey = keyForSelectedNode(next);
+    if (options?.appendKey) {
+      const nextKeys = new Set(selectedNodeKeys);
+      const wasSelected = nextKeys.has(clickedKey);
+      if (wasSelected) {
+        nextKeys.delete(clickedKey);
+      } else {
+        nextKeys.add(clickedKey);
+      }
+      setSelectedNodeKeys(nextKeys);
+      if (nextKeys.size === 0) {
+        selection.setSelectedNode(null);
+      } else if (wasSelected) {
+        const fallbackKey = Array.from(nextKeys)[0] as TreeNodeKey | undefined;
+        selection.setSelectedNode(fallbackKey ? selectedNodeFromKey(fallbackKey) : null);
+      } else {
+        selection.setSelectedNode(next);
+      }
+      selectionAnchorRef.current = clickedKey;
+      return;
+    }
+
+    selection.setSelectedNode(next);
     if (!options?.shiftKey || !selectionAnchorRef.current) {
       setSelectedNodeKeys(new Set<TreeNodeKey>([clickedKey]));
       selectionAnchorRef.current = clickedKey;
@@ -192,6 +226,57 @@ export function AgentChartSurface() {
       .map((key) => key.slice('business_unit:'.length));
     const orgUnitById = new Map(orgUnits.map((unit) => [unit.id, unit]));
     const businessUnitById = new Map(businessUnits.map((unit) => [unit.id, unit]));
+    const operatorsByOrgUnitId = new Map<string, Array<(typeof operators)[number]>>();
+    operators.forEach((operator) => {
+      const list = operatorsByOrgUnitId.get(operator.orgUnitId) ?? [];
+      list.push(operator);
+      operatorsByOrgUnitId.set(operator.orgUnitId, list);
+    });
+    const childOrgIdsByParentId = new Map<string, string[]>();
+    orgUnits.forEach((unit) => {
+      if (!unit.parentOrgUnitId) {
+        return;
+      }
+      const list = childOrgIdsByParentId.get(unit.parentOrgUnitId) ?? [];
+      list.push(unit.id);
+      childOrgIdsByParentId.set(unit.parentOrgUnitId, list);
+    });
+
+    const collectOrgSubtree = (rootId: string): Set<string> => {
+      const out = new Set<string>();
+      const queue = [rootId];
+      while (queue.length > 0) {
+        const currentId = queue.shift();
+        if (!currentId || out.has(currentId)) {
+          continue;
+        }
+        out.add(currentId);
+        const children = childOrgIdsByParentId.get(currentId) ?? [];
+        children.forEach((childId) => {
+          if (!out.has(childId)) {
+            queue.push(childId);
+          }
+        });
+      }
+      return out;
+    };
+
+    const operatorIdsToDelete = new Set<string>(operatorIds);
+    const orgIdsToDelete = new Set<string>(orgUnitIds);
+    orgUnitIds.forEach((nodeId) => {
+      collectOrgSubtree(nodeId).forEach((id) => orgIdsToDelete.add(id));
+    });
+    orgIdsToDelete.forEach((orgId) => {
+      (operatorsByOrgUnitId.get(orgId) ?? []).forEach((operator) => operatorIdsToDelete.add(operator.id));
+    });
+
+    operatorIdsToDelete.forEach((operatorId) => {
+      const operator = getOperatorById(operatorId);
+      if (operator?.sourceAgentId) {
+        deleteAgent(operator.sourceAgentId);
+      }
+    });
+
     const orgDepth = (id: string): number => {
       let depth = 0;
       let cursor = orgUnitById.get(id);
@@ -212,10 +297,6 @@ export function AgentChartSurface() {
     };
 
     operatorIds.forEach((operatorId) => {
-      const operator = getOperatorById(operatorId);
-      if (operator?.sourceAgentId) {
-        deleteAgent(operator.sourceAgentId);
-      }
       actions.executeCommand({ kind: 'delete_operator', operatorId });
     });
     orgUnitIds

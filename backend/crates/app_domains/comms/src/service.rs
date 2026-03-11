@@ -55,6 +55,87 @@ fn payload_string(payload: Option<&Value>, key: &str) -> Option<String> {
         .filter(|value| !value.is_empty())
 }
 
+fn normalized_text(value: &str) -> String {
+    value
+        .trim()
+        .to_ascii_lowercase()
+        .chars()
+        .map(|ch| if ch.is_ascii_alphanumeric() { ch } else { ' ' })
+        .collect::<String>()
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+fn edit_distance_at_most_two(a: &str, b: &str) -> bool {
+    if a.is_empty() || b.is_empty() {
+        return false;
+    }
+    let a_chars = a.chars().collect::<Vec<_>>();
+    let b_chars = b.chars().collect::<Vec<_>>();
+    let a_len = a_chars.len();
+    let b_len = b_chars.len();
+    if a_len.abs_diff(b_len) > 2 {
+        return false;
+    }
+    let mut prev = (0..=b_len).collect::<Vec<_>>();
+    let mut curr = vec![0usize; b_len + 1];
+    for i in 1..=a_len {
+        curr[0] = i;
+        for j in 1..=b_len {
+            let cost = if a_chars[i - 1] == b_chars[j - 1] { 0 } else { 1 };
+            curr[j] = (prev[j] + 1).min(curr[j - 1] + 1).min(prev[j - 1] + cost);
+        }
+        std::mem::swap(&mut prev, &mut curr);
+    }
+    prev[b_len] <= 2
+}
+
+fn fuzzy_contains(haystack: &str, needle: &str) -> bool {
+    let h = normalized_text(haystack);
+    let n = normalized_text(needle);
+    if h.is_empty() || n.is_empty() {
+        return false;
+    }
+    if h.contains(&n) || n.contains(&h) {
+        return true;
+    }
+    h.split_whitespace().any(|token| {
+        token.starts_with(&n) || n.starts_with(token) || edit_distance_at_most_two(token, &n)
+    })
+}
+
+fn participants_text(value: Option<&Value>) -> String {
+    let Some(value) = value else {
+        return String::new();
+    };
+    let mut parts: Vec<String> = Vec::new();
+    match value {
+        Value::String(single) => {
+            parts.push(single.clone());
+        }
+        Value::Array(items) => {
+            for item in items {
+                if let Some(single) = item.as_str() {
+                    parts.push(single.to_string());
+                }
+            }
+        }
+        Value::Object(map) => {
+            for key in ["from", "to", "members", "memberAddresses", "peerNumber"] {
+                if let Some(entry) = map.get(key) {
+                    let nested = participants_text(Some(entry));
+                    if !nested.is_empty() {
+                        parts.push(nested);
+                    }
+                }
+            }
+        }
+        _ => {}
+    }
+    parts.join(" ")
+}
+
 impl CommsDomainService {
     pub fn execute_tool_request(
         &self,
@@ -108,6 +189,32 @@ impl CommsDomainService {
                     });
                     data.push(json!({ "accounts": accounts }));
                 }
+                ("read", "operator_directory") => {
+                    let channel = selector_string(op.selector.as_ref(), "channel");
+                    let query = selector_string(op.selector.as_ref(), "query");
+                    let name = selector_string(op.selector.as_ref(), "name");
+                    let title = selector_string(op.selector.as_ref(), "title");
+                    let limit = op
+                        .selector
+                        .as_ref()
+                        .and_then(|value| value.get("limit"))
+                        .and_then(|value| value.as_i64())
+                        .unwrap_or(20);
+                    let matches = store.list_operator_directory(
+                        channel.as_deref(),
+                        query.as_deref(),
+                        name.as_deref(),
+                        title.as_deref(),
+                        limit,
+                    )?;
+                    op_results.push(CommsOpResult {
+                        action,
+                        target,
+                        status: "ok".to_string(),
+                        message: format!("loaded {} directory matches", matches.len()),
+                    });
+                    data.push(json!({ "matches": matches }));
+                }
                 ("read", "thread") => {
                     let thread_id = selector_string(op.selector.as_ref(), "threadId")
                         .ok_or_else(|| DomainError::InvalidInput("read thread requires selector.threadId".to_string()))?;
@@ -129,6 +236,10 @@ impl CommsDomainService {
                     let account_id = selector_string(op.selector.as_ref(), "accountId");
                     let folder = selector_string(op.selector.as_ref(), "folder");
                     let search = selector_string(op.selector.as_ref(), "search");
+                    let from_participant = selector_string(op.selector.as_ref(), "fromParticipant");
+                    let to_participant = selector_string(op.selector.as_ref(), "toParticipant");
+                    let subject_contains = selector_string(op.selector.as_ref(), "subjectContains");
+                    let state_filter = selector_string(op.selector.as_ref(), "state");
                     let limit = op
                         .selector
                         .as_ref()
@@ -141,14 +252,69 @@ impl CommsDomainService {
                         .and_then(|value| value.get("offset"))
                         .and_then(|value| value.as_i64())
                         .unwrap_or(0);
-                    let threads = store.list_threads(
+
+                    let use_extended_filters = from_participant.is_some()
+                        || to_participant.is_some()
+                        || subject_contains.is_some()
+                        || state_filter.is_some();
+                    let source_limit = if use_extended_filters {
+                        limit.max(200).min(1000)
+                    } else {
+                        limit
+                    };
+                    let source_offset = if use_extended_filters { 0 } else { offset };
+                    let mut threads = store.list_threads(
                         channel.as_deref(),
                         account_id.as_deref(),
                         folder.as_deref(),
                         search.as_deref(),
-                        limit,
-                        offset,
+                        source_limit,
+                        source_offset,
                     )?;
+
+                    if use_extended_filters {
+                        threads.retain(|thread| {
+                            let passes_from = from_participant.as_ref().map_or(true, |needle| {
+                                fuzzy_contains(
+                                    &participants_text(thread.get("participants").and_then(|v| v.get("from"))),
+                                    needle,
+                                )
+                            });
+                            let passes_to = to_participant.as_ref().map_or(true, |needle| {
+                                fuzzy_contains(
+                                    &participants_text(thread.get("participants").and_then(|v| v.get("to"))),
+                                    needle,
+                                )
+                            });
+                            let passes_subject = subject_contains.as_ref().map_or(true, |needle| {
+                                let subject = thread
+                                    .get("subject")
+                                    .and_then(|value| value.as_str())
+                                    .unwrap_or("");
+                                let title = thread
+                                    .get("title")
+                                    .and_then(|value| value.as_str())
+                                    .unwrap_or("");
+                                fuzzy_contains(subject, needle) || fuzzy_contains(title, needle)
+                            });
+                            let passes_state = state_filter.as_ref().map_or(true, |needle| {
+                                let state = thread
+                                    .get("state")
+                                    .and_then(|value| value.as_str())
+                                    .unwrap_or("");
+                                normalized_text(state) == normalized_text(needle)
+                            });
+                            passes_from && passes_to && passes_subject && passes_state
+                        });
+
+                        let start = offset.max(0) as usize;
+                        let end = (start + limit.max(1) as usize).min(threads.len());
+                        threads = if start >= threads.len() {
+                            Vec::new()
+                        } else {
+                            threads[start..end].to_vec()
+                        };
+                    }
                     op_results.push(CommsOpResult {
                         action,
                         target,

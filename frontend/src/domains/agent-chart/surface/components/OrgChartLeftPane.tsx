@@ -20,7 +20,7 @@ type OrgChartLeftPaneProps = {
   onRedo: () => void;
   selectedNode: SelectedNode;
   selectedNodeKeys: Set<string>;
-  onNodeClick: (next: SelectedNode, options?: { shiftKey?: boolean }) => void;
+  onNodeClick: (next: SelectedNode, options?: { shiftKey?: boolean; appendKey?: boolean }) => void;
   operators: Operator[];
   orgUnits: OrgUnit[];
   businessUnits: BusinessUnit[];
