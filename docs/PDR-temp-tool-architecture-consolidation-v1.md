@@ -13,6 +13,7 @@
   - `comms_tool/{input,output,handler}.rs`
 - `comms_tool` orchestration moved into `app_domains/comms/service` with thin wrapper in `app_persistence`.
 - `org_manage_entities_v2` orchestration moved into `app_domains/org/tool_orchestration` with thin wrapper in `app_persistence`.
+- Comms delivery transport policy moved into `app_domains/comms/delivery_policy` with `app_persistence` transport adapter.
 - Shared dispatch + runtime adapters now route through tool handlers -> domain services -> persistence adapters.
 
 ## Problem
@@ -118,14 +119,14 @@ Keep in `app_persistence`:
 - Keep rollback path by preserving old implementation behind a temporary adapter until parity is confirmed.
 
 ## Implementation Checklist
-- [ ] Add shared app-tool dispatch adapter.
-- [ ] Refactor server runtime service to delegate app tools.
-- [ ] Refactor desktop runtime service to delegate app tools.
-- [ ] Extract org tool handler/input/output into `agent_core/tools/org_manage_entities_v2`.
-- [ ] Move org business rules into `app_domains/org`.
-- [ ] Extract comms tool handler/input/output into `agent_core/tools/comms_tool`.
-- [ ] Move comms business rules into `app_domains/comms`.
-- [ ] Shrink `app_persistence` to storage adapters.
+- [x] Add shared app-tool dispatch adapter.
+- [x] Refactor server runtime service to delegate app tools.
+- [x] Refactor desktop runtime service to delegate app tools.
+- [x] Extract org tool handler/input/output into `agent_core/tools/org_manage_entities_v2`.
+- [x] Move org business rules into `app_domains/org`.
+- [x] Extract comms tool handler/input/output into `agent_core/tools/comms_tool`.
+- [x] Move comms business rules into `app_domains/comms`.
+- [x] Shrink `app_persistence` to storage adapters.
 - [ ] Remove legacy glue and update READMEs.
 - [ ] Validate parity + build server/desktop.
 

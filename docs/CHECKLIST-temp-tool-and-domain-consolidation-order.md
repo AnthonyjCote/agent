@@ -44,7 +44,7 @@ Keep production behavior stable while migrating.
 - [x] Add `agent_core/src/tools/comms_tool/output.rs`.
 - [x] Add `agent_core/src/tools/comms_tool/handler.rs`.
 - [x] Move comms action orchestration into `app_domains/comms/service`.
-- [ ] Move comms delivery policy into `app_domains/comms` (adapter calls persistence port).
+- [x] Move comms delivery policy into `app_domains/comms` (adapter calls persistence port).
 - [x] Update tool registry/dispatcher to call new comms handler.
 - [ ] Compare output parity against Phase 0 snapshots.
 

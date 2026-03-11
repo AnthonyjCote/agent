@@ -593,7 +593,6 @@ async fn append_comms_message(
         state
             .comms_delivery
             .send_email(
-                &state.state_store,
                 &state.workspace_id,
                 SendEmailInput {
                     thread_id: thread_id.clone(),
@@ -611,7 +610,6 @@ async fn append_comms_message(
         state
             .comms_delivery
             .send_sms(
-                &state.state_store,
                 &state.workspace_id,
                 SendSmsInput {
                     thread_id: thread_id.clone(),
@@ -626,7 +624,6 @@ async fn append_comms_message(
         state
             .comms_delivery
             .send_chat(
-                &state.state_store,
                 &state.workspace_id,
                 SendChatInput {
                     thread_id: thread_id.clone(),
@@ -895,7 +892,9 @@ async fn main() {
     let app_state = AppState {
         runtime: Arc::new(RuntimeService::new(runtime_store, workspace_id.clone())),
         persistence_health: Arc::new(persistence_bootstrap.health),
-        comms_delivery: Arc::new(CommsDeliveryService::new_from_env()),
+        comms_delivery: Arc::new(CommsDeliveryService::new_from_env(
+            PersistenceStateStore::new(persistence_bootstrap.paths.clone()),
+        )),
         workspace_id,
         state_store,
     };

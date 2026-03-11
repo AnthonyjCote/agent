@@ -480,7 +480,6 @@ fn append_comms_message(
     if thread.channel == "email" && direction.eq_ignore_ascii_case("outbound") {
         return comms_delivery
             .send_email(
-                &state_store,
                 &workspace_id,
                 SendEmailInput {
                     thread_id: input.thread_id.trim().to_string(),
@@ -498,7 +497,6 @@ fn append_comms_message(
     if thread.channel == "sms" && direction.eq_ignore_ascii_case("outbound") {
         return comms_delivery
             .send_sms(
-                &state_store,
                 &workspace_id,
                 SendSmsInput {
                     thread_id: input.thread_id.trim().to_string(),
@@ -513,7 +511,6 @@ fn append_comms_message(
     if thread.channel == "chat" && direction.eq_ignore_ascii_case("outbound") {
         return comms_delivery
             .send_chat(
-                &state_store,
                 &workspace_id,
                 SendChatInput {
                     thread_id: input.thread_id.trim().to_string(),
@@ -833,7 +830,9 @@ fn main() {
     let persistence_state_store = Arc::new(PersistenceStateStore::new(
         persistence_bootstrap.paths.clone(),
     ));
-    let comms_delivery = Arc::new(CommsDeliveryService::new_from_env());
+    let comms_delivery = Arc::new(CommsDeliveryService::new_from_env(
+        PersistenceStateStore::new(persistence_bootstrap.paths.clone()),
+    ));
 
     tauri::Builder::default()
         .manage(runtime)

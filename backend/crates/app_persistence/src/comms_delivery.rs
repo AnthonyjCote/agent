@@ -1,137 +1,142 @@
 use std::collections::{HashMap, HashSet};
 
+use app_domain_comms::delivery_policy::{
+    CommsDeliveryAdapter as DomainCommsDeliveryAdapter,
+    CommsDeliveryService as DomainCommsDeliveryService,
+    SendChatInput,
+    SendEmailInput,
+    SendSmsInput,
+};
+use app_domains_core::errors::DomainError;
 use serde::Deserialize;
 use serde_json::{json, Value};
 
 use crate::{CommsMessageRecord, PersistenceError, PersistenceStateStore};
 
 #[derive(Debug, Clone)]
-pub struct SendEmailInput {
-    pub thread_id: String,
-    pub from_account_ref: String,
-    pub to_participants: Option<Value>,
-    pub cc_participants: Option<Value>,
-    pub bcc_participants: Option<Value>,
-    pub subject: Option<String>,
-    pub body_text: String,
-    pub reply_to_message_id: Option<String>,
-}
-
-#[derive(Debug, Clone)]
-pub struct SendSmsInput {
-    pub thread_id: String,
-    pub from_account_ref: String,
-    pub to_participants: Option<Value>,
-    pub body_text: String,
-    pub reply_to_message_id: Option<String>,
-}
-
-#[derive(Debug, Clone)]
-pub struct SendChatInput {
-    pub thread_id: String,
-    pub from_account_ref: String,
-    pub to_participants: Option<Value>,
-    pub body_text: String,
-    pub reply_to_message_id: Option<String>,
-}
-
-#[derive(Debug, Clone)]
 pub struct CommsDeliveryService {
-    email_transport_mode: EmailTransportMode,
-    sms_transport_mode: SmsTransportMode,
+    domain_service: DomainCommsDeliveryService,
+    adapter: PersistenceCommsDeliveryAdapter,
+}
+
+#[derive(Debug, Clone)]
+struct PersistenceCommsDeliveryAdapter {
+    store: PersistenceStateStore,
     sandbox_email_adapter: SandboxEmailAdapter,
     sandbox_sms_adapter: SandboxSmsAdapter,
 }
 
-impl Default for CommsDeliveryService {
-    fn default() -> Self {
-        Self::new_from_env()
-    }
-}
-
 impl CommsDeliveryService {
-    pub fn new_from_env() -> Self {
-        let email_mode = std::env::var("COMMS_EMAIL_TRANSPORT")
-            .unwrap_or_else(|_| "sandbox".to_string())
-            .trim()
-            .to_lowercase();
-        let sms_mode = std::env::var("COMMS_SMS_TRANSPORT")
-            .unwrap_or_else(|_| "sandbox".to_string())
-            .trim()
-            .to_lowercase();
-        let email_transport_mode = match email_mode.as_str() {
-            "sandbox" => EmailTransportMode::Sandbox,
-            _ => EmailTransportMode::Sandbox,
-        };
-        let sms_transport_mode = match sms_mode.as_str() {
-            "sandbox" => SmsTransportMode::Sandbox,
-            _ => SmsTransportMode::Sandbox,
-        };
+    pub fn new_from_env(store: PersistenceStateStore) -> Self {
         Self {
-            email_transport_mode,
-            sms_transport_mode,
-            sandbox_email_adapter: SandboxEmailAdapter::default(),
-            sandbox_sms_adapter: SandboxSmsAdapter::default(),
+            domain_service: DomainCommsDeliveryService::new_from_env(),
+            adapter: PersistenceCommsDeliveryAdapter {
+                store,
+                sandbox_email_adapter: SandboxEmailAdapter::default(),
+                sandbox_sms_adapter: SandboxSmsAdapter::default(),
+            },
         }
     }
 
     pub fn send_email(
         &self,
-        store: &PersistenceStateStore,
         workspace_id: &str,
         input: SendEmailInput,
     ) -> Result<CommsMessageRecord, PersistenceError> {
-        match self.email_transport_mode {
-            EmailTransportMode::Sandbox => self
-                .sandbox_email_adapter
-                .send_email(store, workspace_id, input),
-        }
+        let payload = self
+            .domain_service
+            .send_email(&self.adapter, workspace_id, input)
+            .map_err(domain_error_to_persistence)?;
+        to_message_record(payload)
     }
 
     pub fn send_sms(
         &self,
-        store: &PersistenceStateStore,
         workspace_id: &str,
         input: SendSmsInput,
     ) -> Result<CommsMessageRecord, PersistenceError> {
-        match self.sms_transport_mode {
-            SmsTransportMode::Sandbox => self
-                .sandbox_sms_adapter
-                .send_sms(store, workspace_id, input),
-        }
+        let payload = self
+            .domain_service
+            .send_sms(&self.adapter, workspace_id, input)
+            .map_err(domain_error_to_persistence)?;
+        to_message_record(payload)
     }
 
     pub fn send_chat(
         &self,
-        store: &PersistenceStateStore,
         workspace_id: &str,
         input: SendChatInput,
     ) -> Result<CommsMessageRecord, PersistenceError> {
-        // V1 chat transport is internal-only and modeled through canonical comms writes.
-        self.send_chat_internal(store, workspace_id, input)
+        let payload = self
+            .domain_service
+            .send_chat(&self.adapter, workspace_id, input)
+            .map_err(domain_error_to_persistence)?;
+        to_message_record(payload)
+    }
+}
+
+impl DomainCommsDeliveryAdapter for PersistenceCommsDeliveryAdapter {
+    fn send_email(&self, workspace_id: &str, input: SendEmailInput) -> app_domains_core::DomainResult<Value> {
+        let message = self
+            .sandbox_email_adapter
+            .send_email(&self.store, workspace_id, input)
+            .map_err(|error| DomainError::Internal(error.to_string()))?;
+        serde_json::to_value(message).map_err(|error| DomainError::Internal(error.to_string()))
     }
 
+    fn send_sms(&self, workspace_id: &str, input: SendSmsInput) -> app_domains_core::DomainResult<Value> {
+        let message = self
+            .sandbox_sms_adapter
+            .send_sms(&self.store, workspace_id, input)
+            .map_err(|error| DomainError::Internal(error.to_string()))?;
+        serde_json::to_value(message).map_err(|error| DomainError::Internal(error.to_string()))
+    }
+
+    fn send_chat(&self, workspace_id: &str, input: SendChatInput) -> app_domains_core::DomainResult<Value> {
+        let message = self
+            .send_chat_internal(workspace_id, input)
+            .map_err(|error| DomainError::Internal(error.to_string()))?;
+        serde_json::to_value(message).map_err(|error| DomainError::Internal(error.to_string()))
+    }
+}
+
+fn domain_error_to_persistence(error: DomainError) -> PersistenceError {
+    PersistenceError::Io {
+        context: "Comms delivery domain operation failed",
+        source: std::io::Error::new(std::io::ErrorKind::Other, error.to_string()),
+        path: None,
+    }
+}
+
+fn to_message_record(payload: Value) -> Result<CommsMessageRecord, PersistenceError> {
+    serde_json::from_value(payload).map_err(|error| PersistenceError::JsonParse {
+        context: "Failed to parse comms delivery message payload",
+        source: error,
+        path: None,
+    })
+}
+
+impl PersistenceCommsDeliveryAdapter {
     fn send_chat_internal(
         &self,
-        store: &PersistenceStateStore,
         workspace_id: &str,
         input: SendChatInput,
     ) -> Result<CommsMessageRecord, PersistenceError> {
-        let sender_thread = store
+        let sender_thread = self.store
             .get_comms_thread(workspace_id, &input.thread_id)?
             .ok_or_else(|| PersistenceError::Sql {
                 context: "Sender comms thread not found for chat transport",
                 source: rusqlite::Error::QueryReturnedNoRows,
                 path: None,
             })?;
-        let sender_account = store.get_comms_account_by_address(
+        let sender_account = self.store.get_comms_account_by_address(
             workspace_id,
             "chat",
             &input.from_account_ref,
         )?;
 
         if sender_thread.channel != "chat" {
-            return store.append_comms_message(
+            return self.store.append_comms_message(
                 workspace_id,
                 &input.thread_id,
                 "outbound",
@@ -145,7 +150,7 @@ impl CommsDeliveryService {
             );
         }
 
-        let sender_message = store.append_comms_message(
+        let sender_message = self.store.append_comms_message(
             workspace_id,
             &input.thread_id,
             "outbound",
@@ -174,12 +179,12 @@ impl CommsDeliveryService {
             chat_thread_key(&participants_for_key)
         };
         if sender_thread.thread_key.trim().is_empty() {
-            store.update_comms_thread_thread_key(workspace_id, &sender_thread.thread_id, &thread_key)?;
+            self.store.update_comms_thread_thread_key(workspace_id, &sender_thread.thread_id, &thread_key)?;
         }
 
         for recipient in recipients {
-            let Some(account) = store.get_comms_account_by_address(workspace_id, "chat", &recipient)? else {
-                store.insert_comms_delivery_event(
+            let Some(account) = self.store.get_comms_account_by_address(workspace_id, "chat", &recipient)? else {
+                self.store.insert_comms_delivery_event(
                     workspace_id,
                     &sender_message.message_id,
                     &sender_message.thread_id,
@@ -190,7 +195,7 @@ impl CommsDeliveryService {
                 continue;
             };
 
-            let recipient_thread = match store.find_latest_comms_thread_by_thread_key(
+            let recipient_thread = match self.store.find_latest_comms_thread_by_thread_key(
                 workspace_id,
                 "chat",
                 &account.account_id,
@@ -206,7 +211,7 @@ impl CommsDeliveryService {
                     } else {
                         sender_thread.title.clone()
                     };
-                    let created = store.create_comms_thread(
+                    let created = self.store.create_comms_thread(
                         workspace_id,
                         "chat",
                         &account.account_id,
@@ -215,12 +220,12 @@ impl CommsDeliveryService {
                         Some(&sender_thread.participants),
                         Some("inbox"),
                     )?;
-                    store.update_comms_thread_thread_key(
+                    self.store.update_comms_thread_thread_key(
                         workspace_id,
                         &created.thread_id,
                         &thread_key,
                     )?;
-                    store
+                    self.store
                         .get_comms_thread(workspace_id, &created.thread_id)?
                         .ok_or_else(|| PersistenceError::Sql {
                             context: "Chat recipient thread not found after create",
@@ -230,7 +235,7 @@ impl CommsDeliveryService {
                 }
             };
 
-            store.append_comms_message(
+            self.store.append_comms_message(
                 workspace_id,
                 &recipient_thread.thread_id,
                 "inbound",
@@ -244,7 +249,7 @@ impl CommsDeliveryService {
             )?;
         }
 
-        store.insert_comms_delivery_event(
+        self.store.insert_comms_delivery_event(
             workspace_id,
             &sender_message.message_id,
             &sender_message.thread_id,
@@ -255,16 +260,6 @@ impl CommsDeliveryService {
 
         Ok(sender_message)
     }
-}
-
-#[derive(Debug, Clone, Copy)]
-enum EmailTransportMode {
-    Sandbox,
-}
-
-#[derive(Debug, Clone, Copy)]
-enum SmsTransportMode {
-    Sandbox,
 }
 
 trait EmailTransportAdapter {

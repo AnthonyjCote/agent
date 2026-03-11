@@ -15,7 +15,8 @@
 - Comms business orchestration moved to `app_domains/comms/service` with `app_persistence` as storage adapter.
 - Org business orchestration moved to `app_domains/org/tool_orchestration` and exposed via `app_domains/org/service`.
 - `app_persistence/org_tool.rs` and `app_persistence/comms_tool.rs` now run as thin wrappers into domain services.
-- Remaining work: parity snapshots/manual validation and moving comms delivery policy module into `app_domains/comms`.
+- Comms delivery policy moved into `app_domains/comms/delivery_policy` with `app_persistence` acting as adapter.
+- Remaining work: parity snapshots/manual validation and final legacy cleanup pruning.
 
 ## Context
 We now have dedicated domain crates scaffolded:
@@ -97,10 +98,10 @@ Disallowed:
 - Add small domain tests for key invariants before deleting old paths.
 
 ## Implementation Checklist
-- [ ] Add `ports.rs` traits to `app_domains/org` and `app_domains/comms`.
-- [ ] Move org business orchestration from persistence into `app_domains/org`.
-- [ ] Move comms business orchestration from persistence into `app_domains/comms`.
-- [ ] Implement domain ports in `app_persistence`.
-- [ ] Update tool handlers in `agent_core` to call domain services.
+- [x] Add `ports.rs` traits to `app_domains/org` and `app_domains/comms`.
+- [x] Move org business orchestration from persistence into `app_domains/org`.
+- [x] Move comms business orchestration from persistence into `app_domains/comms`.
+- [x] Implement domain ports in `app_persistence`.
+- [x] Update tool handlers in `agent_core` to call domain services.
 - [ ] Remove legacy business logic from persistence after parity validation.
-- [ ] Update crate READMEs and architecture docs.
+- [x] Update crate READMEs and architecture docs.
