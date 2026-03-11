@@ -1,95 +1,94 @@
 # PDR-temp-tool-use-regression-repair-v1
 
-## Purpose
-Repair the current tool-use regression so fast-ack returns to strict acknowledgement + routing behavior, while preserving dynamic toolbox prefetch expansion for deep-stage first-pass efficiency.
+## Append-Only Format
+- This PDR uses compact append blocks.
+- New updates must be added as new blocks at the end.
+- Existing blocks are immutable except typo fixes.
 
-This PDR is also the rolling execution tracker until both core domains below are stable enough to call "done for now":
-- Comms Tool (`comms_tool`)
-- Org Chart Tool (`org_manage_entities_v2`)
+---
 
-## Current Regression Summary
-- Ack stage is emitting provider-native `tool_use` events.
-- Ack model is attempting real tool calls instead of returning strict decision JSON.
-- This breaks handoff, causes invalid ack-only clarifications, and regresses prefetch flow.
+## Block 001 - Locked Ack Simplification Decisions
+### Goal
+Stabilize fast-ack behavior for weak models by minimizing schema complexity and moving enrichment logic to backend runtime.
 
-## Desired Runtime Contract (Locked)
-1. Ack stage is routing-only:
-- Output must be strict JSON decision envelope only.
-- No provider tool calling.
-- No app tool calling.
-- No native web search.
+### Locked Schema (Ack Output)
+```json
+{
+  "decision": "ack_only|handoff_deep_default|handoff_deep_escalate",
+  "ack_text": "short user-facing text",
+  "target_domains": ["comms|org|calendar|tasks|websearch"],
+  "primary_intent": "read|write|edit|analyze|mixed|unknown",
+  "named_entities": ["..."],
+  "filter_keywords": ["..."],
+  "relative_dates": ["..."]
+}
+```
 
-2. Toolbox expansion remains active:
-- Ack still emits `prefetch_tools` (with structured args when needed).
-- Prefetch expansion is backend-internal only (`run_prefetch_gate` path).
-- Expanded packets are injected into deep stage context.
+### Locked Rules
+- `target_domains` replaces tool-level planning in ack.
+- `websearch` is represented as a domain (remove standalone boolean flag).
+- `primary_intent` supports `mixed` for compound requests.
+- Ack extracts only high-confidence hints from user prompt + recent context.
+- Ack does not execute, draft, solve, or recommend.
+- Backend maps domains -> tools and performs deterministic prefetch expansion for deep stage.
 
-3. Deep stage remains tool-capable:
-- Deep model can call app tools and native search (when gated on).
-- Iterative deep loops may request additional prefetch expansion through runtime-managed flow, not provider-tool execution in ack.
+---
 
-## Implementation Plan
-
-### A) Ack Runtime Hardening
-- Enforce ack profile with tools disabled at provider request/config layer.
-- Treat any ack-stage `tool_use` / tool envelope output as invalid ack response.
-- Ack parser accepts only schema:
-  - `decision`
-  - `ack_text`
+## Block 002 - Backend Implementation Scope
+### A) Ack Prompt / Parser Refactor
+- Replace current ack prompt with compact protocol format aligned to locked schema.
+- Remove prompt references that imply direct tool usage.
+- Update ack parser to accept only locked schema keys.
+- Remove old ack fields:
   - `prefetch_tools`
+  - `expansions`
   - `requires_web_search`
-- Add one bounded retry on invalid ack output with compact corrective suffix.
-- If still invalid: fail gracefully with non-impersonating error event (no canned agent text).
 
-### B) Prefetch Ownership Clarification
-- Keep `toolbox_prefetch` as internal runtime resolver only (not model-callable surface).
-- Preserve structured prefetch specs:
-  - Comms send/check intent
-  - Method-specific args
-  - Recipient/query hints
-- Preserve method-specific context packet injection to deep stage.
+### B) Domain-to-Tool Mapping Layer
+- Add runtime mapper:
+  - `target_domains` + `primary_intent` + entity/filter/date hints
+  - => deterministic prefetch specs + deep context packets
+- Keep mapper backend-owned and provider-agnostic.
 
-### C) Debug/Trace Clarity
-- Add explicit debug marker for ack decision parsing result:
-  - `ack_decision_parsed`
-  - `ack_decision_invalid`
-- Ensure ack trace does not show misleading provider tool lifecycle as valid app-tool path.
+### C) Dynamic Expansion Preservation
+- Keep comms prefetch behavior:
+  - recipient resolution
+  - thread/message pre-open for checks
+  - one-step send contract hints
+- Add org-prefetch routing from simplified hints:
+  - snapshot / unit / operator reads based on entities + intent.
 
-## Rolling Task Sections
+### D) Ack Guardrails
+- Ack stage must not run tools.
+- Reject/repair invalid ack outputs with bounded retry.
+- Preserve strict JSON-only ack contract.
 
-### Rolling Tasks - Ack + Prefetch Stability
-- [ ] Confirm ack never emits tool lifecycle events in runtime logs.
-- [ ] Confirm ack returns strict JSON across trivial, ambiguous, and tool-required prompts.
-- [ ] Confirm structured prefetch args survive parsing (including comms intents).
-- [ ] Confirm deep receives packetized prefetch context in first deep step.
-- [ ] Confirm no deterministic/canned agent-voice fallback strings are emitted.
+### E) Debug/Observability
+- Keep provider stream merge block for easier diagnosis.
+- Add clear ack parse success/failure markers.
 
-### Rolling Tasks - Comms Tool Edge Cases
-- [ ] One-step send contract only (no required pre-create thread for outbound send).
-- [ ] Sender identity auto-scoped to active operator; no sender ID required from model.
-- [ ] Read/check self-scope enforced; cross-mailbox reads blocked.
-- [ ] Search behavior supports practical partial/fuzzy participant matching.
-- [ ] Fast path: exact single-match prefetch can include opened thread/message payload for deep.
-- [ ] Ensure message routing parity between tool path and UI path (outbox/inbox placement).
-- [ ] Validate read/unread state operations remain correct.
+---
 
-### Rolling Tasks - Org Chart Tool Edge Cases
-- [ ] Delete operations remain deterministic and final (no reappearance via sync loop).
-- [ ] Manifest-org sync cannot remap deleted entities unexpectedly.
-- [ ] Unassigned behavior remains explicit and non-destructive.
-- [ ] Batch writes keep predictable validation and error semantics.
-- [ ] Name-ref ergonomics remain model-friendly while backend IDs stay internal.
+## Implementation Checklist
+- [ ] Rewrite ack prompt to locked schema + compact protocol wording.
+- [ ] Refactor ack parser to locked schema only.
+- [ ] Remove legacy ack fields from parser, prompt, and downstream runtime contracts.
+- [ ] Implement domain-to-tool mapping module in runtime.
+- [ ] Rewire prefetch gate to consume mapped specs from new ack schema.
+- [ ] Keep comms dynamic expansion behavior parity after rewire.
+- [ ] Add org dynamic expansion path from simplified hints.
+- [ ] Update deep prompt assembly to consume new mapped packets.
+- [ ] Add/adjust debug events for new ack contract and mapping output.
+- [ ] Run desktop smoke tests:
+  - [ ] Comms send flow
+  - [ ] Comms check/reply flow
+  - [ ] Org read/mutate planning flow
+  - [ ] Mixed-intent task dump routing flow
 
-## Exit Criteria ("Done for now")
-- Ack stage is stable and routing-only with zero tool-call leakage.
-- Prefetch-driven deep first-pass success improves (fewer unnecessary deep tool calls).
-- Comms and Org tools both pass edge-case regression checks listed above.
-- No high-severity regressions observed in desktop test loop across at least:
-  - send/check comms workflows
-  - org create/update/delete workflows
+---
 
-## Non-Goals
-- Full event orchestration queue implementation.
-- New domain launches beyond comms/org stabilization.
-- Broad UX redesign unrelated to regression repair.
-
+## Exit Criteria (This Phase)
+- Ack outputs the locked schema reliably.
+- Ack no longer leaks into execution behavior.
+- Deep receives equivalent or better first-pass context for comms and org than prior system.
+- No regressions in desktop chat workflow for core comms/org use cases.

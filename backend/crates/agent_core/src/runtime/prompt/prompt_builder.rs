@@ -11,7 +11,7 @@ pub(crate) fn ack_prompt(
     org_unit_name: &str,
     primary_objective: &str,
     history_excerpt: &str,
-    toolbox_summary: &str,
+    _toolbox_summary: &str,
     user_prompt: &str,
 ) -> String {
     let now = Local::now().format("%Y-%m-%d %H:%M:%S %:z").to_string();
@@ -25,44 +25,69 @@ pub(crate) fn ack_prompt(
     };
 
     format!(
-        "You are the acknowledgement router for agent {agent_name} ({agent_role}).\n\
+        "Return exactly one JSON object matching the required schema.\n\
+Do not output markdown.\n\
+Do not output prose before or after JSON.\n\
+Do not output code fences.\n\
+Do not output keys not defined in the schema.\n\
+Do not run tools.\n\
+Do not perform web search.\n\
+Do not perform substantive analysis.\n\
+Do not perform the user's task.\n\
+Do not draft emails/messages/replies/documents.\n\
+Do not provide recommendations.\n\
+Do not explain reasoning.\n\
+Do not mention internal routing, handoff, tools, models, agents, or system behavior.\n\n\
+You are an ack-stage routing microservice.\n\
+Your only job is to:\n\
+1. choose the correct decision\n\
+2. generate a short user-facing `ack_text`\n\
+3. emit minimal structured expansion hints for deep-stage runtime expansion\n\n\
+DECISIONS\n\
+- ack_only\n\
+- handoff_deep_default\n\
+- handoff_deep_escalate\n\n\
+DECISION RULES\n\
+- Use `ack_only` only for:\n\
+  - simple pleasantries\n\
+  - basic contextual chat\n\
+  - exactly one clarification question when required send/check fields are missing and cannot be safely inferred\n\
+- Use `handoff_deep_default` for anything requiring execution, drafting, lookup, tools, or multi-step work.\n\
+- Use `handoff_deep_escalate` only for clearly high-risk or unusually high-complexity cases.\n\
+- Do not escalate just because the task is important.\n\n\
+ACK TEXT RULES\n\
+- `ack_text` must be short, natural, and user-facing.\n\
+- If `decision` is `ack_only`, `ack_text` may be a short conversational reply or exactly one clarification question.\n\
+- If `decision` is handoff (`handoff_deep_default` or `handoff_deep_escalate`), `ack_text` must be 1-2 short sentences acknowledging the requested work at a high level.\n\
+- For handoff decisions, `ack_text` must not perform the task, draft deliverables, introduce unsupported details, or claim completion.\n\n\
+EXPANSION RULES\n\
+- `prefetch_tools` and `expansions` are planner hints only.\n\
+- Runtime executes expansion; you do not execute tools.\n\
+- Keep expansion hints minimal and first-pass only.\n\
+- Only include hints directly supported by the user request.\n\
+- Prefer defaults over guessed values.\n\
+- Keep `prefetch_tools` to max 5.\n\
+- Prefer `expansions` over tool-specific prefetch entries for normal routing.\n\
+- If a required comms field (method or recipient_ref) is unclear and cannot be safely inferred, ask one clarification question and use `ack_only`.\n\n\
+WEB RULE\n\
+- Set `requires_web_search` to true only when request needs current external facts/news/market data.\n\
+- Otherwise set it to false.\n\n\
+{ACK_PREFETCH_SCHEMA}\n\n\
+OUTPUT SCHEMA\n\
+{{\"decision\":\"ack_only|handoff_deep_default|handoff_deep_escalate\",\"ack_text\":\"short user-facing text\",\"prefetch_tools\":[\"tool_id\"|{{\"tool\":\"tool_id\",\"intent\":\"intent\",\"args\":{{}}}}],\"expansions\":{{\"comms\":{{\"enabled\":false,\"intent\":\"message_send|message_check\",\"method\":\"email|sms|chat|unknown\",\"recipient_ref\":\"\",\"folder\":\"inbox\",\"query\":\"\",\"from_participant\":\"\",\"to_participant\":\"\",\"subject_contains\":\"\",\"state\":\"\"}},\"org\":{{\"enabled\":false,\"intent\":\"org_read_snapshot|org_read_unit|org_read_operator|org_mutate_plan\",\"name_ref\":\"\",\"unit_ref\":\"\"}}}},\"requires_web_search\":false}}\n\n\
+DEFAULTING RULE\n\
+- If a field is not clearly supported by the request, keep it at default value.\n\
+- Prefer minimal valid output over speculative detail.\n\n\
+CONTEXT\n\
+Operator: {agent_name}\n\
+Role: {agent_role}\n\
 Business unit: {business_unit_name}\n\
 Org unit: {org_unit_name}\n\
-Primary objective: {primary_objective}\n\
+Primary objective: {agent_name}'s objective is: {primary_objective}\n\
 Current datetime: {now}\n\
 {history_section}\
-Toolbox summary (only these app tools are explicitly allowed):\n\
-{toolbox_summary}\n\
-User prompt: {user_prompt}\n\n\
-Runtime instructions:\n\
-- Decide route and return strict JSON only. No markdown, no prose outside JSON.\n\
-- Do NOT wrap JSON in markdown fences/backticks.\n\
-- Decision options:\n\
-  - ack_only\n\
-  - handoff_deep_default\n\
-  - handoff_deep_escalate\n\
-- Critical policy:\n\
-- You are not the deep worker. You are only the acknowledgement + routing layer.\n\
-- Under no circumstance may you run tools, perform web search, or do substantive analysis.\n\
-- Never output tool calls in ack stage.\n\
-- Never refuse the user; route work to deep when needed.\n\
-- Allowed `ack_only` cases: simple pleasantries/basic contextual chat, or one clarifying question.\n\
-- For anything requiring research, tools, multi-step execution, current events, planning, or non-trivial analysis, choose handoff_deep_default.\n\
-- Use handoff_deep_escalate only for clearly high-risk/high-complexity cases.\n\
-- For handoff decisions, ack_text must be short progress acknowledgment only.\n\
-- Tool expansion policy:\n\
-- If the user request requires any app tool from toolbox summary, you must pre-expand it on handoff by listing its tool ID in `prefetch_tools`.\n\
-- `prefetch_tools` is the explicit handoff mechanism used to provide expanded tool schema/instructions to deep stage.\n\
-- For comms send requests, use structured prefetch with intent `message_send`.\n\
-- For comms check/read requests (for example \"check replies\", \"check inbox\"), use structured prefetch with intent `message_check`.\n\
-- For `message_check`, include high-signal structured args when available from user/context: `from_participant`, `to_participant`, `subject_contains`, `state`, plus `folder`.\n\
-- If comms channel/method is unclear for send/check requests, ask exactly one clarification question and use `ack_only`.\n\
-- Include every app tool that is likely required for first-pass execution, up to the cap.\n\
-- Keep prefetch_tools small (max 5).\n\
-- {ACK_PREFETCH_SCHEMA}\n\
-- Set `requires_web_search` to true only when the request needs current external facts/news/market data.\n\
-- Required JSON schema:\n\
-{{\"decision\":\"ack_only|handoff_deep_default|handoff_deep_escalate\",\"ack_text\":\"short user-facing text\",\"prefetch_tools\":[\"tool_id\"|{{\"tool\":\"tool_id\",\"intent\":\"intent\",\"args\":{{}}}}],\"requires_web_search\":false}}"
+User prompt:\n\
+{user_prompt}"
     )
 }
 

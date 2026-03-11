@@ -34,6 +34,7 @@ struct AckEnvelopeRaw {
     ack_text: Option<String>,
     prefetch_tools: Option<Vec<AckPrefetchEntryRaw>>,
     requires_web_search: Option<bool>,
+    expansions: Option<AckExpansionsRaw>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -41,6 +42,50 @@ struct AckEnvelopeRaw {
 enum AckPrefetchEntryRaw {
     ToolId(String),
     ToolSpec(PrefetchSpecRaw),
+}
+
+#[derive(Debug, Deserialize)]
+struct AckExpansionsRaw {
+    #[serde(default)]
+    comms: Option<AckCommsExpansionRaw>,
+    #[serde(default)]
+    org: Option<AckOrgExpansionRaw>,
+}
+
+#[derive(Debug, Deserialize)]
+struct AckCommsExpansionRaw {
+    #[serde(default)]
+    enabled: Option<bool>,
+    #[serde(default)]
+    intent: Option<String>,
+    #[serde(default)]
+    method: Option<String>,
+    #[serde(default)]
+    recipient_ref: Option<String>,
+    #[serde(default)]
+    folder: Option<String>,
+    #[serde(default)]
+    query: Option<String>,
+    #[serde(default)]
+    from_participant: Option<String>,
+    #[serde(default)]
+    to_participant: Option<String>,
+    #[serde(default)]
+    subject_contains: Option<String>,
+    #[serde(default)]
+    state: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct AckOrgExpansionRaw {
+    #[serde(default)]
+    enabled: Option<bool>,
+    #[serde(default)]
+    intent: Option<String>,
+    #[serde(default)]
+    name_ref: Option<String>,
+    #[serde(default)]
+    unit_ref: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -62,6 +107,10 @@ fn decision_from_text(value: &str) -> Option<AckDecision> {
 }
 
 fn parse_ack_envelope(raw: &str, allowed_tool_ids: &[String]) -> Option<AckEnvelope> {
+    fn clean_optional(value: Option<String>) -> Option<String> {
+        value.map(|item| item.trim().to_string()).filter(|item| !item.is_empty())
+    }
+
     fn normalize_json_candidate(candidate: &str) -> Option<String> {
         let trimmed = candidate.trim();
         if trimmed.is_empty() {
@@ -111,6 +160,44 @@ fn parse_ack_envelope(raw: &str, allowed_tool_ids: &[String]) -> Option<AckEnvel
                         tool: spec.tool,
                         intent: spec.intent.map(|value| value.trim().to_string()).filter(|value| !value.is_empty()),
                         args: spec.args.unwrap_or(serde_json::Value::Object(serde_json::Map::new())),
+                    });
+                }
+            }
+        }
+        if let Some(expansions) = parsed.expansions {
+            if let Some(comms) = expansions.comms {
+                if comms.enabled.unwrap_or(false) {
+                    let intent = clean_optional(comms.intent).unwrap_or_else(|| "message_send".to_string());
+                    let args = serde_json::json!({
+                        "method": clean_optional(comms.method).unwrap_or_else(|| "unknown".to_string()),
+                        "recipient_ref": clean_optional(comms.recipient_ref).unwrap_or_default(),
+                        "folder": clean_optional(comms.folder).unwrap_or_else(|| "inbox".to_string()),
+                        "query": clean_optional(comms.query).unwrap_or_default(),
+                        "from_participant": clean_optional(comms.from_participant).unwrap_or_default(),
+                        "to_participant": clean_optional(comms.to_participant).unwrap_or_default(),
+                        "subject_contains": clean_optional(comms.subject_contains).unwrap_or_default(),
+                        "state": clean_optional(comms.state).unwrap_or_default(),
+                    });
+                    requested_tool_ids.push("comms_tool".to_string());
+                    requested_specs.push(PrefetchSpec {
+                        tool: "comms_tool".to_string(),
+                        intent: Some(intent),
+                        args,
+                    });
+                }
+            }
+            if let Some(org) = expansions.org {
+                if org.enabled.unwrap_or(false) {
+                    let intent = clean_optional(org.intent).unwrap_or_else(|| "org_read_snapshot".to_string());
+                    let args = serde_json::json!({
+                        "name_ref": clean_optional(org.name_ref).unwrap_or_default(),
+                        "unit_ref": clean_optional(org.unit_ref).unwrap_or_default(),
+                    });
+                    requested_tool_ids.push("org_manage_entities_v2".to_string());
+                    requested_specs.push(PrefetchSpec {
+                        tool: "org_manage_entities_v2".to_string(),
+                        intent: Some(intent),
+                        args,
                     });
                 }
             }
@@ -173,16 +260,6 @@ pub(crate) fn resolve_ack_envelope(
     }
 
     let trimmed = raw_ack_output.trim();
-    if !trimmed.is_empty() && !trimmed.contains('{') {
-        return Ok(AckEnvelope {
-            decision: AckDecision::AckOnly,
-            ack_text: trimmed.to_string(),
-            prefetch_tools: Vec::new(),
-            prefetch_specs: Vec::new(),
-            requires_web_search: false,
-        });
-    }
-
     let preview = trimmed.chars().take(220).collect::<String>();
     Err(RunError {
         code: "ack_envelope_invalid".to_string(),

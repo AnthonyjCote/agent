@@ -66,6 +66,20 @@ pub(crate) fn run_prefetch_gate(
     {
         static_prefetch_tool_ids.retain(|tool_id| tool_id != "comms_tool");
     }
+    if ack_envelope
+        .prefetch_specs
+        .iter()
+        .any(|spec| spec.tool == "org_manage_entities_v2")
+    {
+        static_prefetch_tool_ids.retain(|tool_id| tool_id != "org_manage_entities_v2");
+    }
+    if prefetch_resolution
+        .requested_tool_ids
+        .iter()
+        .any(|tool_id| tool_id == "org_manage_entities_v2")
+    {
+        static_prefetch_tool_ids.retain(|tool_id| tool_id != "org_manage_entities_v2");
+    }
     let mut prefetched_tool_details_sections = Vec::new();
     let static_details = render_tool_details(&static_prefetch_tool_ids, &context.allowed_tool_ids);
     if !static_details.trim().is_empty() {

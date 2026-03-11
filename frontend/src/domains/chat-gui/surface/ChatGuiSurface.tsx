@@ -94,6 +94,7 @@ function parseDebugStreamJson(line: string): Record<string, unknown> | null {
 function buildRuntimeDebugCards(events: Array<Record<string, unknown>>, hideProviderEcho: boolean): DebugCard[] {
   const cards: DebugCard[] = [];
   const requestByPhase = new Map<string, string>();
+  const providerAssistantMergeByPhase = new Map<string, string>();
 
   events.forEach((event, index) => {
     const eventType = String(event.event ?? '');
@@ -170,6 +171,13 @@ function buildRuntimeDebugCards(events: Array<Record<string, unknown>>, hideProv
         if (type === 'message') {
           const role = typeof parsed.role === 'string' ? parsed.role : 'assistant';
           const content = typeof parsed.content === 'string' ? parsed.content : '';
+          if (role === 'assistant' && content) {
+            const phaseKey = phase || 'default';
+            providerAssistantMergeByPhase.set(
+              phaseKey,
+              `${providerAssistantMergeByPhase.get(phaseKey) ?? ''}${content}`
+            );
+          }
           cards.push({
             key: `runtime-${index}`,
             eventType: eventType,
@@ -271,6 +279,26 @@ function buildRuntimeDebugCards(events: Array<Record<string, unknown>>, hideProv
       raw: stringifyDebugRaw(event)
     });
   });
+
+  if (providerAssistantMergeByPhase.size > 0) {
+    for (const [phase, merged] of providerAssistantMergeByPhase.entries()) {
+      const subtitle = phase ? `phase: ${phase}` : undefined;
+      const raw = stringifyDebugRaw({
+        event: 'debug_model_stream_merge',
+        phase,
+        role: 'assistant',
+        merged
+      });
+      cards.push({
+        key: `runtime-merge-${phase}`,
+        eventType: 'debug_model_stream_merge',
+        title: 'Provider Stream Merge (assistant)',
+        subtitle,
+        summary: compactDebugText(merged),
+        raw
+      });
+    }
+  }
 
   return cards;
 }

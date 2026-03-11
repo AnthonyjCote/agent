@@ -6,6 +6,7 @@ use crate::{
         resolve_message_check_prefetch_from_tools, resolve_message_send_prefetch_from_tools,
         MessageMethod,
     },
+    tools::registry::execute_tool_by_id,
 };
 
 pub mod manifest;
@@ -60,6 +61,18 @@ impl PrefetchResolution {
     }
 }
 
+fn run_tool_call_for_prefetch(
+    tool_name: &str,
+    args: &serde_json::Value,
+    executor: &mut dyn FnMut(&str, &serde_json::Value) -> Result<Option<ToolOutputEnvelope>, RunError>,
+) -> Result<Option<ToolOutputEnvelope>, RunError> {
+    match execute_tool_by_id(tool_name, args) {
+        Ok(Some(output)) => Ok(Some(output)),
+        Ok(None) => executor(tool_name, args),
+        Err(error) => Err(error),
+    }
+}
+
 pub fn resolve_prefetch(
     specs: &[PrefetchSpec],
     allowed_tool_ids: &[String],
@@ -80,6 +93,113 @@ pub fn resolve_prefetch(
         }
         if !resolution.requested_tool_ids.iter().any(|value| value == &spec.tool) {
             resolution.requested_tool_ids.push(spec.tool.clone());
+        }
+
+        if spec.tool == "org_manage_entities_v2" {
+            let intent = spec.intent.as_deref().unwrap_or("");
+            let read_args = match intent {
+                "org_read_snapshot" => Some(serde_json::json!({
+                    "action":"read",
+                    "items":[{"target":"snapshot"}]
+                })),
+                "org_read_unit" => {
+                    let unit_ref = spec
+                        .args
+                        .get("unit_ref")
+                        .or_else(|| spec.args.get("name_ref"))
+                        .and_then(|value| value.as_str())
+                        .map(str::trim)
+                        .unwrap_or("");
+                    if unit_ref.is_empty() {
+                        None
+                    } else {
+                        Some(serde_json::json!({
+                            "action":"read",
+                            "items":[{"target":"org_unit","name_ref":unit_ref}]
+                        }))
+                    }
+                }
+                "org_read_operator" => {
+                    let name_ref = spec
+                        .args
+                        .get("name_ref")
+                        .and_then(|value| value.as_str())
+                        .map(str::trim)
+                        .unwrap_or("");
+                    if name_ref.is_empty() {
+                        None
+                    } else {
+                        Some(serde_json::json!({
+                            "action":"read",
+                            "items":[{"target":"operator","name_ref":name_ref}]
+                        }))
+                    }
+                }
+                _ => None,
+            };
+
+            if let Some(args) = read_args {
+                match run_tool_call_for_prefetch("org_manage_entities_v2", &args, executor) {
+                    Ok(Some(output)) => {
+                        resolution.packets.push(PrefetchPacket {
+                            tool: "org_manage_entities_v2".to_string(),
+                            intent: intent.to_string(),
+                            status: "resolved".to_string(),
+                            resolved_data: output.structured_data.clone(),
+                            clarification_prompt: None,
+                        });
+                        resolution.detail_blocks.push(
+                            "tool: org_manage_entities_v2\nintent: prefetch read\nprefetch contract:\n- Prefetch provides compact org context to deep stage.\n- Use app tool calls only for follow-up reads/writes beyond provided prefetch packet.\n".to_string()
+                        );
+                        resolution.work_log_entries.push(format!(
+                            "Prefetch org_manage_entities_v2 intent={} status=resolved",
+                            intent
+                        ));
+                    }
+                    Ok(None) => {
+                        resolution.packets.push(PrefetchPacket {
+                            tool: "org_manage_entities_v2".to_string(),
+                            intent: intent.to_string(),
+                            status: "unresolved".to_string(),
+                            resolved_data: None,
+                            clarification_prompt: None,
+                        });
+                        resolution.work_log_entries.push(format!(
+                            "Prefetch org_manage_entities_v2 intent={} status=unresolved",
+                            intent
+                        ));
+                    }
+                    Err(error) => {
+                        resolution.packets.push(PrefetchPacket {
+                            tool: "org_manage_entities_v2".to_string(),
+                            intent: intent.to_string(),
+                            status: "failed".to_string(),
+                            resolved_data: Some(serde_json::json!({
+                                "error": error.message
+                            })),
+                            clarification_prompt: None,
+                        });
+                        resolution.work_log_entries.push(format!(
+                            "Prefetch org_manage_entities_v2 intent={} failed={}",
+                            intent,
+                            error.code
+                        ));
+                    }
+                }
+            } else {
+                resolution.packets.push(PrefetchPacket {
+                    tool: "org_manage_entities_v2".to_string(),
+                    intent: intent.to_string(),
+                    status: "missing_input".to_string(),
+                    resolved_data: None,
+                    clarification_prompt: None,
+                });
+                resolution.work_log_entries.push(format!(
+                    "Prefetch org_manage_entities_v2 intent={} missing_input",
+                    intent
+                ));
+            }
+            continue;
         }
 
         if spec.tool != "comms_tool" {

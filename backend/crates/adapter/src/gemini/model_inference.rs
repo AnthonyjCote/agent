@@ -22,14 +22,6 @@ use super::{
 pub struct GeminiCliModelInference;
 
 fn default_model_name(profile: Option<&str>) -> Option<String> {
-    let configured = std::env::var("AGENT_DECK_GEMINI_MODEL")
-        .ok()
-        .map(|value| value.trim().to_string())
-        .filter(|value| !value.is_empty());
-    if configured.is_some() {
-        return configured;
-    }
-
     match profile.unwrap_or("deep_default") {
         "ack" => std::env::var("AGENT_DECK_GEMINI_MODEL_ACK")
             .ok()
@@ -40,11 +32,23 @@ fn default_model_name(profile: Option<&str>) -> Option<String> {
             .ok()
             .map(|value| value.trim().to_string())
             .filter(|value| !value.is_empty())
+            .or_else(|| {
+                std::env::var("AGENT_DECK_GEMINI_MODEL")
+                    .ok()
+                    .map(|value| value.trim().to_string())
+                    .filter(|value| !value.is_empty())
+            })
             .or_else(|| Some(AGENT_DECK_GEMINI_DEEP_ESCALATE_ALIAS.to_string())),
         _ => std::env::var("AGENT_DECK_GEMINI_MODEL_DEEP_DEFAULT")
             .ok()
             .map(|value| value.trim().to_string())
             .filter(|value| !value.is_empty())
+            .or_else(|| {
+                std::env::var("AGENT_DECK_GEMINI_MODEL")
+                    .ok()
+                    .map(|value| value.trim().to_string())
+                    .filter(|value| !value.is_empty())
+            })
             .or_else(|| Some(AGENT_DECK_GEMINI_DEEP_DEFAULT_ALIAS.to_string())),
     }
 }

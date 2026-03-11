@@ -137,6 +137,7 @@ fn ensure_alias_config(root: &mut Value) {
             "modelConfig": {
                 "model": GEMINI_ACK_MODEL_ID,
                 "generateContentConfig": {
+                    "tools": [],
                     "thinkingConfig": {
                         "thinkingBudget": 0
                     }

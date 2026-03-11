@@ -11,6 +11,15 @@ use crate::{
     },
 };
 
+fn looks_like_ack_tool_use(lines: &[String]) -> bool {
+    lines.iter().any(|line| {
+        let compact = line.trim();
+        compact.contains("\"type\":\"tool_use\"")
+            || compact.contains("\"tool_calls\"")
+            || compact.contains("\"type\":\"tool_result\"")
+    })
+}
+
 pub(crate) fn run_ack_stage<M: ModelInferencePort>(
     context: &RunContext,
     inference: &M,
@@ -37,18 +46,45 @@ pub(crate) fn run_ack_stage<M: ModelInferencePort>(
         },
     );
 
-    let ack_output = infer_and_collect(
+    let mut ack_collected = infer_and_collect(
         inference,
         &context.workspace_id,
         &context.run_id,
         "ack_stage",
         "ack",
         false,
-        ack_prompt_text,
+        ack_prompt_text.clone(),
         on_event,
         trace_store,
-    )?
-    .text;
+    )?;
+
+    if looks_like_ack_tool_use(&ack_collected.debug_lines) {
+        append_event(
+            trace_store,
+            on_event,
+            RunEvent::DebugModelStreamLine {
+                run_id: context.run_id.clone(),
+                phase: "ack_stage".to_string(),
+                line: "{\"type\":\"ack_decision_invalid\",\"reason\":\"ack_tool_use_detected_retrying\"}".to_string(),
+            },
+        );
+        let corrective = format!(
+            "{}\n\nCorrection:\n- Your previous output attempted tool execution.\n- This is forbidden in ack stage.\n- Return ONLY one strict JSON decision object. No tools, no prose, no markdown.",
+            ack_prompt_text
+        );
+        ack_collected = infer_and_collect(
+            inference,
+            &context.workspace_id,
+            &context.run_id,
+            "ack_stage",
+            "ack",
+            false,
+            corrective,
+            on_event,
+            trace_store,
+        )?;
+    }
+    let ack_output = ack_collected.text;
 
     append_event(
         trace_store,
@@ -60,7 +96,54 @@ pub(crate) fn run_ack_stage<M: ModelInferencePort>(
         },
     );
 
-    let envelope = resolve_ack_envelope(&ack_output, &context.allowed_tool_ids)?;
+    let envelope = match resolve_ack_envelope(&ack_output, &context.allowed_tool_ids) {
+        Ok(value) => value,
+        Err(_) => {
+            append_event(
+                trace_store,
+                on_event,
+                RunEvent::DebugModelStreamLine {
+                    run_id: context.run_id.clone(),
+                    phase: "ack_stage".to_string(),
+                    line: "{\"type\":\"ack_decision_invalid\",\"reason\":\"invalid_json_envelope_retrying\"}".to_string(),
+                },
+            );
+            let corrective = format!(
+                "{}\n\nCorrection:\n- Return ONLY one strict JSON object matching the required schema.\n- No prose, markdown, code fences, or tool calls.",
+                ack_prompt_text
+            );
+            let retry = infer_and_collect(
+                inference,
+                &context.workspace_id,
+                &context.run_id,
+                "ack_stage",
+                "ack",
+                false,
+                corrective,
+                on_event,
+                trace_store,
+            )?;
+            resolve_ack_envelope(&retry.text, &context.allowed_tool_ids)?
+        }
+    };
+    append_event(
+        trace_store,
+        on_event,
+        RunEvent::DebugModelStreamLine {
+            run_id: context.run_id.clone(),
+            phase: "ack_stage".to_string(),
+            line: format!(
+                "{{\"type\":\"ack_decision_parsed\",\"decision\":\"{}\",\"prefetch_count\":{},\"requires_web_search\":{}}}",
+                match envelope.decision {
+                    crate::runtime::parsing::ack_decision_parser::AckDecision::AckOnly => "ack_only",
+                    crate::runtime::parsing::ack_decision_parser::AckDecision::HandoffDeepDefault => "handoff_deep_default",
+                    crate::runtime::parsing::ack_decision_parser::AckDecision::HandoffDeepEscalate => "handoff_deep_escalate",
+                },
+                envelope.prefetch_specs.len(),
+                envelope.requires_web_search
+            ),
+        },
+    );
     append_event(
         trace_store,
         on_event,
@@ -72,4 +155,3 @@ pub(crate) fn run_ack_stage<M: ModelInferencePort>(
     );
     Ok(envelope)
 }
-

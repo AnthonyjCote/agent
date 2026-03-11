@@ -8,6 +8,7 @@ use crate::runtime::{events::event_writer::append_event, tracing::memory_trace_s
 pub(crate) struct CollectedInference {
     pub text: String,
     pub delta_chunks: Vec<String>,
+    pub debug_lines: Vec<String>,
 }
 
 fn find_tool_envelope_start(text: &str) -> Option<usize> {
@@ -60,6 +61,7 @@ pub(crate) fn infer_and_collect<M: ModelInferencePort>(
 ) -> Result<CollectedInference, RunError> {
     let mut streamed_parts_raw = Vec::new();
     let mut streamed_parts_visible = Vec::new();
+    let mut debug_lines = Vec::new();
     let mut stream_accumulator = String::new();
     let mut emitted_visible_len = 0usize;
     let mut on_inference_event = |event: InferenceEvent| {
@@ -99,6 +101,13 @@ pub(crate) fn infer_and_collect<M: ModelInferencePort>(
             if trimmed.is_empty() {
                 return;
             }
+            if phase == "ack_stage"
+                && (trimmed.contains("\"type\":\"tool_use\"")
+                    || trimmed.contains("\"type\":\"tool_result\""))
+            {
+                return;
+            }
+            debug_lines.push(trimmed.clone());
             append_event(
                 trace_store,
                 on_event,
@@ -130,5 +139,6 @@ pub(crate) fn infer_and_collect<M: ModelInferencePort>(
     Ok(CollectedInference {
         text,
         delta_chunks: streamed_parts_visible,
+        debug_lines,
     })
 }
