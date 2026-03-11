@@ -89,7 +89,7 @@ pub(crate) fn run_prefetch_gate(
     if ack_envelope
         .prefetch_specs
         .iter()
-        .any(|spec| spec.tool == "comms_tool" && spec.intent.as_deref() == Some("message_send"))
+        .any(|spec| spec.tool == "comms_tool")
     {
         static_prefetch_tool_ids.retain(|tool_id| tool_id != "comms_tool");
     }

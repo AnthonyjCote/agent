@@ -53,9 +53,9 @@ impl MessageMethod {
 
     pub fn send_args_hint(&self) -> &'static str {
         match self {
-            MessageMethod::Email => "{\"ops\":[{\"action\":\"create\",\"target\":\"thread\",\"payload\":{\"channel\":\"email\",\"title\":\"<recipient name>\",\"subject\":\"<subject>\"}},{\"action\":\"create\",\"target\":\"message\",\"payload\":{\"threadId\":\"<thread_id>\",\"direction\":\"outbound\",\"toParticipants\":[\"<recipient_email>\"],\"subject\":\"<subject>\",\"bodyText\":\"<body>\"}}]}",
-            MessageMethod::Sms => "{\"ops\":[{\"action\":\"create\",\"target\":\"thread\",\"payload\":{\"channel\":\"sms\",\"title\":\"<recipient name>\",\"participants\":{\"peerNumber\":\"<recipient_phone>\"}}},{\"action\":\"create\",\"target\":\"message\",\"payload\":{\"threadId\":\"<thread_id>\",\"direction\":\"outbound\",\"toParticipants\":[\"<recipient_phone>\"],\"bodyText\":\"<body>\"}}]}",
-            MessageMethod::Chat => "{\"ops\":[{\"action\":\"create\",\"target\":\"thread\",\"payload\":{\"channel\":\"chat\",\"title\":\"<recipient name>\",\"participants\":{\"kind\":\"dm\",\"memberAddresses\":[\"<recipient_chat>\"]}}},{\"action\":\"create\",\"target\":\"message\",\"payload\":{\"threadId\":\"<thread_id>\",\"direction\":\"outbound\",\"toParticipants\":[\"<recipient_chat>\"],\"bodyText\":\"<body>\"}}]}",
+            MessageMethod::Email => "{\"ops\":[{\"action\":\"create\",\"target\":\"message\",\"payload\":{\"channel\":\"email\",\"direction\":\"outbound\",\"toParticipants\":[\"<recipient_email>\"],\"subject\":\"<subject>\",\"bodyText\":\"<body>\"}}]}",
+            MessageMethod::Sms => "{\"ops\":[{\"action\":\"create\",\"target\":\"message\",\"payload\":{\"channel\":\"sms\",\"direction\":\"outbound\",\"toParticipants\":[\"<recipient_phone>\"],\"bodyText\":\"<body>\"}}]}",
+            MessageMethod::Chat => "{\"ops\":[{\"action\":\"create\",\"target\":\"message\",\"payload\":{\"channel\":\"chat\",\"direction\":\"outbound\",\"toParticipants\":[\"<recipient_chat>\"],\"bodyText\":\"<body>\"}}]}",
         }
     }
 }

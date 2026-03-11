@@ -137,6 +137,11 @@
   background: linear-gradient(180deg, #23344f 0%, #1b2b45 100%);
 }
 
+.comms-email-mail-row.is-unread {
+  border-color: color-mix(in srgb, #7ea8ff 52%, var(--border-strong));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, #7ea8ff 22%, transparent);
+}
+
 .comms-email-mail-row-top {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;

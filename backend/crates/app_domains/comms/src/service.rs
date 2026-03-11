@@ -74,6 +74,7 @@ impl CommsDomainService {
 
         let mut op_results: Vec<CommsOpResult> = Vec::new();
         let mut data = Vec::new();
+        let mut last_created_thread_id: Option<String> = None;
 
         for op in request.ops {
             let action = op.action.trim().to_ascii_lowercase();
@@ -251,13 +252,25 @@ impl CommsDomainService {
                         status: "ok".to_string(),
                         message: "thread created".to_string(),
                     });
+                    last_created_thread_id = thread
+                        .get("threadId")
+                        .and_then(|value| value.as_str())
+                        .map(|value| value.trim().to_string())
+                        .filter(|value| !value.is_empty());
                     data.push(json!({ "thread": thread }));
                 }
                 ("create", "message") => {
-                    let thread_id = payload_string(op.payload.as_ref(), "threadId")
-                        .ok_or_else(|| DomainError::InvalidInput("create message requires payload.threadId".to_string()))?;
+                    let requested_thread_id = payload_string(op.payload.as_ref(), "threadId");
+                    let thread_id = requested_thread_id.as_deref().and_then(|value| {
+                        if value.eq_ignore_ascii_case("new") {
+                            last_created_thread_id.as_deref()
+                        } else {
+                            Some(value)
+                        }
+                    });
                     let direction = payload_string(op.payload.as_ref(), "direction")
                         .unwrap_or_else(|| "outbound".to_string());
+                    let channel = payload_string(op.payload.as_ref(), "channel");
                     let from_account_ref = payload_string(op.payload.as_ref(), "fromAccountRef")
                         .ok_or_else(|| DomainError::InvalidInput("create message requires payload.fromAccountRef".to_string()))?;
                     let body_text = payload_string(op.payload.as_ref(), "bodyText")
@@ -276,17 +289,68 @@ impl CommsDomainService {
                         .payload
                         .as_ref()
                         .and_then(|value| value.get("bccParticipants"));
-                    let message = store.append_message(
-                        &thread_id,
-                        &direction,
-                        &from_account_ref,
-                        to_participants,
-                        cc_participants,
-                        bcc_participants,
-                        subject.as_deref(),
-                        &body_text,
-                        reply_to_message_id.as_deref(),
-                    )?;
+                    let message = if direction.eq_ignore_ascii_case("outbound") {
+                        let outbound_channel = channel
+                            .clone()
+                            .or_else(|| {
+                                if subject.as_ref().map(|value| !value.trim().is_empty()).unwrap_or(false) {
+                                    Some("email".to_string())
+                                } else {
+                                    None
+                                }
+                            })
+                            .or_else(|| {
+                                to_participants
+                                    .and_then(|value| value.as_array())
+                                    .and_then(|items| items.first())
+                                    .and_then(|item| item.as_str())
+                                    .map(str::trim)
+                                    .filter(|value| !value.is_empty())
+                                    .map(|value| {
+                                        if value.contains('@') {
+                                            "email".to_string()
+                                        } else if value.starts_with('+') {
+                                            "sms".to_string()
+                                        } else {
+                                            "chat".to_string()
+                                        }
+                                    })
+                            })
+                            .ok_or_else(|| {
+                                DomainError::InvalidInput(
+                                    "create message outbound requires payload.channel or inferable recipient/subject"
+                                        .to_string(),
+                                )
+                            })?;
+                        store.send_outbound_message(
+                            &outbound_channel,
+                            thread_id,
+                            &from_account_ref,
+                            to_participants,
+                            cc_participants,
+                            bcc_participants,
+                            subject.as_deref(),
+                            &body_text,
+                            reply_to_message_id.as_deref(),
+                        )?
+                    } else {
+                        let resolved_thread_id = thread_id.ok_or_else(|| {
+                            DomainError::InvalidInput(
+                                "create message inbound requires payload.threadId".to_string(),
+                            )
+                        })?;
+                        store.append_message(
+                            resolved_thread_id,
+                            &direction,
+                            &from_account_ref,
+                            to_participants,
+                            cc_participants,
+                            bcc_participants,
+                            subject.as_deref(),
+                            &body_text,
+                            reply_to_message_id.as_deref(),
+                        )?
+                    };
                     op_results.push(CommsOpResult {
                         action,
                         target,

@@ -47,12 +47,30 @@ Preferred selector fields for check/reply workflows:
 - `channel` (`email|sms|chat`)
 - `folder` (`inbox|sent|archive|trash` where applicable)
 - `search`
+- `fromParticipant`
+- `toParticipant`
+- `subjectContains`
+- `state`
 - `limit`
 - `offset`
 
 Important:
 - Legacy/freeform shapes like `action: "read_threads"` or `params: {...}` are invalid and should be normalized or rejected with clear errors.
 - Tool detail instructions must include exact valid examples for checking inbox and reading thread messages.
+- Filtering should support partial/fuzzy-friendly matching on participant and subject fields (normalization + approximate matching) to avoid false-negative “not found” outcomes from minor input variance.
+
+### Prefetch Fast Path for Message Check (Locked)
+- Ack prefetch for `intent=message_check` must perform thread discovery with structured filters in current-operator mailbox scope.
+- Prefetch response should include compact candidate threads:
+  - `threadId`
+  - `subject`
+  - `from`
+  - `state`
+  - `lastMessageAtMs`
+- If one clear match is found (all provided filters align and candidate set is size 1):
+  - prefetch must also execute `read messages` for that thread,
+  - inject prefetched message payload into deep context,
+  - include `recommendedThreadId` so deep can act immediately without extra search/read discovery calls.
 
 ## Fast-Ack Prefetch Integration
 Shared fast-ack prefetch contract is defined in:

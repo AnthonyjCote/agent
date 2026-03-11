@@ -81,7 +81,83 @@ pub fn resolve_prefetch(
             resolution.requested_tool_ids.push(spec.tool.clone());
         }
 
-        if spec.tool != "comms_tool" || spec.intent.as_deref() != Some("message_send") {
+        if spec.tool != "comms_tool" {
+            continue;
+        }
+        let intent = spec.intent.as_deref().unwrap_or("");
+        if intent != "message_send" && intent != "message_check" {
+            continue;
+        }
+
+        if intent == "message_check" {
+            let method = spec
+                .args
+                .get("method")
+                .and_then(|value| value.as_str())
+                .and_then(MessageMethod::parse);
+            let Some(method) = method else {
+                let question = "Which channel should I check: email, sms, or chat?".to_string();
+                resolution.packets.push(PrefetchPacket {
+                    tool: "comms_tool".to_string(),
+                    intent: "message_check".to_string(),
+                    status: "missing_input".to_string(),
+                    resolved_data: None,
+                    clarification_prompt: Some(question.clone()),
+                });
+                if resolution.clarification_prompt.is_none() {
+                    resolution.clarification_prompt = Some(question);
+                }
+                continue;
+            };
+            let folder = spec
+                .args
+                .get("folder")
+                .and_then(|value| value.as_str())
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .unwrap_or("inbox");
+            let query = spec
+                .args
+                .get("query")
+                .and_then(|value| value.as_str())
+                .map(str::trim)
+                .unwrap_or("");
+            let read_threads_hint = if query.is_empty() {
+                format!(
+                    "{{\"ops\":[{{\"action\":\"read\",\"target\":\"threads\",\"selector\":{{\"channel\":\"{}\",\"folder\":\"{}\",\"limit\":20}}}}]}}",
+                    method.as_str(),
+                    folder
+                )
+            } else {
+                format!(
+                    "{{\"ops\":[{{\"action\":\"read\",\"target\":\"threads\",\"selector\":{{\"channel\":\"{}\",\"folder\":\"{}\",\"search\":\"{}\",\"limit\":20}}}}]}}",
+                    method.as_str(),
+                    folder,
+                    query.replace('\"', "'")
+                )
+            };
+            resolution.packets.push(PrefetchPacket {
+                tool: "comms_tool".to_string(),
+                intent: "message_check".to_string(),
+                status: "resolved".to_string(),
+                resolved_data: Some(serde_json::json!({
+                    "method": method.as_str(),
+                    "folder": folder,
+                    "query": query,
+                })),
+                clarification_prompt: None,
+            });
+            resolution.detail_blocks.push(format!(
+                "tool: comms_tool\nintent: message_check\nmethod: {}\nmethod-specific read contract:\n- Read scope is auto-enforced to current operator mailbox.\n- Do not pass sender IDs, operator IDs, or other operator references.\n- Start by reading threads, then read messages from a returned threadId if needed.\n- Use this comms_tool args pattern (threads):\n{}\n- Use this comms_tool args pattern (messages):\n{{\"ops\":[{{\"action\":\"read\",\"target\":\"messages\",\"selector\":{{\"threadId\":\"<thread_id>\",\"limit\":50}}}}]}}\n",
+                method.as_str(),
+                read_threads_hint
+            ));
+            resolution.work_log_entries.push(format!(
+                "Prefetch comms_tool/message_check method={} folder={} query={}",
+                method.as_str(),
+                folder,
+                if query.is_empty() { "(none)" } else { query }
+            ));
             continue;
         }
 
@@ -156,7 +232,7 @@ pub fn resolve_prefetch(
             clarification_prompt: resolved.clarification_question.clone(),
         });
         resolution.detail_blocks.push(format!(
-            "tool: comms_tool\nintent: message_send\nmethod: {}\nmethod-specific send contract:\n- Sender identity is auto-enforced from current operator.\n- Do not provide sender account IDs or sender addresses; runtime injects sender deterministically.\n- Use only {} destination fields from resolved prefetch matches.\n- Do not use other channel fields.\n- Use this comms_tool args pattern:\n{}\n",
+            "tool: comms_tool\nintent: message_send\nmethod: {}\nmethod-specific send contract:\n- Sender identity is auto-enforced from current operator.\n- Do not provide sender account IDs or sender addresses; runtime injects sender deterministically.\n- Use exactly one-step send: one `create message` op only (do not create thread first).\n- Use the exact resolved {} destination from prefetch matches; do not substitute or invent another recipient.\n- Do not use other channel fields.\n- Use this comms_tool args pattern:\n{}\n",
             method.as_str(),
             method.field_label(),
             method.send_args_hint()

@@ -46,6 +46,14 @@ For each prefetch entry:
 3. Build a compact `Resolved Prefetch` context block.
 4. Inject only relevant expanded tool instructions into deep prompt.
 
+Comms `message_check` fast-path (locked):
+- If filters resolve to one clear thread match, prefetch must also execute `read messages` for that thread in prefetch stage.
+- Deep context packet must include:
+  - `recommended_thread_id`
+  - `recommended_thread_summary` (compact)
+  - `prefetched_messages` (bounded payload)
+- Deep stage should then act directly on the prefetched message context without a discovery/search step.
+
 If prefetch resolution fails for ambiguity/missing intent args:
 - Return a structured clarification requirement.
 - Do not start deep stage until clarified.
@@ -84,6 +92,14 @@ Examples:
     - resolve recipient candidates from internal contacts
     - return method-relevant destination fields and send schema packet
   - no extra explicit lookup tool call required from deep model for standard cases
+
+- `comms_tool` + `intent=message_check`
+  - simplified args: `method`, optional `folder`, optional `query`
+  - deterministic enrichment:
+    - run structured thread filtering in current-operator mailbox scope
+    - return ranked compact candidates
+    - if one clear candidate, prefetch message content and inject direct-action packet
+  - no method fallback; missing channel/method must trigger single clarification question in ack stage (`ack_only`)
 
 Source-of-truth resolution path:
 - v1: operator directory/contact records

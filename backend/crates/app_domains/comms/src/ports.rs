@@ -56,6 +56,18 @@ pub trait CommsToolStore {
         body_text: &str,
         reply_to_message_id: Option<&str>,
     ) -> DomainResult<Value>;
+    fn send_outbound_message(
+        &self,
+        channel: &str,
+        thread_id: Option<&str>,
+        from_account_ref: &str,
+        to_participants: Option<&Value>,
+        cc_participants: Option<&Value>,
+        bcc_participants: Option<&Value>,
+        subject: Option<&str>,
+        body_text: &str,
+        reply_to_message_id: Option<&str>,
+    ) -> DomainResult<Value>;
     fn update_thread(
         &self,
         thread_id: &str,

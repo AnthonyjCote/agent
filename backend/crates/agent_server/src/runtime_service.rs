@@ -1,4 +1,7 @@
-use std::{collections::HashMap, sync::Mutex};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Mutex,
+};
 
 use adapter::{app_tool_backend::PersistentAppToolBackend, gemini::model_inference::GeminiCliModelInference};
 use app_persistence::CommsThreadRecord;
@@ -54,6 +57,7 @@ impl RuntimeService {
             .unwrap_or("")
             .trim()
             .to_string();
+        let agent_name_for_tools = request.agent_name.clone();
         let history_excerpt = self.render_history_excerpt(&thread_id);
         let org_compact_preload = self
             .state_store
@@ -94,6 +98,7 @@ impl RuntimeService {
                         &state_store_for_tools,
                         &workspace_id_for_tools,
                         &agent_id_for_tools,
+                        &agent_name_for_tools,
                         args,
                     )?
                 } else {
@@ -238,6 +243,7 @@ fn enforce_comms_sender_scope(
     state_store: &PersistenceStateStore,
     workspace_id: &str,
     operator_id: &str,
+    operator_name: &str,
     args: &serde_json::Value,
 ) -> Result<serde_json::Value, agent_core::models::run::RunError> {
     let mut normalized = args.clone();
@@ -259,6 +265,119 @@ fn enforce_comms_sender_scope(
             .unwrap_or("")
             .trim()
             .to_ascii_lowercase();
+        if action == "read" {
+            if target == "accounts" {
+                if let Some(selector) = ensure_selector_object_mut(op) {
+                    selector.insert(
+                        "operatorId".to_string(),
+                        serde_json::Value::String(operator_id.trim().to_string()),
+                    );
+                }
+                continue;
+            }
+
+            if target == "threads" {
+                let selector = ensure_selector_object_mut(op).ok_or_else(|| {
+                    agent_core::models::run::RunError {
+                        code: "tool_invalid_args".to_string(),
+                        message: "comms_tool read threads requires a valid selector object."
+                            .to_string(),
+                        retryable: false,
+                    }
+                })?;
+                let channel = selector
+                    .get("channel")
+                    .and_then(|value| value.as_str())
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty())
+                    .unwrap_or("email")
+                    .to_string();
+                let account = resolve_operator_account_by_channel(
+                    state_store,
+                    workspace_id,
+                    operator_id,
+                    operator_name,
+                    &channel,
+                )?;
+                selector.insert(
+                    "channel".to_string(),
+                    serde_json::Value::String(channel),
+                );
+                selector.insert(
+                    "accountId".to_string(),
+                    serde_json::Value::String(account.account_id),
+                );
+                continue;
+            }
+
+            if target == "account" {
+                let selector = ensure_selector_object_mut(op).ok_or_else(|| {
+                    agent_core::models::run::RunError {
+                        code: "tool_invalid_args".to_string(),
+                        message: "comms_tool read account requires a valid selector object."
+                            .to_string(),
+                        retryable: false,
+                    }
+                })?;
+                let channel = selector
+                    .get("channel")
+                    .and_then(|value| value.as_str())
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty())
+                    .unwrap_or("email")
+                    .to_string();
+                let account = resolve_operator_account_by_channel(
+                    state_store,
+                    workspace_id,
+                    operator_id,
+                    operator_name,
+                    &channel,
+                )?;
+                selector.insert(
+                    "channel".to_string(),
+                    serde_json::Value::String(channel),
+                );
+                selector.insert(
+                    "accountId".to_string(),
+                    serde_json::Value::String(account.account_id),
+                );
+                continue;
+            }
+
+            if matches!(target.as_str(), "thread" | "messages" | "message") {
+                let selector = ensure_selector_object_mut(op).ok_or_else(|| {
+                    agent_core::models::run::RunError {
+                        code: "tool_invalid_args".to_string(),
+                        message: format!(
+                            "comms_tool read {} requires a valid selector object.",
+                            target
+                        ),
+                        retryable: false,
+                    }
+                })?;
+                let Some(thread_id) = selector
+                    .get("threadId")
+                    .and_then(|value| value.as_str())
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty())
+                else {
+                    return Err(agent_core::models::run::RunError {
+                        code: "tool_invalid_args".to_string(),
+                        message: format!("comms_tool read {} requires selector.threadId.", target),
+                        retryable: false,
+                    });
+                };
+                assert_thread_owned_by_operator(
+                    state_store,
+                    workspace_id,
+                    thread_id,
+                    operator_id,
+                    operator_name,
+                )?;
+                continue;
+            }
+        }
+
         if action != "create" {
             continue;
         }
@@ -285,6 +404,7 @@ fn enforce_comms_sender_scope(
                 state_store,
                 workspace_id,
                 operator_id,
+                operator_name,
                 &channel,
             )?;
             payload.insert(
@@ -347,6 +467,7 @@ fn enforce_comms_sender_scope(
                 state_store,
                 workspace_id,
                 operator_id,
+                operator_name,
                 &channel,
             )?;
             payload.insert(
@@ -383,9 +504,10 @@ fn resolve_operator_account_by_channel(
     state_store: &PersistenceStateStore,
     workspace_id: &str,
     operator_id: &str,
+    operator_name: &str,
     channel: &str,
 ) -> Result<app_persistence::CommsAccountRecord, agent_core::models::run::RunError> {
-    let accounts = state_store
+    let direct_accounts = state_store
         .list_comms_accounts(workspace_id, Some(operator_id), Some(channel))
         .map_err(|error| agent_core::models::run::RunError {
             code: "tool_invalid_args".to_string(),
@@ -395,17 +517,216 @@ fn resolve_operator_account_by_channel(
             ),
             retryable: false,
         })?;
-    accounts
-        .into_iter()
-        .next()
-        .ok_or_else(|| agent_core::models::run::RunError {
+    if let Some(account) = direct_accounts.into_iter().next() {
+        return Ok(account);
+    }
+
+    if let Some(mapped_operator_id) = resolve_operator_id_by_display_name(
+        state_store,
+        workspace_id,
+        channel,
+        operator_name,
+    )? {
+        let mapped_accounts = state_store
+            .list_comms_accounts(workspace_id, Some(mapped_operator_id.as_str()), Some(channel))
+            .map_err(|error| agent_core::models::run::RunError {
+                code: "tool_invalid_args".to_string(),
+                message: format!(
+                    "comms_tool sender enforcement failed while loading mapped {} account for operator {}: {}",
+                    channel, mapped_operator_id, error
+                ),
+                retryable: false,
+            })?;
+        if let Some(account) = mapped_accounts.into_iter().next() {
+            return Ok(account);
+        }
+        return ensure_operator_channel_account(
+            state_store,
+            workspace_id,
+            mapped_operator_id.as_str(),
+            operator_name,
+            channel,
+        );
+    }
+
+    ensure_operator_channel_account(
+        state_store,
+        workspace_id,
+        operator_id,
+        operator_name,
+        channel,
+    )
+}
+
+fn resolve_operator_id_by_display_name(
+    state_store: &PersistenceStateStore,
+    workspace_id: &str,
+    channel: &str,
+    operator_name: &str,
+) -> Result<Option<String>, agent_core::models::run::RunError> {
+    let all_channel_accounts = state_store
+        .list_comms_accounts(workspace_id, None, Some(channel))
+        .map_err(|error| agent_core::models::run::RunError {
             code: "tool_invalid_args".to_string(),
             message: format!(
-                "Current operator has no {} account configured. Cannot send via comms_tool on that channel.",
-                channel
+                "comms_tool sender enforcement failed while scanning {} accounts: {}",
+                channel, error
+            ),
+            retryable: false,
+        })?;
+    let target = normalize_person_name(operator_name);
+    if target.is_empty() {
+        return Ok(None);
+    }
+    for account in all_channel_accounts {
+        let display = account
+            .display_name
+            .replace(" (EMAIL)", "")
+            .replace(" (SMS)", "")
+            .replace(" (CHAT)", "");
+        if normalize_person_name(&display) == target {
+            return Ok(Some(account.operator_id));
+        }
+    }
+    Ok(None)
+}
+
+fn ensure_operator_channel_account(
+    state_store: &PersistenceStateStore,
+    workspace_id: &str,
+    operator_id: &str,
+    operator_name: &str,
+    channel: &str,
+) -> Result<app_persistence::CommsAccountRecord, agent_core::models::run::RunError> {
+    let normalized_channel = channel.trim().to_ascii_lowercase();
+    let account_id = format!("acct_{}_{}", normalized_channel, operator_id.trim());
+    let safe_name = if operator_name.trim().is_empty() {
+        "Operator".to_string()
+    } else {
+        operator_name.trim().to_string()
+    };
+    let display_name = format!("{} ({})", safe_name, normalized_channel.to_ascii_uppercase());
+    let address = match normalized_channel.as_str() {
+        "email" => format!(
+            "{}@agentdeck.io",
+            normalize_person_name(&safe_name).replace(' ', ".")
+        ),
+        "chat" => format!("@{}", normalize_person_name(&safe_name).replace(' ', ".")),
+        "sms" => String::new(),
+        _ => String::new(),
+    };
+
+    state_store
+        .upsert_comms_account(
+            workspace_id,
+            account_id.as_str(),
+            operator_id.trim(),
+            normalized_channel.as_str(),
+            address.as_str(),
+            display_name.as_str(),
+            Some("active"),
+        )
+        .map_err(|error| agent_core::models::run::RunError {
+            code: "tool_invalid_args".to_string(),
+            message: format!(
+                "Current operator has no {} account configured and auto-provision failed: {}",
+                normalized_channel, error
             ),
             retryable: false,
         })
+}
+
+fn normalize_person_name(value: &str) -> String {
+    value
+        .trim()
+        .to_ascii_lowercase()
+        .chars()
+        .map(|ch| if ch.is_ascii_alphanumeric() { ch } else { ' ' })
+        .collect::<String>()
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+fn ensure_selector_object_mut(
+    op: &mut serde_json::Value,
+) -> Option<&mut serde_json::Map<String, serde_json::Value>> {
+    if op.get("selector").is_none() {
+        let map = op.as_object_mut()?;
+        map.insert(
+            "selector".to_string(),
+            serde_json::Value::Object(serde_json::Map::new()),
+        );
+    }
+    op.get_mut("selector").and_then(|value| value.as_object_mut())
+}
+
+fn assert_thread_owned_by_operator(
+    state_store: &PersistenceStateStore,
+    workspace_id: &str,
+    thread_id: &str,
+    operator_id: &str,
+    operator_name: &str,
+) -> Result<(), agent_core::models::run::RunError> {
+    let Some(thread) = state_store
+        .get_comms_thread(workspace_id, thread_id)
+        .map_err(|error| agent_core::models::run::RunError {
+            code: "tool_invalid_args".to_string(),
+            message: format!(
+                "comms_tool read scope failed while loading thread {}: {}",
+                thread_id, error
+            ),
+            retryable: false,
+        })?
+    else {
+        return Err(agent_core::models::run::RunError {
+            code: "tool_invalid_args".to_string(),
+            message: format!("comms_tool read requires an existing threadId (not found: {})", thread_id),
+            retryable: false,
+        });
+    };
+
+    let mut allowed_account_ids = collect_operator_account_ids(state_store, workspace_id, operator_id)?;
+    if let Some(mapped_operator_id) = resolve_operator_id_by_display_name(
+        state_store,
+        workspace_id,
+        &thread.channel,
+        operator_name,
+    )? {
+        allowed_account_ids.extend(collect_operator_account_ids(
+            state_store,
+            workspace_id,
+            mapped_operator_id.as_str(),
+        )?);
+    }
+
+    if allowed_account_ids.contains(&thread.account_id) {
+        return Ok(());
+    }
+
+    Err(agent_core::models::run::RunError {
+        code: "tool_permission_denied".to_string(),
+        message: "comms_tool read denied: thread is not owned by current operator mailbox.".to_string(),
+        retryable: false,
+    })
+}
+
+fn collect_operator_account_ids(
+    state_store: &PersistenceStateStore,
+    workspace_id: &str,
+    operator_id: &str,
+) -> Result<HashSet<String>, agent_core::models::run::RunError> {
+    let accounts = state_store
+        .list_comms_accounts(workspace_id, Some(operator_id), None)
+        .map_err(|error| agent_core::models::run::RunError {
+            code: "tool_invalid_args".to_string(),
+            message: format!(
+                "comms_tool account scope failed while loading accounts for operator {}: {}",
+                operator_id, error
+            ),
+            retryable: false,
+        })?;
+    Ok(accounts.into_iter().map(|value| value.account_id).collect())
 }
 
 fn normalize_message_thread_for_sender(

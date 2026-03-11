@@ -51,6 +51,7 @@ export function CommsEmailSurface({
     () => state.threads.find((thread) => thread.threadId === state.activeThreadId) ?? null,
     [state.activeThreadId, state.threads]
   );
+  const selectedThreadIsRead = (selectedThread?.state || '').toLowerCase() === 'read';
   const latestSelectedMessage = state.messages[state.messages.length - 1] ?? null;
 
   const splitRecipients = (value: string) =>
@@ -138,6 +139,20 @@ export function CommsEmailSurface({
     await state.updateThread(selectedThread.threadId, { folder: 'archive' });
     setReadOpen(false);
     setFolder('archive');
+  };
+
+  const handleMarkRead = async () => {
+    if (!selectedThread) {
+      return;
+    }
+    await state.updateThread(selectedThread.threadId, { state: 'read' });
+  };
+
+  const handleMarkUnread = async () => {
+    if (!selectedThread) {
+      return;
+    }
+    await state.updateThread(selectedThread.threadId, { state: 'unread' });
   };
 
   const handleDeleteFromRead = async () => {
@@ -249,7 +264,7 @@ export function CommsEmailSurface({
                   <button
                     key={thread.threadId}
                     type="button"
-                    className={`comms-email-mail-row ${state.activeThreadId === thread.threadId ? 'is-active' : ''}`}
+                    className={`comms-email-mail-row ${state.activeThreadId === thread.threadId ? 'is-active' : ''} ${(thread.state || '').toLowerCase() === 'unread' ? 'is-unread' : ''}`}
                     onClick={() => {
                       state.setActiveThreadId(thread.threadId);
                       setReadOpen(true);
@@ -260,10 +275,13 @@ export function CommsEmailSurface({
                       <span>{formatCommsTime(thread.lastMessageAtMs || thread.updatedAtMs)}</span>
                     </div>
                     <p className="comms-email-mail-row-subject">{thread.subject || '(no subject)'}</p>
-                    <p className="comms-email-mail-row-meta">{thread.messageCount} message(s)</p>
+                    <p className="comms-email-mail-row-meta">
+                      {thread.messageCount} message(s)
+                      {(thread.state || '').toLowerCase() === 'unread' ? ' · unread' : ''}
+                    </p>
                   </button>
                 ))}
-              </div>
+            </div>
             <CommsComposeFab ariaLabel="Compose email" onClick={() => setComposeOpen(true)} />
           </section>
         }
@@ -295,9 +313,12 @@ export function CommsEmailSurface({
         thread={selectedThread}
         messages={state.messages}
         folder={folder}
+        isRead={selectedThreadIsRead}
         onClose={() => setReadOpen(false)}
         onReply={handleReplyFromRead}
         onForward={handleForwardFromRead}
+        onMarkRead={() => void handleMarkRead()}
+        onMarkUnread={() => void handleMarkUnread()}
         onArchive={() => void handleArchiveFromRead()}
         onDelete={() => void handleDeleteFromRead()}
       />

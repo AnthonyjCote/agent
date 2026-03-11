@@ -8,11 +8,14 @@ type ReadEmailModalProps = {
   thread: CommsThreadRecord | null;
   messages: CommsMessageRecord[];
   folder: string;
+  isRead: boolean;
   onClose: () => void;
   onReply: () => void;
   onForward: () => void;
   onArchive: () => void;
   onDelete: () => void;
+  onMarkRead: () => void;
+  onMarkUnread: () => void;
 };
 
 function participantsToText(value: unknown): string {
@@ -36,7 +39,20 @@ function participantsToText(value: unknown): string {
   return '';
 }
 
-export function ReadEmailModal({ open, thread, messages, folder, onClose, onReply, onForward, onArchive, onDelete }: ReadEmailModalProps) {
+export function ReadEmailModal({
+  open,
+  thread,
+  messages,
+  folder,
+  isRead,
+  onClose,
+  onReply,
+  onForward,
+  onArchive,
+  onDelete,
+  onMarkRead,
+  onMarkUnread
+}: ReadEmailModalProps) {
   const latest = messages[messages.length - 1] ?? null;
   const fromText = latest?.fromAccountRef || '(unknown sender)';
   const toText = participantsToText(latest?.toParticipants) || '(unknown recipient)';
@@ -52,6 +68,11 @@ export function ReadEmailModal({ open, thread, messages, folder, onClose, onRepl
             <div className="read-email-actions">
               <TextButton label="Reply" variant="secondary" onClick={onReply} />
               <TextButton label="Forward" variant="secondary" onClick={onForward} />
+              {isRead ? (
+                <TextButton label="Mark Unread" variant="ghost" onClick={onMarkUnread} />
+              ) : (
+                <TextButton label="Mark Read" variant="ghost" onClick={onMarkRead} />
+              )}
               <TextButton label="Archive" variant="ghost" onClick={onArchive} />
               <TextButton label={folder === 'trash' ? 'Delete Permanently' : 'Delete'} variant="danger" onClick={onDelete} />
             </div>

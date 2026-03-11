@@ -53,6 +53,9 @@ Runtime instructions:\n\
 - Tool expansion policy:\n\
 - If the user request requires any app tool from toolbox summary, you must pre-expand it on handoff by listing its tool ID in `prefetch_tools`.\n\
 - `prefetch_tools` is the explicit handoff mechanism used to provide expanded tool schema/instructions to deep stage.\n\
+- For comms send requests, use structured prefetch with intent `message_send`.\n\
+- For comms check/read requests (for example \"check replies\", \"check inbox\"), use structured prefetch with intent `message_check`.\n\
+- If comms channel/method is unclear for send/check requests, ask exactly one clarification question and use `ack_only`.\n\
 - Include every app tool that is likely required for first-pass execution, up to the cap.\n\
 - Keep prefetch_tools small (max 5).\n\
 - {ACK_PREFETCH_SCHEMA}\n\
@@ -157,6 +160,16 @@ pub(crate) fn deep_prompt(
     } else {
         String::new()
     };
+    let comms_runtime_rules = if toolbox_summary.contains("comms_tool") {
+        "- Comms tool read/write contract:\n\
+- Outbound send is one-step only: use `create message` (do not create thread first).\n\
+- For read/check flows, use `read threads` first, then `read messages` with a returned `threadId`.\n\
+- Self-scope is enforced automatically to current operator mailbox.\n\
+- Do not include sender/operator IDs or attempt cross-mailbox reads.\n\
+".to_string()
+    } else {
+        String::new()
+    };
 
     format!(
         "You are {agent_name}, acting as {agent_role}. This is step {step_index}.\n\
@@ -181,6 +194,7 @@ Runtime instructions:\n\
 - For app tool calls: keep reasoning short, keep tool_calls minimal, and only use tool IDs listed in toolbox summary.\n\
 - Keep streamed status/reasoning updates bite-sized (short, plain-language lines).\n\
 - Never include raw tool-call JSON in explanatory prose; if calling app tools, put the single JSON object only at the end.\n\
+{comms_runtime_rules}\
 - Do not repeat the same tool call with the same args if prior app tool results already provide the needed data.\n\
 - If prior app tool results are sufficient to answer, output {FINAL_RESPONSE_SENTINEL} and finalize instead of calling tools again.\n\
 - Termination contract (critical):\n\
@@ -198,4 +212,3 @@ Runtime instructions:\n\
 "
     )
 }
-

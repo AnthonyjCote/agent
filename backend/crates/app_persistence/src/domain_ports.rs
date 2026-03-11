@@ -4,6 +4,7 @@ use app_domain_comms::{
 };
 use app_domain_org::ports::{OrgChartStateRecord as DomainOrgChartStateRecord, OrgToolStore};
 use app_domains_core::{errors::DomainError, DomainResult};
+use serde_json::Value;
 
 use crate::PersistenceStateStore;
 
@@ -79,6 +80,22 @@ impl PersistenceCommsToolPort {
 
     fn to_json<T: serde::Serialize>(value: T) -> DomainResult<serde_json::Value> {
         serde_json::to_value(value).map_err(|error| DomainError::Internal(error.to_string()))
+    }
+
+    fn extract_addresses(value: Option<&Value>) -> Vec<String> {
+        let Some(value) = value else {
+            return Vec::new();
+        };
+        match value {
+            Value::String(single) => vec![single.trim().to_string()],
+            Value::Array(items) => items
+                .iter()
+                .filter_map(|item| item.as_str())
+                .map(|item| item.trim().to_string())
+                .filter(|item| !item.is_empty())
+                .collect(),
+            _ => Vec::new(),
+        }
     }
 }
 
@@ -238,6 +255,132 @@ impl CommsToolStore for PersistenceCommsToolPort {
             )
             .map_err(|error| DomainError::Internal(error.to_string()))?;
         Self::to_json(record)
+    }
+
+    fn send_outbound_message(
+        &self,
+        channel: &str,
+        thread_id: Option<&str>,
+        from_account_ref: &str,
+        to_participants: Option<&Value>,
+        cc_participants: Option<&Value>,
+        bcc_participants: Option<&Value>,
+        subject: Option<&str>,
+        body_text: &str,
+        reply_to_message_id: Option<&str>,
+    ) -> DomainResult<Value> {
+        let normalized_channel = channel.trim().to_ascii_lowercase();
+        let sender_account = self
+            .store
+            .get_comms_account_by_address(&self.workspace_id, &normalized_channel, from_account_ref)
+            .map_err(|error| DomainError::Internal(error.to_string()))?
+            .ok_or_else(|| {
+                DomainError::InvalidInput(format!(
+                    "Sender account not found for channel={} fromAccountRef={}",
+                    normalized_channel, from_account_ref
+                ))
+            })?;
+
+        let resolved_thread_id = {
+            let provided = thread_id
+                .map(str::trim)
+                .filter(|value| !value.is_empty() && !value.eq_ignore_ascii_case("new"))
+                .map(ToOwned::to_owned);
+            if let Some(value) = provided {
+                value
+            } else {
+                let title = Self::extract_addresses(to_participants)
+                    .first()
+                    .cloned()
+                    .unwrap_or_else(|| "Outbound".to_string());
+                let participants = match normalized_channel.as_str() {
+                    "sms" => {
+                        let peer = Self::extract_addresses(to_participants)
+                            .first()
+                            .cloned()
+                            .unwrap_or_default();
+                        if peer.is_empty() {
+                            None
+                        } else {
+                            Some(serde_json::json!({ "peerNumber": peer }))
+                        }
+                    }
+                    "chat" => Some(serde_json::json!({
+                        "kind": "dm",
+                        "memberAddresses": Self::extract_addresses(to_participants)
+                    })),
+                    _ => None,
+                };
+                let folder = if normalized_channel == "email" {
+                    "sent"
+                } else {
+                    "inbox"
+                };
+                let thread = self
+                    .store
+                    .create_comms_thread(
+                        &self.workspace_id,
+                        &normalized_channel,
+                        &sender_account.account_id,
+                        Some(title.as_str()),
+                        subject,
+                        participants.as_ref(),
+                        Some(folder),
+                    )
+                    .map_err(|error| DomainError::Internal(error.to_string()))?;
+                thread.thread_id
+            }
+        };
+
+        let delivery = crate::CommsDeliveryService::new_from_env(self.store.clone());
+        let message = match normalized_channel.as_str() {
+            "email" => delivery
+                .send_email(
+                    &self.workspace_id,
+                    crate::SendEmailInput {
+                        thread_id: resolved_thread_id,
+                        from_account_ref: from_account_ref.to_string(),
+                        to_participants: to_participants.cloned(),
+                        cc_participants: cc_participants.cloned(),
+                        bcc_participants: bcc_participants.cloned(),
+                        subject: subject.map(ToOwned::to_owned),
+                        body_text: body_text.to_string(),
+                        reply_to_message_id: reply_to_message_id.map(ToOwned::to_owned),
+                    },
+                )
+                .map_err(|error| DomainError::Internal(error.to_string()))?,
+            "sms" => delivery
+                .send_sms(
+                    &self.workspace_id,
+                    crate::SendSmsInput {
+                        thread_id: resolved_thread_id,
+                        from_account_ref: from_account_ref.to_string(),
+                        to_participants: to_participants.cloned(),
+                        body_text: body_text.to_string(),
+                        reply_to_message_id: reply_to_message_id.map(ToOwned::to_owned),
+                    },
+                )
+                .map_err(|error| DomainError::Internal(error.to_string()))?,
+            "chat" => delivery
+                .send_chat(
+                    &self.workspace_id,
+                    crate::SendChatInput {
+                        thread_id: resolved_thread_id,
+                        from_account_ref: from_account_ref.to_string(),
+                        to_participants: to_participants.cloned(),
+                        body_text: body_text.to_string(),
+                        reply_to_message_id: reply_to_message_id.map(ToOwned::to_owned),
+                    },
+                )
+                .map_err(|error| DomainError::Internal(error.to_string()))?,
+            _ => {
+                return Err(DomainError::InvalidInput(format!(
+                    "Unsupported outbound channel: {}",
+                    normalized_channel
+                )));
+            }
+        };
+        Self::to_json(message)
     }
 
     fn update_thread(
