@@ -9,7 +9,7 @@
 // @domain: chat-gui
 // @adr: none
 
-import type { ViewDefinition } from '../../app/shell/model/ui-contract';
+import type { ViewDefinition } from '@/app/shell/model/ui-contract';
 import { ChatGuiView } from './view';
 
 export const chatGuiViewDefinition: ViewDefinition = {

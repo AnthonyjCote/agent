@@ -20,9 +20,13 @@ import {
   useState,
   type PropsWithChildren
 } from 'react';
-import { useRuntimeClient } from '../../../app/runtime/RuntimeProvider';
-import { AGENT_MANIFESTS_CHANGED_EVENT, loadAgentManifests } from '../agents/agent-storage';
-import type { AgentManifest } from '../agents';
+import { useRuntimeClient } from '@/app/runtime/RuntimeProvider';
+import {
+  AGENT_MANIFESTS_CHANGED_EVENT,
+  loadAgentManifests,
+  normalizeAgentManifestRecords
+} from '@/shared/config/agents/agent-storage';
+import type { AgentManifest } from '@/shared/config/agents';
 import {
   canRedoOrgCommand,
   canUndoOrgCommand,
@@ -255,7 +259,7 @@ function useOrgChartStoreState(): OrgChartStoreValue {
 
     const loadRuntimeAgentManifests = async (): Promise<AgentManifest[]> => {
       try {
-        return await runtimeClient.listAgentManifests();
+        return normalizeAgentManifestRecords(await runtimeClient.listAgentManifests());
       } catch {
         return loadAgentManifests();
       }
@@ -320,8 +324,9 @@ function useOrgChartStoreState(): OrgChartStoreValue {
       void runtimeClient
         .listAgentManifests()
         .then((manifests) => {
+          const normalized = normalizeAgentManifestRecords(manifests);
           setData((current) =>
-            syncOperatorsFromAgents(current, manifests, {
+            syncOperatorsFromAgents(current, normalized, {
               createMissingOperators: true
             })
           );

@@ -1,6 +1,6 @@
 import type { CommsMessageRecord, CommsThreadRecord } from '@agent-deck/runtime-client';
-import { ModalShell, ModalTopRail, TextButton } from '../../../../../shared/ui';
-import { formatCommsTime } from '../../../model';
+import { ModalShell, ModalTopRail, TextButton } from '@/shared/ui';
+import { formatCommsTime } from '@/domains/comms/model';
 import './ReadEmailModal.css';
 
 type ReadEmailModalProps = {

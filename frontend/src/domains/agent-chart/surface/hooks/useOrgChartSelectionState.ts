@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
-import type { Operator, BusinessUnit, OrgUnit } from '../../../../shared/config';
-import type { DropdownOption } from '../../../../shared/ui';
-import type { SelectedNode } from '../types';
+import type { Operator, BusinessUnit, OrgUnit } from '@/shared/config';
+import type { DropdownOption } from '@/shared/ui';
+import type { SelectedNode } from '@/domains/agent-chart/surface/types';
 
 function findTopLevelOrgUnit(units: OrgUnit[], orgUnitId: string): OrgUnit | undefined {
   let cursor = units.find((unit) => unit.id === orgUnitId);

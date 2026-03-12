@@ -1,4 +1,4 @@
-import { AgentAvatar, ModalShell } from '../../../../../shared/ui';
+import { AgentAvatar, ModalShell } from '@/shared/ui';
 import type { ComposeEmailContact } from './ComposeEmailModal';
 import './ComposeEmailContactsModal.css';
 

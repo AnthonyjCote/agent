@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import { AgentAvatar, ConfirmDialogModal, LeftColumnShell, LeftColumnTopBar, TextButton, TextField } from '../../../../shared/ui';
-import { useRuntimeClient } from '../../../../app/runtime/RuntimeProvider';
-import { formatCommsTime, useCommsChannelState } from '../../model';
+import { AgentAvatar, ConfirmDialogModal, LeftColumnShell, LeftColumnTopBar, TextButton, TextField } from '@/shared/ui';
+import { useRuntimeClient } from '@/app/runtime/RuntimeProvider';
+import { formatCommsTime, useCommsChannelState } from '@/domains/comms/model';
 import { ComposeSmsModal, type ComposeSmsContact } from './compose-modal';
-import { CommsComposeFab } from '../shared';
+import { CommsComposeFab } from '@/domains/comms/surface/shared';
 import './CommsSmsSurface.css';
 
 function parseSmsRecipientNumber(value: string): string {

@@ -11,11 +11,11 @@
 // @adr: none
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { createDefaultAgentManifestInput, useAgentManifestStore, useOrgChartStore } from '../../../shared/config';
-import { ConfirmDialogModal, LeftColumnShell } from '../../../shared/ui';
-import { buildOperatorTree, useOrgChartPointerDnd } from '../model';
+import { createDefaultAgentManifestInput, useAgentManifestStore, useOrgChartStore } from '@/shared/config';
+import { ConfirmDialogModal, LeftColumnShell } from '@/shared/ui';
+import { buildOperatorTree, useOrgChartPointerDnd } from '@/domains/agent-chart/model';
 import { OrgChartDragChip } from './OrgChartDragChip';
-import { AgentAvatarCropModal, OrgEntityCreateModal } from '../../../shared/modules';
+import { AgentAvatarCropModal, OrgEntityCreateModal } from '@/shared/modules';
 import {
   OrgChartLeftPane,
   OrgChartRightPane

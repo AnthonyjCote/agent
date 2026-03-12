@@ -1,6 +1,6 @@
-import { buildOperatorTree, type OperatorTreeNode, type OrgUnitTreeNode } from '../../model';
-import type { Operator, OrgUnit } from '../../../../shared/config';
-import type { BusinessUnitTreeNode, SelectedNode } from '../types';
+import { buildOperatorTree, type OperatorTreeNode, type OrgUnitTreeNode } from '@/domains/agent-chart/model';
+import type { Operator, OrgUnit } from '@/shared/config';
+import type { BusinessUnitTreeNode, SelectedNode } from '@/domains/agent-chart/surface/types';
 import { NodeMedia, NodeMediaIcon } from './NodeMedia';
 import { CollapseToggleIcon } from './CollapseToggleIcon';
 

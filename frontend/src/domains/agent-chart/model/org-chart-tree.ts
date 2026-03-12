@@ -10,7 +10,7 @@
 // @domain: agent-chart
 // @adr: none
 
-import type { Operator, OrgUnit } from '../../../shared/config';
+import type { Operator, OrgUnit } from '@/shared/config';
 
 export type OrgUnitTreeNode = {
   unit: OrgUnit;

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
-import type { OperatorKind } from '../../config/org-chart';
-import { AgentAvatar, DropdownSelector, InfoTooltip, ModalShell, TextAreaField, TextButton, TextField, type DropdownOption } from '../../ui';
-import { AgentAvatarCropModal } from '../agent-manifest';
+import type { OperatorKind } from '@/shared/config/org-chart';
+import { AgentAvatar, DropdownSelector, InfoTooltip, ModalShell, TextAreaField, TextButton, TextField, type DropdownOption } from '@/shared/ui';
+import { AgentAvatarCropModal } from '@/shared/modules/agent-manifest';
 import './OrgEntityCreateModal.css';
 
 type EntityKind = 'business_unit' | 'org_unit' | 'operator';

@@ -9,7 +9,7 @@
 // @domain: app
 // @adr: none
 
-import type { ViewDefinition } from './model/ui-contract';
+import type { ViewDefinition } from '@/app/shell/model/ui-contract';
 
 type ViewRouterProps = {
   viewDefinition: ViewDefinition;

@@ -1,5 +1,5 @@
 import { createContext, useContext, useMemo, type PropsWithChildren } from 'react';
-import { useRuntimeClient } from '../../../app/runtime/RuntimeProvider';
+import { useRuntimeClient } from '@/app/runtime/RuntimeProvider';
 import { useChatGuiState } from './useChatGuiState';
 
 type ChatGuiStoreValue = ReturnType<typeof useChatGuiState>;

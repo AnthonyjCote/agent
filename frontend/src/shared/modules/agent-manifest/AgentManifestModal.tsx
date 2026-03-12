@@ -15,7 +15,7 @@ import {
   createDefaultAgentManifestInput,
   type AgentManifest,
   type AgentManifestInput
-} from '../../config/agents';
+} from '@/shared/config/agents';
 import {
   AgentAvatar,
   ConfirmDialogModal,
@@ -25,7 +25,7 @@ import {
   TextButton,
   TextField,
   type DropdownOption
-} from '../../ui';
+} from '@/shared/ui';
 import { AgentAvatarCropModal } from './AgentAvatarCropModal';
 import './AgentManifestModal.css';
 

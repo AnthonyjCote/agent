@@ -10,8 +10,8 @@
 // @domain: app-settings
 // @adr: none
 
-import { useProviderConfigStore, type ProviderId } from '../../../../shared/config';
-import { ColumnCard, DropdownSelector, TextField, ToggleSwitch } from '../../../../shared/ui';
+import { useProviderConfigStore, type ProviderId } from '@/shared/config';
+import { ColumnCard, DropdownSelector, TextField, ToggleSwitch } from '@/shared/ui';
 import './ProvidersSettingsPanel.css';
 
 const PROVIDER_IDS: ProviderId[] = ['gemini', 'openai', 'local'];

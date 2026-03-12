@@ -11,9 +11,9 @@
 // @adr: none
 
 import { useState } from 'react';
-import { LeftColumnShell, ColumnCard } from '../../../shared/ui';
-import { SETTINGS_CATEGORIES, type SettingsCategoryId } from '../lib/settings-categories';
-import { ProvidersSettingsPanel } from '../modules/providers';
+import { LeftColumnShell, ColumnCard } from '@/shared/ui';
+import { SETTINGS_CATEGORIES, type SettingsCategoryId } from '@/domains/app-settings/lib/settings-categories';
+import { ProvidersSettingsPanel } from '@/domains/app-settings/modules/providers';
 import './AppSettingsSurface.css';
 
 function PlaceholderCategoryPanel({ title }: { title: string }) {

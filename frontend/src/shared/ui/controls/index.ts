@@ -1,6 +1,6 @@
-export { ToggleSwitch } from './ToggleSwitch';
-export { DropdownSelector } from './DropdownSelector';
-export { TextField } from './TextField';
-export { TextAreaField } from './TextAreaField';
-export { TextButton } from './TextButton';
-export type { DropdownOption } from './DropdownSelector';
+export { ToggleSwitch } from './toggle-switch/ToggleSwitch';
+export { DropdownSelector } from './dropdown-selector/DropdownSelector';
+export { TextField } from './text-field/TextField';
+export { TextAreaField } from './text-area-field/TextAreaField';
+export { TextButton } from './text-button/TextButton';
+export type { DropdownOption } from './dropdown-selector/DropdownSelector';

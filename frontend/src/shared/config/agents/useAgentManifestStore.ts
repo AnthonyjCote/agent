@@ -19,31 +19,18 @@ import {
   useState,
   type PropsWithChildren
 } from 'react';
-import { useRuntimeClient } from '../../../app/runtime/RuntimeProvider';
+import { useRuntimeClient } from '@/app/runtime/RuntimeProvider';
 import {
   applyAgentManifestUpdate,
   createAgentManifestFromInput,
   type AgentManifest,
   type AgentManifestInput
 } from './agent-manifest';
-import { AGENT_MANIFESTS_CHANGED_EVENT, loadAgentManifests } from './agent-storage';
-
-function normalizeAgentManifest(value: unknown): AgentManifest {
-  const record = (value ?? {}) as Record<string, unknown>;
-  return {
-    schemaVersion: '1.0',
-    agentId: typeof record.agentId === 'string' ? record.agentId : `agt_${Math.random().toString(36).slice(2, 10)}`,
-    avatarSourceDataUrl: typeof record.avatarSourceDataUrl === 'string' ? record.avatarSourceDataUrl : '',
-    avatarDataUrl: typeof record.avatarDataUrl === 'string' ? record.avatarDataUrl : '',
-    name: typeof record.name === 'string' ? record.name : '',
-    role: typeof record.role === 'string' ? record.role : '',
-    primaryObjective: typeof record.primaryObjective === 'string' ? record.primaryObjective : '',
-    systemDirectiveShort: typeof record.systemDirectiveShort === 'string' ? record.systemDirectiveShort : '',
-    toolsPolicyRef: typeof record.toolsPolicyRef === 'string' ? record.toolsPolicyRef : 'policy_default',
-    createdAt: typeof record.createdAt === 'string' ? record.createdAt : new Date().toISOString(),
-    updatedAt: typeof record.updatedAt === 'string' ? record.updatedAt : new Date().toISOString()
-  };
-}
+import {
+  AGENT_MANIFESTS_CHANGED_EVENT,
+  loadAgentManifests,
+  normalizeAgentManifestRecords
+} from './agent-storage';
 
 function emitAgentManifestsChanged() {
   if (typeof window === 'undefined') {
@@ -71,7 +58,7 @@ function useAgentManifestStoreState(): AgentManifestStoreValue {
 
     const hydrate = async () => {
       try {
-        const persisted = (await runtimeClient.listAgentManifests()).map(normalizeAgentManifest);
+        const persisted = normalizeAgentManifestRecords(await runtimeClient.listAgentManifests());
         if (persisted.length > 0) {
           if (!cancelled) {
             setAgents(persisted);

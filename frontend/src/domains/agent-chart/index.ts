@@ -9,7 +9,7 @@
 // @domain: agent-chart
 // @adr: none
 
-import type { ViewDefinition } from '../../app/shell/model/ui-contract';
+import type { ViewDefinition } from '@/app/shell/model/ui-contract';
 import { AgentChartView } from './view';
 
 export const agentChartViewDefinition: ViewDefinition = {

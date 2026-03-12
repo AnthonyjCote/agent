@@ -10,7 +10,7 @@
 /* @domain: shared */
 /* @adr: none */
 
-@import './ControlField.tokens.css';
+@import '../ControlField.tokens.css';
 
 .text-area-field-control {
   width: 100%;

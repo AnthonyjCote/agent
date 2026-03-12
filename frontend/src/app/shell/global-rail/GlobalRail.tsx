@@ -10,9 +10,9 @@
 // @domain: app
 // @adr: none
 
-import type { ViewMode } from './model/ui-contract';
-import { VIEW_DEFINITIONS, VIEW_ORDER } from './view-registry';
-import { NavTooltipPopover } from '../../shared/ui';
+import type { ViewMode } from '@/app/shell/model/ui-contract';
+import { VIEW_DEFINITIONS, VIEW_ORDER } from '@/app/shell/view-registry/view-registry';
+import { NavTooltipPopover } from '@/shared/ui';
 import './GlobalRail.css';
 
 type GlobalRailProps = {

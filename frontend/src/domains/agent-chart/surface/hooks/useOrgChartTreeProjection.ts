@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
-import { buildOrgUnitTree, type OrgUnitTreeNode } from '../../model';
-import type { Operator, BusinessUnit, OrgUnit } from '../../../../shared/config';
-import type { BusinessUnitTreeNode } from '../types';
+import { buildOrgUnitTree, type OrgUnitTreeNode } from '@/domains/agent-chart/model';
+import type { Operator, BusinessUnit, OrgUnit } from '@/shared/config';
+import type { BusinessUnitTreeNode } from '@/domains/agent-chart/surface/types';
 
 export type OrgChartTreeProjection = {
   orgTree: OrgUnitTreeNode[];

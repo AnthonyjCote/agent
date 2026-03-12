@@ -12,9 +12,9 @@
 // @adr: none
 
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { type AgentManifest, useAgentManifestStore } from '../../../shared/config/agents';
-import { useOrgChartStore } from '../../../shared/config/org-chart';
-import { AgentManifestModal, DebugCardsPanel, buildClientDebugCards, buildRuntimeDebugCards } from '../../../shared/modules';
+import { type AgentManifest, useAgentManifestStore } from '@/shared/config/agents';
+import { useOrgChartStore } from '@/shared/config/org-chart';
+import { AgentManifestModal, DebugCardsPanel, buildClientDebugCards, buildRuntimeDebugCards } from '@/shared/modules';
 import {
   AgentAvatar,
   AgentGrid,
@@ -27,9 +27,9 @@ import {
   TextButton,
   TextField,
   DropdownSelector
-} from '../../../shared/ui';
-import type { SearchQueryLink } from '../lib';
-import { useChatGuiStore } from '../model/ChatGuiStoreProvider';
+} from '@/shared/ui';
+import type { SearchQueryLink } from '@/domains/chat-gui/lib';
+import { useChatGuiStore } from '@/domains/chat-gui/model/ChatGuiStoreProvider';
 import './ChatGuiSurface.css';
 
 const ACTIVE_AGENT_STORAGE_KEY = 'agent-deck:chat:active-agent-id';

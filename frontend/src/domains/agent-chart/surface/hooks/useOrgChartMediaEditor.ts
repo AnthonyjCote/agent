@@ -1,5 +1,5 @@
 import { useRef, useState, type ChangeEvent, type RefObject } from 'react';
-import type { PendingMediaTarget } from '../types';
+import type { PendingMediaTarget } from '@/domains/agent-chart/surface/types';
 
 type UseOrgChartMediaEditorInput = {
   onSave: (target: Exclude<PendingMediaTarget, null>, sourceDataUrl: string, croppedDataUrl: string) => void;

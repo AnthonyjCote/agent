@@ -1,2 +1,2 @@
-export { ChatComposerShell } from './ChatComposerShell';
-export { MessageThreadShell } from './MessageThreadShell';
+export { ChatComposerShell } from './chat-composer-shell/ChatComposerShell';
+export { MessageThreadShell } from './message-thread-shell/MessageThreadShell';

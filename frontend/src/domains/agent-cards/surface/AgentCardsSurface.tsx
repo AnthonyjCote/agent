@@ -11,10 +11,10 @@
 // @adr: none
 
 import { useState } from 'react';
-import { useAgentManifestStore } from '../../../shared/config/agents';
-import { useOrgChartStore } from '../../../shared/config/org-chart';
-import { AgentManifestModal } from '../../../shared/modules';
-import { TextButton } from '../../../shared/ui';
+import { useAgentManifestStore } from '@/shared/config/agents';
+import { useOrgChartStore } from '@/shared/config/org-chart';
+import { AgentManifestModal } from '@/shared/modules';
+import { TextButton } from '@/shared/ui';
 import './AgentCardsSurface.css';
 
 export function AgentCardsSurface() {

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ModalShell, ModalTopRail, TextAreaField, TextButton, TextField } from '../../../../../shared/ui';
+import { ModalShell, ModalTopRail, TextAreaField, TextButton, TextField } from '@/shared/ui';
 import { ComposeSmsContactsModal } from './ComposeSmsContactsModal';
 import './ComposeSmsModal.css';
 

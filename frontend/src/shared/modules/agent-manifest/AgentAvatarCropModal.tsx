@@ -18,7 +18,7 @@ import {
   type MouseEvent,
   type PointerEvent
 } from 'react';
-import { ModalShell, TextButton } from '../../ui';
+import { ModalShell, TextButton } from '@/shared/ui';
 import './AgentAvatarCropModal.css';
 
 type LoadedImage = {

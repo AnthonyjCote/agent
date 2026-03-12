@@ -9,7 +9,7 @@
 // @domain: app-settings
 // @adr: none
 
-import type { ViewDefinition } from '../../app/shell/model/ui-contract';
+import type { ViewDefinition } from '@/app/shell/model/ui-contract';
 import { AppSettingsView } from './view';
 
 export const appSettingsViewDefinition: ViewDefinition = {

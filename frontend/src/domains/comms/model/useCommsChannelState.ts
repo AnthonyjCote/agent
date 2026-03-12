@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { CommsAccountRecord, CommsChannel, CommsMessageRecord, CommsThreadRecord } from '@agent-deck/runtime-client';
-import { useRuntimeClient } from '../../../app/runtime/RuntimeProvider';
+import { useRuntimeClient } from '@/app/runtime/RuntimeProvider';
 
 function isValidSmsAddress(value: string): boolean {
   return /^\+\d{8,15}$/.test(value.trim());

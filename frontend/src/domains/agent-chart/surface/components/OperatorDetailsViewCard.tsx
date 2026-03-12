@@ -1,5 +1,5 @@
-import { AgentAvatar } from '../../../../shared/ui';
-import type { Operator } from '../../../../shared/config';
+import { AgentAvatar } from '@/shared/ui';
+import type { Operator } from '@/shared/config';
 
 type OperatorDetailsViewCardProps = {
   operator: Operator;

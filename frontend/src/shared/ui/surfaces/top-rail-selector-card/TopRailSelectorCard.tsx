@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
-import { useAgentManifestStore, useOrgChartStore } from '../../config';
-import { AgentAvatar } from '../avatar';
-import { resolveAvatarSrc } from '../avatar/resolveAvatarSrc';
+import { useAgentManifestStore, useOrgChartStore } from '@/shared/config';
+import { AgentAvatar } from '@/shared/ui/avatar';
+import { resolveAvatarSrc } from '@/shared/ui/avatar/resolveAvatarSrc';
 import './TopRailSelectorCard.css';
 
 type TopRailSelectorCardProps = {

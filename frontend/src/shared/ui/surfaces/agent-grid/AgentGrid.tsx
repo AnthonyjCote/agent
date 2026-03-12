@@ -10,8 +10,8 @@
 // @domain: shared
 // @adr: none
 
-import type { AgentManifest } from '../../config/agents';
-import { AgentAvatar } from '../avatar';
+import type { AgentManifest } from '@/shared/config/agents';
+import { AgentAvatar } from '@/shared/ui/avatar';
 import './AgentGrid.css';
 
 type AgentGridProps = {

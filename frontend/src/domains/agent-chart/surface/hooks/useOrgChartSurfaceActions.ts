@@ -1,6 +1,6 @@
 import { useState, type Dispatch, type SetStateAction } from 'react';
-import type { OrgCommand } from '../../../../shared/config';
-import type { PendingDelete, SelectedNode } from '../types';
+import type { OrgCommand } from '@/shared/config';
+import type { PendingDelete, SelectedNode } from '@/domains/agent-chart/surface/types';
 
 type UseOrgChartSurfaceActionsInput = {
   execute: (command: OrgCommand) => { ok: boolean; message?: string };

@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { Operator, BusinessUnit, OrgCommand, OrgUnit } from '../../../../shared/config';
-import { TopRailShell } from '../../../../shared/ui';
-import { canEditOrgNode } from '../../lib/permissions';
-import type { PendingDelete } from '../types';
-import type { OrgChartSelectionState } from '../hooks';
+import type { Operator, BusinessUnit, OrgCommand, OrgUnit } from '@/shared/config';
+import { TopRailShell } from '@/shared/ui';
+import { canEditOrgNode } from '@/domains/agent-chart/lib/permissions';
+import type { PendingDelete } from '@/domains/agent-chart/surface/types';
+import type { OrgChartSelectionState } from '@/domains/agent-chart/surface/hooks';
 import { ActorDetailsCard } from './ActorDetailsCard';
 import { BusinessUnitDetailsCard } from './BusinessUnitDetailsCard';
 import { BusinessUnitDetailsViewCard } from './BusinessUnitDetailsViewCard';

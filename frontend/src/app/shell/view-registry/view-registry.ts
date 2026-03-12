@@ -10,13 +10,13 @@
 // @domain: app
 // @adr: none
 
-import type { ViewDefinition, ViewMode } from './model/ui-contract';
-import { chatGuiViewDefinition } from '../../domains/chat-gui';
-import { commsViewDefinition } from '../../domains/comms';
-import { agentCardsViewDefinition } from '../../domains/agent-cards';
-import { agentChartViewDefinition } from '../../domains/agent-chart';
-import { debugViewDefinition } from '../../domains/debug';
-import { appSettingsViewDefinition } from '../../domains/app-settings';
+import type { ViewDefinition, ViewMode } from '@/app/shell/model/ui-contract';
+import { chatGuiViewDefinition } from '@/domains/chat-gui';
+import { commsViewDefinition } from '@/domains/comms';
+import { agentCardsViewDefinition } from '@/domains/agent-cards';
+import { agentChartViewDefinition } from '@/domains/agent-chart';
+import { debugViewDefinition } from '@/domains/debug';
+import { appSettingsViewDefinition } from '@/domains/app-settings';
 
 export function isDebugDomainEnabled(): boolean {
   const raw = String(import.meta.env.VITE_DEBUG_DOMAIN_ENABLED ?? 'true').trim().toLowerCase();

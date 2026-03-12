@@ -8,9 +8,9 @@ import {
   ModalTopRail,
   TextButton,
   TextField
-} from '../../../../shared/ui';
-import { useRuntimeClient } from '../../../../app/runtime/RuntimeProvider';
-import { formatCommsTime, useCommsChannelState } from '../../model';
+} from '@/shared/ui';
+import { useRuntimeClient } from '@/app/runtime/RuntimeProvider';
+import { formatCommsTime, useCommsChannelState } from '@/domains/comms/model';
 import './CommsChatSurface.css';
 
 type ChatContact = {

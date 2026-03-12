@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { RuntimeRunEvent } from '@agent-deck/runtime-client';
-import { useRuntimeClient } from '../../../app/runtime/RuntimeProvider';
+import { useRuntimeClient } from '@/app/runtime/RuntimeProvider';
 
 type DebugTabId = 'run-lab' | 'tool-console' | 'state-inspector';
 

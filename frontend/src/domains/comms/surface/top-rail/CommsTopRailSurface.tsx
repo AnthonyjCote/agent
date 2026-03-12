@@ -1,5 +1,5 @@
 import type { CommsChannel } from '@agent-deck/runtime-client';
-import { TopRailSelectorCard, TopRailShell } from '../../../../shared/ui';
+import { TopRailSelectorCard, TopRailShell } from '@/shared/ui';
 import './CommsTopRailSurface.css';
 
 const CHANNELS: Array<{ id: CommsChannel; label: string }> = [

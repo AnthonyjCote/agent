@@ -1,8 +1,8 @@
 import type { Dispatch, SetStateAction } from 'react';
-import { LeftColumnTopBar, NavTooltipPopover } from '../../../../shared/ui';
-import type { Operator, BusinessUnit, OrgUnit } from '../../../../shared/config';
-import type { BusinessUnitTreeNode, SelectedNode } from '../types';
-import { useOrgChartPointerDnd, type OrgUnitTreeNode } from '../../model';
+import { LeftColumnTopBar, NavTooltipPopover } from '@/shared/ui';
+import type { Operator, BusinessUnit, OrgUnit } from '@/shared/config';
+import type { BusinessUnitTreeNode, SelectedNode } from '@/domains/agent-chart/surface/types';
+import { useOrgChartPointerDnd, type OrgUnitTreeNode } from '@/domains/agent-chart/model';
 import { OrgHierarchyTree } from './OrgHierarchyTree';
 
 type ScopeBucket = 'unassigned';

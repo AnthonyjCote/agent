@@ -1,4 +1,4 @@
-import type { AgentSummary, RuntimeCapabilities } from '@agent-deck/schemas';
+import type { AgentManifestRecord, AgentSummary, RuntimeCapabilities } from '@agent-deck/schemas';
 import type {
   AppendThreadMessageInput,
   AppendCommsMessageInput,
@@ -65,15 +65,15 @@ export class HttpTransport implements AgentRuntimeClient {
     return (await response.json()) as LocalStorageMigrationStatus;
   }
 
-  async listAgentManifests(): Promise<unknown[]> {
+  async listAgentManifests(): Promise<AgentManifestRecord[]> {
     const response = await fetch(`${this.baseUrl}/state/agent-manifests`);
     if (!response.ok) {
       throw new Error(`Failed to fetch agent manifests: ${response.status}`);
     }
-    return (await response.json()) as unknown[];
+    return (await response.json()) as AgentManifestRecord[];
   }
 
-  async replaceAgentManifests(manifests: unknown[]): Promise<void> {
+  async replaceAgentManifests(manifests: AgentManifestRecord[]): Promise<void> {
     const response = await fetch(`${this.baseUrl}/state/agent-manifests`, {
       method: 'PUT',
       headers: { 'content-type': 'application/json' },

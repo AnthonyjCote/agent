@@ -1,8 +1,8 @@
 import { useMemo } from 'react';
-import { useAgentManifestStore, useOrgChartStore } from '../../config';
-import { AgentAvatar } from '../avatar';
-import { resolveAvatarSrc } from '../avatar/resolveAvatarSrc';
-import { ModalShell, type ModalSize } from './ModalShell';
+import { useAgentManifestStore, useOrgChartStore } from '@/shared/config';
+import { AgentAvatar } from '@/shared/ui/avatar';
+import { resolveAvatarSrc } from '@/shared/ui/avatar/resolveAvatarSrc';
+import { ModalShell, type ModalSize } from '@/shared/ui/overlays/modal-shell/ModalShell';
 import './OperatorSelectorModal.css';
 
 export type OperatorSelectorOption = {

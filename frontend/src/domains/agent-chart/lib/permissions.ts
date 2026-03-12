@@ -1,4 +1,4 @@
-import type { SelectedNode } from '../surface/types';
+import type { SelectedNode } from '@/domains/agent-chart/surface/types';
 
 type OrgEditPermissionContext = {
   sessionRole?: 'owner' | 'admin' | 'member' | 'viewer';

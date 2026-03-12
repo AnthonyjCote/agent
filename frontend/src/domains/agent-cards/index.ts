@@ -9,7 +9,7 @@
 // @domain: agent-cards
 // @adr: none
 
-import type { ViewDefinition } from '../../app/shell/model/ui-contract';
+import type { ViewDefinition } from '@/app/shell/model/ui-contract';
 import { AgentCardsView } from './view';
 
 export const agentCardsViewDefinition: ViewDefinition = {

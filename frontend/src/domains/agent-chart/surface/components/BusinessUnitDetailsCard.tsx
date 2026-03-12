@@ -1,4 +1,4 @@
-import { AgentAvatar, DropdownSelector, TextAreaField, TextButton, TextField, type DropdownOption } from '../../../../shared/ui';
+import { AgentAvatar, DropdownSelector, TextAreaField, TextButton, TextField, type DropdownOption } from '@/shared/ui';
 
 type BusinessUnit = {
   id: string;

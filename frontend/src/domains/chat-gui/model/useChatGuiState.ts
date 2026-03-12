@@ -18,7 +18,7 @@ import type {
   ChatThreadSummary,
   RuntimeRunEvent
 } from '@agent-deck/runtime-client';
-import { type ActiveAgent, type ChatMessage, type SearchQueryLink } from '../lib';
+import { type ActiveAgent, type ChatMessage, type SearchQueryLink } from '@/domains/chat-gui/lib';
 
 const WORKSPACE_ID = 'ws_local_v1';
 const FINAL_RESPONSE_SENTINEL = '[[FINAL_RESPONSE]]';

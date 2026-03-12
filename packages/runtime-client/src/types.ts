@@ -1,4 +1,4 @@
-import type { AgentSummary, RuntimeCapabilities } from '@agent-deck/schemas';
+import type { AgentManifestRecord, AgentSummary, RuntimeCapabilities } from '@agent-deck/schemas';
 
 export interface StartRunInput {
   workspaceId: string;
@@ -288,8 +288,8 @@ export interface AgentRuntimeClient {
   listAgents(): Promise<AgentSummary[]>;
   getLocalStorageMigrationStatus(): Promise<LocalStorageMigrationStatus>;
   completeLocalStorageMigration(): Promise<LocalStorageMigrationStatus>;
-  listAgentManifests(): Promise<unknown[]>;
-  replaceAgentManifests(manifests: unknown[]): Promise<void>;
+  listAgentManifests(): Promise<AgentManifestRecord[]>;
+  replaceAgentManifests(manifests: AgentManifestRecord[]): Promise<void>;
   getOrgChartState(): Promise<OrgChartStatePayload | null>;
   saveOrgChartState(payload: OrgChartStatePayload): Promise<void>;
   listThreads(input?: ListThreadsInput): Promise<ChatThreadSummary[]>;

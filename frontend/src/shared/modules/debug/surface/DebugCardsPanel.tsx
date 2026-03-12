@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
-import { DropdownSelector } from '../../../ui';
-import type { DebugCard } from '../lib/debugEventCards';
+import { DropdownSelector } from '@/shared/ui';
+import type { DebugCard } from '@/shared/modules/debug/lib/debugEventCards';
 import './DebugCardsPanel.css';
 
 type DebugCardsPanelProps = {

@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
-import { LeftColumnShell, LeftColumnTopBar, TextButton } from '../../../../shared/ui';
-import { formatCommsTime, useCommsChannelState } from '../../model';
-import { CommsComposeFab } from '../shared';
+import { LeftColumnShell, LeftColumnTopBar, TextButton } from '@/shared/ui';
+import { formatCommsTime, useCommsChannelState } from '@/domains/comms/model';
+import { CommsComposeFab } from '@/domains/comms/surface/shared';
 import { ComposeEmailModal, type ComposeEmailContact } from './compose-modal';
 import { ReadEmailModal } from './read-modal';
 import './CommsEmailSurface.css';

@@ -1,4 +1,4 @@
-import { ModalShell, ModalTopRail, TextAreaField, TextButton, TextField } from '../../../../../shared/ui';
+import { ModalShell, ModalTopRail, TextAreaField, TextButton, TextField } from '@/shared/ui';
 import { useState } from 'react';
 import { ComposeEmailContactsModal } from './ComposeEmailContactsModal';
 import './ComposeEmailModal.css';

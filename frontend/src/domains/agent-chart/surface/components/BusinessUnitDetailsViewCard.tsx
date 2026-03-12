@@ -1,4 +1,4 @@
-import { AgentAvatar } from '../../../../shared/ui';
+import { AgentAvatar } from '@/shared/ui';
 
 type BusinessUnit = {
   name: string;

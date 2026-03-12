@@ -12,7 +12,7 @@
 // @adr: none
 
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
-import type { Operator, BusinessUnit, OrgCommand, OrgUnit } from '../../../shared/config';
+import type { Operator, BusinessUnit, OrgCommand, OrgUnit } from '@/shared/config';
 
 type DragPayload =
   | { kind: 'org_unit'; id: string }

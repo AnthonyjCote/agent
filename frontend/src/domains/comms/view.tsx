@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { CommsChannel } from '@agent-deck/runtime-client';
 import { CommsChatSurface, CommsEmailSurface, CommsSmsSurface, CommsTopRailSurface } from './surface';
-import { useAgentManifestStore, useOrgChartStore } from '../../shared/config';
-import { OperatorSelectorModal } from '../../shared/ui';
+import { useAgentManifestStore, useOrgChartStore } from '@/shared/config';
+import { OperatorSelectorModal } from '@/shared/ui';
 import './view.css';
 
 const COMMS_ACTIVE_OPERATOR_STORAGE_KEY = 'agent-deck.comms.active-operator-id';

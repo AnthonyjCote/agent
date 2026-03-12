@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useAgentManifestStore, useOrgChartStore } from '../../../shared/config';
+import { useAgentManifestStore, useOrgChartStore } from '@/shared/config';
 import {
   TextButton,
   TopRailShell,
   DropdownSelector,
   TopRailSelectorCard,
   OperatorSelectorModal
-} from '../../../shared/ui';
-import { DebugCardsPanel, buildRuntimeDebugCards } from '../../../shared/modules';
-import { useDebugDomainState, type DebugOperatorRef } from '../model/useDebugDomainState';
+} from '@/shared/ui';
+import { DebugCardsPanel, buildRuntimeDebugCards } from '@/shared/modules';
+import { useDebugDomainState, type DebugOperatorRef } from '@/domains/debug/model/useDebugDomainState';
 import './DebugSurface.css';
 
 const DEBUG_ACTIVE_OPERATOR_STORAGE_KEY = 'agent-deck.debug.active-operator-id';

@@ -1,4 +1,4 @@
-import type { Operator } from '../../../../shared/config';
+import type { Operator } from '@/shared/config';
 import type { ReactNode } from 'react';
 
 export function NodeMediaIcon({

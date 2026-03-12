@@ -10,9 +10,9 @@
 // @domain: app
 // @adr: none
 
-import type { ViewDefinition, ViewMode } from './model/ui-contract';
-import { GlobalRail } from './GlobalRail';
-import { ViewRouter } from './ViewRouter';
+import type { ViewDefinition, ViewMode } from '@/app/shell/model/ui-contract';
+import { GlobalRail } from '@/app/shell/global-rail/GlobalRail';
+import { ViewRouter } from '@/app/shell/view-router/ViewRouter';
 import './ShellFrame.css';
 
 type ShellFrameProps = {

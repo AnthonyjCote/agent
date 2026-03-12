@@ -1,5 +1,5 @@
-import { AgentAvatar, DropdownSelector, TextAreaField, TextButton, TextField, type DropdownOption } from '../../../../shared/ui';
-import type { Operator } from '../../../../shared/config';
+import { AgentAvatar, DropdownSelector, TextAreaField, TextButton, TextField, type DropdownOption } from '@/shared/ui';
+import type { Operator } from '@/shared/config';
 
 type ActorDetailsCardProps = {
   operator: Operator;

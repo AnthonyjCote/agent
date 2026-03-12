@@ -10,8 +10,8 @@
 // @domain: shared
 // @adr: none
 
-import { TextButton } from '../controls';
-import { ModalShell } from './ModalShell';
+import { TextButton } from '@/shared/ui/controls';
+import { ModalShell } from '@/shared/ui/overlays/modal-shell/ModalShell';
 import './ConfirmDialogModal.css';
 
 type ConfirmDialogModalProps = {

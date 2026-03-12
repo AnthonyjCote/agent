@@ -10,6 +10,7 @@
 // @domain: shared
 // @adr: none
 
+import type { AgentManifestRecord } from '@agent-deck/schemas';
 import type { AgentManifest } from './agent-manifest';
 
 const STORAGE_KEY = 'agent-deck.agent-manifests';
@@ -37,25 +38,31 @@ export function loadAgentManifests(): AgentManifest[] {
     if (!Array.isArray(parsed)) {
       return [];
     }
-    return parsed.map((item) => {
-      const record = (item ?? {}) as Record<string, unknown>;
-      return {
-        schemaVersion: '1.0',
-        agentId: typeof record.agentId === 'string' ? record.agentId : `agt_${Math.random().toString(36).slice(2, 10)}`,
-        avatarSourceDataUrl: typeof record.avatarSourceDataUrl === 'string' ? record.avatarSourceDataUrl : '',
-        avatarDataUrl: typeof record.avatarDataUrl === 'string' ? record.avatarDataUrl : '',
-        name: typeof record.name === 'string' ? record.name : '',
-        role: typeof record.role === 'string' ? record.role : '',
-        primaryObjective: typeof record.primaryObjective === 'string' ? record.primaryObjective : '',
-        systemDirectiveShort: typeof record.systemDirectiveShort === 'string' ? record.systemDirectiveShort : '',
-        toolsPolicyRef: typeof record.toolsPolicyRef === 'string' ? record.toolsPolicyRef : 'policy_default',
-        createdAt: typeof record.createdAt === 'string' ? record.createdAt : new Date().toISOString(),
-        updatedAt: typeof record.updatedAt === 'string' ? record.updatedAt : new Date().toISOString()
-      };
-    });
+    return normalizeAgentManifestRecords(parsed);
   } catch {
     return [];
   }
+}
+
+export function normalizeAgentManifestRecord(value: AgentManifestRecord | unknown): AgentManifest {
+  const record = (value ?? {}) as Record<string, unknown>;
+  return {
+    schemaVersion: '1.0',
+    agentId: typeof record.agentId === 'string' ? record.agentId : `agt_${Math.random().toString(36).slice(2, 10)}`,
+    avatarSourceDataUrl: typeof record.avatarSourceDataUrl === 'string' ? record.avatarSourceDataUrl : '',
+    avatarDataUrl: typeof record.avatarDataUrl === 'string' ? record.avatarDataUrl : '',
+    name: typeof record.name === 'string' ? record.name : '',
+    role: typeof record.role === 'string' ? record.role : '',
+    primaryObjective: typeof record.primaryObjective === 'string' ? record.primaryObjective : '',
+    systemDirectiveShort: typeof record.systemDirectiveShort === 'string' ? record.systemDirectiveShort : '',
+    toolsPolicyRef: typeof record.toolsPolicyRef === 'string' ? record.toolsPolicyRef : 'policy_default',
+    createdAt: typeof record.createdAt === 'string' ? record.createdAt : new Date().toISOString(),
+    updatedAt: typeof record.updatedAt === 'string' ? record.updatedAt : new Date().toISOString()
+  };
+}
+
+export function normalizeAgentManifestRecords(values: Array<AgentManifestRecord | unknown>): AgentManifest[] {
+  return values.map((value) => normalizeAgentManifestRecord(value));
 }
 
 export function saveAgentManifests(manifests: AgentManifest[]) {

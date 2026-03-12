@@ -1,4 +1,4 @@
-import type { AgentSummary, RuntimeCapabilities } from '@agent-deck/schemas';
+import type { AgentManifestRecord, AgentSummary, RuntimeCapabilities } from '@agent-deck/schemas';
 import type {
   AppendThreadMessageInput,
   AppendCommsMessageInput,
@@ -53,12 +53,12 @@ export class TauriTransport implements AgentRuntimeClient {
     return invoke<LocalStorageMigrationStatus>('complete_localstorage_migration');
   }
 
-  async listAgentManifests(): Promise<unknown[]> {
+  async listAgentManifests(): Promise<AgentManifestRecord[]> {
     const invoke = await this.getInvoke();
-    return invoke<unknown[]>('list_agent_manifests');
+    return invoke<AgentManifestRecord[]>('list_agent_manifests');
   }
 
-  async replaceAgentManifests(manifests: unknown[]): Promise<void> {
+  async replaceAgentManifests(manifests: AgentManifestRecord[]): Promise<void> {
     const invoke = await this.getInvoke();
     await invoke<void>('replace_agent_manifests', { manifests });
   }

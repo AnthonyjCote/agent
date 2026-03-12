@@ -1,1 +1,1 @@
-export { CenteredEmptyState } from './CenteredEmptyState';
+export { CenteredEmptyState } from './centered-empty-state/CenteredEmptyState';
