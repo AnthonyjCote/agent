@@ -4,6 +4,7 @@ import type {
   AppendCommsMessageInput,
   AgentRuntimeClient,
   CommsAccountRecord,
+  CommsOperatorPurgeResult,
   CommsMessageRecord,
   CommsThreadRecord,
   CreateCommsThreadInput,
@@ -270,6 +271,17 @@ export class HttpTransport implements AgentRuntimeClient {
       throw new Error(`Failed to append comms message: ${response.status}`);
     }
     return (await response.json()) as CommsMessageRecord;
+  }
+
+  async purgeOperatorCommsData(operatorId: string): Promise<CommsOperatorPurgeResult> {
+    const response = await fetch(
+      `${this.baseUrl}/comms/operators/${encodeURIComponent(operatorId)}/data`,
+      { method: 'DELETE' }
+    );
+    if (!response.ok) {
+      throw new Error(`Failed to purge operator comms data: ${response.status}`);
+    }
+    return (await response.json()) as CommsOperatorPurgeResult;
   }
 
   async dispatchWorkUnit(input: DispatchWorkUnitInput): Promise<DispatchWorkUnitResult> {

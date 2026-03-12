@@ -4,7 +4,7 @@ use adapter::{desktop_capabilities, list_seed_agents, AgentSummary, RuntimeCapab
 use app_persistence::{
     bootstrap_workspace, OrgChartStateRecord, PersistenceHealthReport, PersistenceStateStore,
     CommsDeliveryService, SendChatInput, SendEmailInput, SendSmsInput,
-    CommsAccountRecord, CommsMessageRecord, CommsThreadRecord, ThreadMessageRecord, ThreadRecord,
+    CommsAccountRecord, CommsMessageRecord, CommsOperatorPurgeResult, CommsThreadRecord, ThreadMessageRecord, ThreadRecord,
     WorkUnitRecord,
 };
 use agent_desktop::runtime_service::{RuntimeService, StartRunInput};
@@ -443,6 +443,17 @@ fn delete_comms_thread(
     let workspace_id = state_store.workspace_id().map_err(|error| error.to_string())?;
     state_store
         .delete_comms_thread(&workspace_id, &thread_id)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn purge_operator_comms_data(
+    state_store: State<'_, Arc<PersistenceStateStore>>,
+    operator_id: String,
+) -> Result<CommsOperatorPurgeResult, String> {
+    let workspace_id = state_store.workspace_id().map_err(|error| error.to_string())?;
+    state_store
+        .purge_operator_comms_data(&workspace_id, &operator_id)
         .map_err(|error| error.to_string())
 }
 
@@ -932,6 +943,7 @@ fn main() {
             create_comms_thread,
             update_comms_thread,
             delete_comms_thread,
+            purge_operator_comms_data,
             list_comms_messages,
             append_comms_message,
             list_work_units,

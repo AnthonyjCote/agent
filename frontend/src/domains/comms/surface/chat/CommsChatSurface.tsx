@@ -5,7 +5,7 @@ import {
   ConfirmDialogModal,
   IconButton,
   LeftColumnShell,
-  LeftColumnTopBar,
+  ActionRail,
   ModalShell,
   ModalTopRail,
   NavTooltipPopover,
@@ -257,7 +257,7 @@ export function CommsChatSurface({
         width="wide"
         left={
           <aside className="comms-chat-sidebar">
-            <LeftColumnTopBar
+            <ActionRail
               tone="raised"
               left={<span className="comms-chat-sidebar-title">Chats</span>}
               right={

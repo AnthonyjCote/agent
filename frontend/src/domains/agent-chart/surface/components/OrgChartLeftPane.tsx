@@ -1,5 +1,5 @@
 import type { Dispatch, SetStateAction } from 'react';
-import { IconButton, LeftColumnTopBar, NavTooltipPopover } from '@/shared/ui';
+import { IconButton, ActionRail, NavTooltipPopover } from '@/shared/ui';
 import type { Operator, BusinessUnit, OrgUnit } from '@/shared/config';
 import type { BusinessUnitTreeNode, SelectedNode } from '@/domains/agent-chart/surface/types';
 import { useOrgChartPointerDnd, type OrgUnitTreeNode } from '@/domains/agent-chart/model';
@@ -76,7 +76,7 @@ export function OrgChartLeftPane(props: OrgChartLeftPaneProps) {
 
   return (
     <section className="agent-chart-left-pane" aria-label="Org hierarchy">
-      <LeftColumnTopBar
+      <ActionRail
         tone="raised"
         left={
           <div className="agent-chart-icon-actions">

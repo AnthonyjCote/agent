@@ -24,6 +24,7 @@ import {
   ModalTopRail,
   ModalShell,
   ConfirmDialogModal,
+  DataListTable,
   TextButton,
   TextField,
   DropdownSelector
@@ -925,21 +926,34 @@ export function ChatGuiSurface() {
     >
       <div className="chat-gui-debug-layout">
         <aside className="chat-gui-debug-runs">
-          {threadDebugRuns.map((run) => (
-            <button
-              key={run.runId}
-              type="button"
-              className={`chat-gui-debug-run-item ${selectedDebugRun?.runId === run.runId ? 'is-active' : ''}`}
-              onClick={() => setSelectedDebugRunId(run.runId)}
-            >
-              <span className="chat-gui-debug-run-id">{run.runId}</span>
-              <span className={`chat-gui-debug-run-status status-${run.status}`}>{run.status}</span>
-              <span className="chat-gui-debug-run-prompt">{run.prompt}</span>
-            </button>
-          ))}
-          {threadDebugRuns.length === 0 ? (
-            <div className="chat-gui-debug-empty">No runs yet for this conversation.</div>
-          ) : null}
+          <DataListTable
+            variant="full-bleed"
+            showHeader={false}
+            columns={[
+              {
+                key: 'run',
+                header: 'Run',
+                className: 'chat-gui-debug-run-table-main',
+                render: (run) => (
+                  <div className="chat-gui-debug-run-table-main-cell">
+                    <span className="chat-gui-debug-run-id">{run.runId}</span>
+                    <span className="chat-gui-debug-run-prompt">{run.prompt}</span>
+                  </div>
+                )
+              },
+              {
+                key: 'status',
+                header: 'Status',
+                className: 'chat-gui-debug-run-table-status',
+                render: (run) => <span className={`chat-gui-debug-run-status status-${run.status}`}>{run.status}</span>
+              }
+            ]}
+            rows={threadDebugRuns}
+            getRowKey={(run) => run.runId}
+            activeRowKey={selectedDebugRun?.runId || null}
+            onRowClick={(run) => setSelectedDebugRunId(run.runId)}
+            emptyState={<div className="chat-gui-debug-empty">No runs yet for this conversation.</div>}
+          />
         </aside>
         <section className="chat-gui-debug-detail">
           <div className="chat-gui-debug-meta">

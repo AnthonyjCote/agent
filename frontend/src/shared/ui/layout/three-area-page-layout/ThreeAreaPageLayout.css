@@ -1,0 +1,46 @@
+.three-area-page-layout {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
+.three-area-page-layout-top {
+  min-height: 0;
+}
+
+.three-area-page-layout-main {
+  min-height: 0;
+  height: 100%;
+}
+
+.three-area-page-layout-main > .left-column-shell,
+.three-area-page-layout-main > .workspace-surface {
+  height: 100%;
+  min-height: 0;
+}
+
+.three-area-page-layout-left {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-height: 0;
+  height: 100%;
+}
+
+.three-area-page-layout-left-body {
+  min-height: 0;
+  overflow: auto;
+}
+
+.three-area-page-layout-workspace {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-height: 0;
+  height: 100%;
+}
+
+.three-area-page-layout-workspace-body {
+  min-height: 0;
+  overflow: auto;
+}

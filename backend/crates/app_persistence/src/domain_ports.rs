@@ -223,19 +223,9 @@ impl CommsToolStore for PersistenceCommsToolPort {
         let title_filter = title.map(str::trim).filter(|value| !value.is_empty());
         let mut rows = Vec::new();
         for account in accounts {
-            let (operator_name, operator_title) = operator_index
-                .get(&account.operator_id)
-                .cloned()
-                .unwrap_or_else(|| {
-                    let fallback_name = account
-                        .display_name
-                        .split('(')
-                        .next()
-                        .unwrap_or(&account.display_name)
-                        .trim()
-                        .to_string();
-                    (fallback_name, "Operator".to_string())
-                });
+            let Some((operator_name, operator_title)) = operator_index.get(&account.operator_id).cloned() else {
+                continue;
+            };
 
             if let Some(filter) = name_filter {
                 if !Self::fuzzy_match(&operator_name, filter) {

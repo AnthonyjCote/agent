@@ -2,10 +2,12 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAgentManifestStore, useOrgChartStore } from '@/shared/config';
 import {
   TextButton,
-  TopRailShell,
   DropdownSelector,
   TopRailSelectorCard,
-  OperatorSelectorModal
+  OperatorSelectorModal,
+  ThreeAreaPageLayout,
+  DataListTable,
+  TextAreaField
 } from '@/shared/ui';
 import { DebugCardsPanel, buildRuntimeDebugCards } from '@/shared/modules';
 import { useDebugDomainState, type DebugOperatorRef } from '@/domains/debug/model/useDebugDomainState';
@@ -116,8 +118,11 @@ export function DebugSurface() {
 
   return (
     <section className="debug-surface">
-      <TopRailShell
-        left={
+      <ThreeAreaPageLayout
+        showTopRail
+        showLeftColumn={activeTab === 'run-lab'}
+        leftColumnWidth="standard"
+        topRailLeft={
           <div className="debug-top-left">
             <h2>Debug Workspace</h2>
             <div className="debug-top-tabs" role="tablist" aria-label="Debug tabs">
@@ -134,7 +139,7 @@ export function DebugSurface() {
             </div>
           </div>
         }
-        right={
+        topRailRight={
           <div className="debug-top-right">
             {activeTab === 'run-lab' ? (
               <TextButton label={runsLoading ? 'Refreshing...' : 'Refresh'} variant="ghost" onClick={() => void refreshRuns()} />
@@ -151,30 +156,48 @@ export function DebugSurface() {
             />
           </div>
         }
-      />
-
-      <div className="debug-content">
-        {activeTab === 'run-lab' ? (
-          <section className="debug-run-lab">
+        leftColumnContent={
+          activeTab === 'run-lab' ? (
             <aside className="debug-runs-list">
               {runsLoading ? <div className="debug-empty">Loading runs...</div> : null}
-              {!runsLoading && runs.length === 0 ? <div className="debug-empty">No runs found for this operator.</div> : null}
-              {!runsLoading
-                ? runs.map((run) => (
-                    <button
-                      key={run.runId}
-                      type="button"
-                      className={`debug-run-item${selectedRunId === run.runId ? ' is-active' : ''}`}
-                      onClick={() => setSelectedRunId(run.runId)}
-                    >
-                      <span className="debug-run-id">{run.runId}</span>
-                      <span className={`debug-run-status status-${run.status}`}>{run.status}</span>
-                      <span className="debug-run-prompt">{run.prompt}</span>
-                    </button>
-                  ))
-                : null}
+              {!runsLoading ? (
+                <DataListTable
+                  variant="full-bleed"
+                  showHeader={false}
+                  columns={[
+                    {
+                      key: 'run',
+                      header: 'Run',
+                      className: 'debug-run-table-main',
+                      render: (run) => (
+                        <div className="debug-run-table-main-cell">
+                          <span className="debug-run-id">{run.runId}</span>
+                          <span className="debug-run-prompt">{run.prompt}</span>
+                        </div>
+                      )
+                    },
+                    {
+                      key: 'status',
+                      header: 'Status',
+                      className: 'debug-run-table-status',
+                      render: (run) => <span className={`debug-run-status status-${run.status}`}>{run.status}</span>
+                    }
+                  ]}
+                  rows={runs}
+                  getRowKey={(run) => run.runId}
+                  activeRowKey={selectedRunId}
+                  onRowClick={(run) => setSelectedRunId(run.runId)}
+                  emptyState={<div className="debug-empty">No runs found for this operator.</div>}
+                />
+              ) : null}
             </aside>
-            <div className="debug-run-detail">
+          ) : null
+        }
+        workspaceClassName="debug-workspace"
+        workspaceContent={
+          <div className="debug-content">
+            {activeTab === 'run-lab' ? (
+              <section className="debug-run-detail">
               <div className="debug-run-meta">
                 <span>Run: {selectedRun?.runId || 'none'}</span>
                 <span>Status: {selectedRun?.status || 'idle'}</span>
@@ -197,12 +220,11 @@ export function DebugSurface() {
                 onErrorsOnlyChange={setErrorsOnly}
                 onCopyRaw={copyRaw}
               />
-            </div>
-          </section>
-        ) : null}
+              </section>
+            ) : null}
 
-        {activeTab === 'tool-console' ? (
-          <section className="debug-tool-console">
+            {activeTab === 'tool-console' ? (
+              <section className="debug-tool-console">
             <header>
               <h3>Tool Console</h3>
               <p>Manual tool invocation using runtime execution path and operator scope rules.</p>
@@ -224,28 +246,30 @@ export function DebugSurface() {
               />
             </div>
             <label className="debug-label">Args JSON</label>
-            <textarea
-              className="debug-json-input"
+            <TextAreaField
               value={toolArgsText}
-              onChange={(event) => setToolArgsText(event.currentTarget.value)}
-              spellCheck={false}
+              onValueChange={setToolArgsText}
+              ariaLabel="Tool args JSON input"
+              minRows={10}
             />
             {toolError ? <p className="debug-error">{toolError}</p> : null}
             <label className="debug-label">Result</label>
             <pre className="debug-json-output">{toolResultRaw || '(no result yet)'}</pre>
-          </section>
-        ) : null}
+              </section>
+            ) : null}
 
-        {activeTab === 'state-inspector' ? (
-          <section className="debug-state-inspector">
+            {activeTab === 'state-inspector' ? (
+              <section className="debug-state-inspector">
             <header>
               <h3>State Inspector</h3>
               <p>Read-only snapshot for org and comms state tied to the selected operator.</p>
             </header>
             <pre className="debug-json-output">{stateSnapshotRaw || '(no snapshot loaded yet)'}</pre>
-          </section>
-        ) : null}
-      </div>
+              </section>
+            ) : null}
+          </div>
+        }
+      />
 
       <OperatorSelectorModal
         open={operatorPickerOpen}

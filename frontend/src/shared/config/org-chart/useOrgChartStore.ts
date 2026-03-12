@@ -375,8 +375,22 @@ function useOrgChartStoreState(): OrgChartStoreValue {
   const operators = useMemo(() => sortActors(data.snapshot.operators), [data.snapshot.operators]);
 
   const execute = (command: OrgCommand): OrgCommandResult => {
+    let removedOperatorIds: string[] = [];
     try {
-      setData((current) => executeOrgCommand(current, command));
+      setData((current) => {
+        const next = executeOrgCommand(current, command);
+        const currentIds = new Set(current.snapshot.operators.map((operator) => operator.id));
+        const nextIds = new Set(next.snapshot.operators.map((operator) => operator.id));
+        removedOperatorIds = [...currentIds].filter((id) => !nextIds.has(id));
+        return next;
+      });
+      if (removedOperatorIds.length > 0) {
+        removedOperatorIds.forEach((operatorId) => {
+          void runtimeClient.purgeOperatorCommsData(operatorId).catch((error) => {
+            console.error(`Failed to purge comms data for deleted operator ${operatorId}.`, error);
+          });
+        });
+      }
       return { ok: true };
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to apply org-chart change.';

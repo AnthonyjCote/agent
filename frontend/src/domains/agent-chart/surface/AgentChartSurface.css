@@ -49,11 +49,11 @@
   padding: 0;
 }
 
-.agent-chart-surface .left-column-top-bar {
+.agent-chart-surface .action-rail {
   min-height: 56px;
 }
 
-.agent-chart-right-pane > .left-column-top-bar {
+.agent-chart-right-pane > .action-rail {
   padding: 10px 28px;
 }
 

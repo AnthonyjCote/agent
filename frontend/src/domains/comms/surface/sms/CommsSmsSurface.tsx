@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { AgentAvatar, ConfirmDialogModal, DataListTable, IconButton, LeftColumnShell, LeftColumnTopBar, TextButton, TextField, WorkspaceSurface } from '@/shared/ui';
+import { AgentAvatar, ConfirmDialogModal, DataListTable, IconButton, LeftColumnShell, ActionRail, TextButton, TextField, WorkspaceSurface } from '@/shared/ui';
 import { useRuntimeClient } from '@/app/runtime/RuntimeProvider';
 import { formatCommsTime, useCommsChannelState } from '@/domains/comms/model';
 import { ComposeSmsModal, type ComposeSmsContact } from './compose-modal';
@@ -230,7 +230,7 @@ export function CommsSmsSurface({
         width="wide"
         left={
           <aside className="comms-sms-sidebar">
-            <LeftColumnTopBar
+            <ActionRail
               tone="raised"
               left={<span className="comms-sms-sidebar-title">SMS Threads</span>}
               right={<span className="comms-sms-sidebar-count">{state.threads.length}</span>}

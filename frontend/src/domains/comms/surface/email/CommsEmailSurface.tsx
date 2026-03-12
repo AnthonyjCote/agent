@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { CommsMessageRecord, CommsThreadRecord } from '@agent-deck/runtime-client';
-import { AgentAvatar, DataListTable, IconButton, LeftColumnShell, LeftColumnTopBar, TextButton, WorkspaceSurface } from '@/shared/ui';
+import { AgentAvatar, DataListTable, IconButton, LeftColumnShell, ActionRail, TextButton, WorkspaceSurface } from '@/shared/ui';
 import { formatCommsTime, useCommsChannelState } from '@/domains/comms/model';
 import { inferHeuristicEmailTags } from '@/domains/comms/lib/emailHeuristicTags';
 import { useRuntimeClient } from '@/app/runtime/RuntimeProvider';
@@ -499,7 +499,7 @@ export function CommsEmailSurface({
         width="wide"
         left={
           <aside className="comms-email-sidebar">
-            <LeftColumnTopBar
+            <ActionRail
               tone="raised"
               left={
                 <div className="comms-email-sidebar-title-wrap">
@@ -557,7 +557,7 @@ export function CommsEmailSurface({
         }
         right={
           <WorkspaceSurface className="comms-email-main">
-            <LeftColumnTopBar
+            <ActionRail
               tone="raised"
               left={<span className="comms-email-action-rail-title">{folder.charAt(0).toUpperCase() + folder.slice(1)}</span>}
               right={

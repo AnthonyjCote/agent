@@ -103,6 +103,15 @@ pub struct CommsMessageRecord {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct CommsOperatorPurgeResult {
+    pub operator_id: String,
+    pub accounts_deleted: i64,
+    pub threads_deleted: i64,
+    pub messages_deleted: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct WorkUnitRecord {
     pub work_unit_id: String,
     pub domain: String,
@@ -879,6 +888,79 @@ impl PersistenceStateStore {
             )
             .optional()
             .map_err(|error| self.runtime_sql_error("Failed to load comms account by address", error))
+    }
+
+    pub fn purge_operator_comms_data(
+        &self,
+        workspace_id: &str,
+        operator_id: &str,
+    ) -> Result<CommsOperatorPurgeResult, PersistenceError> {
+        let connection = self.open_runtime_db()?;
+        let transaction = connection
+            .unchecked_transaction()
+            .map_err(|error| self.runtime_sql_error("Failed to begin purge_operator_comms_data transaction", error))?;
+
+        let messages_deleted = transaction
+            .execute(
+                "
+                DELETE FROM comms_messages
+                WHERE workspace_id = ?1
+                  AND thread_id IN (
+                    SELECT thread_id
+                    FROM comms_threads
+                    WHERE workspace_id = ?1
+                      AND account_id IN (
+                        SELECT account_id
+                        FROM comms_accounts
+                        WHERE workspace_id = ?1
+                          AND operator_id = ?2
+                      )
+                  )
+                ",
+                params![workspace_id, operator_id.trim()],
+            )
+            .map_err(|error| self.runtime_sql_error("Failed to purge comms messages for operator", error))?
+            as i64;
+
+        let threads_deleted = transaction
+            .execute(
+                "
+                DELETE FROM comms_threads
+                WHERE workspace_id = ?1
+                  AND account_id IN (
+                    SELECT account_id
+                    FROM comms_accounts
+                    WHERE workspace_id = ?1
+                      AND operator_id = ?2
+                  )
+                ",
+                params![workspace_id, operator_id.trim()],
+            )
+            .map_err(|error| self.runtime_sql_error("Failed to purge comms threads for operator", error))?
+            as i64;
+
+        let accounts_deleted = transaction
+            .execute(
+                "
+                DELETE FROM comms_accounts
+                WHERE workspace_id = ?1
+                  AND operator_id = ?2
+                ",
+                params![workspace_id, operator_id.trim()],
+            )
+            .map_err(|error| self.runtime_sql_error("Failed to purge comms accounts for operator", error))?
+            as i64;
+
+        transaction
+            .commit()
+            .map_err(|error| self.runtime_sql_error("Failed to commit purge_operator_comms_data transaction", error))?;
+
+        Ok(CommsOperatorPurgeResult {
+            operator_id: operator_id.trim().to_string(),
+            accounts_deleted,
+            threads_deleted,
+            messages_deleted,
+        })
     }
 
     pub fn list_comms_threads(

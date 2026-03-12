@@ -2,7 +2,7 @@ use adapter::{list_seed_agents, server_capabilities, AgentSummary, RuntimeCapabi
 use app_persistence::{
     bootstrap_workspace, OrgChartStateRecord, PersistenceHealthReport, PersistenceStateStore,
     CommsDeliveryService, SendChatInput, SendEmailInput, SendSmsInput,
-    CommsAccountRecord, CommsMessageRecord, CommsThreadRecord, ThreadMessageRecord, ThreadRecord,
+    CommsAccountRecord, CommsMessageRecord, CommsOperatorPurgeResult, CommsThreadRecord, ThreadMessageRecord, ThreadRecord,
     WorkUnitRecord,
 };
 use agent_core::models::{
@@ -12,6 +12,7 @@ use agent_core::models::{
 use agent_server::runtime_service::RuntimeService;
 use axum::{
     extract::{Path, State},
+    routing::delete,
     routing::post,
     routing::get,
     routing::patch,
@@ -638,6 +639,17 @@ async fn delete_comms_thread(
     Ok(axum::http::StatusCode::NO_CONTENT)
 }
 
+async fn purge_operator_comms_data(
+    State(state): State<AppState>,
+    Path(operator_id): Path<String>,
+) -> Result<Json<CommsOperatorPurgeResult>, (axum::http::StatusCode, String)> {
+    let result = state
+        .state_store
+        .purge_operator_comms_data(&state.workspace_id, &operator_id)
+        .map_err(internal_error)?;
+    Ok(Json(result))
+}
+
 async fn list_comms_messages(
     State(state): State<AppState>,
     Path(thread_id): Path<String>,
@@ -1009,6 +1021,10 @@ async fn main() {
         .route(
             "/comms/threads/{thread_id}",
             patch(update_comms_thread).delete(delete_comms_thread),
+        )
+        .route(
+            "/comms/operators/{operator_id}/data",
+            delete(purge_operator_comms_data),
         )
         .route(
             "/comms/threads/{thread_id}/messages",

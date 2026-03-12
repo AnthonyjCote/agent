@@ -17,7 +17,7 @@ pub use comms_delivery::CommsDeliveryService;
 pub use org_domain_adapter::OrgManageExecutionOutput;
 pub use sqlite::{bootstrap_workspace, BootstrapResult, DatabaseKind};
 pub use state::{
-    CommsAccountRecord, CommsMessageRecord, CommsThreadRecord, OrgChartStateRecord,
+    CommsAccountRecord, CommsMessageRecord, CommsOperatorPurgeResult, CommsThreadRecord, OrgChartStateRecord,
     PersistenceStateStore, ThreadMessageRecord, ThreadRecord, WorkUnitRecord,
 };
 pub use workspace::{WorkspaceMetadata, WorkspacePaths};

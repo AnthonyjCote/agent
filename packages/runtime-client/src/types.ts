@@ -124,6 +124,13 @@ export interface CommsMessageRecord {
   createdAtMs: number;
 }
 
+export interface CommsOperatorPurgeResult {
+  operatorId: string;
+  accountsDeleted: number;
+  threadsDeleted: number;
+  messagesDeleted: number;
+}
+
 export interface ListCommsAccountsInput {
   operatorId?: string;
   channel?: CommsChannel;
@@ -306,6 +313,7 @@ export interface AgentRuntimeClient {
   deleteCommsThread(threadId: string): Promise<void>;
   listCommsMessages(threadId: string, limit?: number, offset?: number): Promise<CommsMessageRecord[]>;
   appendCommsMessage(input: AppendCommsMessageInput): Promise<CommsMessageRecord>;
+  purgeOperatorCommsData(operatorId: string): Promise<CommsOperatorPurgeResult>;
   dispatchWorkUnit(input: DispatchWorkUnitInput): Promise<DispatchWorkUnitResult>;
   listWorkUnits(status?: string, limit?: number, offset?: number): Promise<WorkUnitRecord[]>;
   startRun(input: StartRunInput): Promise<StartRunResponse>;

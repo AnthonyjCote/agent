@@ -123,6 +123,26 @@ function useAgentManifestStoreState(): AgentManifestStoreValue {
   };
 
   const deleteAgent = (agentId: string) => {
+    void runtimeClient
+      .getOrgChartState()
+      .then((state) => {
+        const operators = (state?.snapshot as { operators?: Array<{ id?: string; sourceAgentId?: string | null }> } | null)
+          ?.operators;
+        if (!Array.isArray(operators)) {
+          return;
+        }
+        operators
+          .filter((operator) => operator.sourceAgentId === agentId)
+          .map((operator) => (typeof operator.id === 'string' ? operator.id : ''))
+          .filter((operatorId) => operatorId.length > 0)
+          .forEach((operatorId) => {
+            void runtimeClient.purgeOperatorCommsData(operatorId).catch((error) => {
+              console.error(`Failed to purge comms data for deleted agent operator ${operatorId}.`, error);
+            });
+          });
+      })
+      .catch(() => undefined);
+
     setAgents((current) => current.filter((agent) => agent.agentId !== agentId));
     emitAgentManifestsChanged();
   };

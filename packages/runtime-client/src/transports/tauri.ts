@@ -4,6 +4,7 @@ import type {
   AppendCommsMessageInput,
   AgentRuntimeClient,
   CommsAccountRecord,
+  CommsOperatorPurgeResult,
   CommsMessageRecord,
   CommsThreadRecord,
   CreateCommsThreadInput,
@@ -141,6 +142,11 @@ export class TauriTransport implements AgentRuntimeClient {
   async appendCommsMessage(input: AppendCommsMessageInput): Promise<CommsMessageRecord> {
     const invoke = await this.getInvoke();
     return invoke<CommsMessageRecord>('append_comms_message', { input });
+  }
+
+  async purgeOperatorCommsData(operatorId: string): Promise<CommsOperatorPurgeResult> {
+    const invoke = await this.getInvoke();
+    return invoke<CommsOperatorPurgeResult>('purge_operator_comms_data', { operatorId });
   }
 
   async dispatchWorkUnit(input: DispatchWorkUnitInput): Promise<DispatchWorkUnitResult> {
