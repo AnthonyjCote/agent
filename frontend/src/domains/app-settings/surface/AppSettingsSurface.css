@@ -24,27 +24,7 @@
 }
 
 .app-settings-category-item {
-  text-align: left;
-  height: 36px;
-  border: 1px solid transparent;
-  border-radius: 10px;
-  background: transparent;
-  color: var(--text-muted);
-  font-weight: 560;
-  padding: 0 12px;
-  cursor: pointer;
-}
-
-.app-settings-category-item:hover {
-  border-color: color-mix(in srgb, var(--border-subtle) 90%, transparent);
-  background: color-mix(in srgb, var(--bg-elev-2) 78%, transparent);
-  color: var(--text-primary);
-}
-
-.app-settings-category-item.active {
-  border-color: color-mix(in srgb, var(--accent) 72%, transparent);
-  background: color-mix(in srgb, var(--bg-elev-2) 94%, transparent);
-  color: var(--text-primary);
+  min-height: 38px;
 }
 
 .app-settings-pane {

@@ -11,7 +11,7 @@
 // @adr: none
 
 import { useProviderConfigStore, type ProviderId } from '@/shared/config';
-import { ColumnCard, DropdownSelector, TextField, ToggleSwitch } from '@/shared/ui';
+import { ContentCard, DropdownSelector, TextField, ToggleSwitch } from '@/shared/ui';
 import './ProvidersSettingsPanel.css';
 
 const PROVIDER_IDS: ProviderId[] = ['gemini', 'openai', 'local'];
@@ -26,7 +26,7 @@ function ProviderFormSection({ providerId, config, updateProvider }: ProviderFor
   const provider = config[providerId];
 
   return (
-    <ColumnCard
+    <ContentCard
       title={providerId === 'gemini' ? 'Gemini' : providerId === 'openai' ? 'OpenAI' : 'Local Provider'}
       description="Authentication and model/runtime configuration"
     >
@@ -88,7 +88,7 @@ function ProviderFormSection({ providerId, config, updateProvider }: ProviderFor
           onValueChange={(next) => updateProvider(providerId, { endpoint: next })}
         />
       </label>
-    </ColumnCard>
+    </ContentCard>
   );
 }
 

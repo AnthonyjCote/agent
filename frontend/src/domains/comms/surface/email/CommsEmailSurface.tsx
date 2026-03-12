@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { LeftColumnShell, LeftColumnTopBar, TextButton } from '@/shared/ui';
+import { ColumnCard, LeftColumnShell, LeftColumnTopBar, TextButton } from '@/shared/ui';
 import { formatCommsTime, useCommsChannelState } from '@/domains/comms/model';
 import { CommsComposeFab } from '@/domains/comms/surface/shared';
 import { ComposeEmailModal, type ComposeEmailContact } from './compose-modal';
@@ -228,14 +228,14 @@ export function CommsEmailSurface({
             <div className="comms-email-sidebar-body">
               <div className="comms-email-folders">
                 {emailFolders.map((item) => (
-                  <button
+                  <ColumnCard
                     key={item}
-                    type="button"
-                    className={`comms-email-folder ${folder === item ? 'is-active' : ''}`}
+                    as="button"
+                    className="comms-email-folder"
+                    active={folder === item}
+                    title={item}
                     onClick={() => setFolder(item)}
-                  >
-                    {item}
-                  </button>
+                  />
                 ))}
                 <button type="button" className="comms-email-folder-add" onClick={handleAddFolder} aria-label="Add email folder">
                   +

@@ -1,5 +1,5 @@
 import type { CommsChannel } from '@agent-deck/runtime-client';
-import { TopRailSelectorCard, TopRailShell } from '@/shared/ui';
+import { TextButton, TopRailSelectorCard, TopRailShell } from '@/shared/ui';
 import './CommsTopRailSurface.css';
 
 const CHANNELS: Array<{ id: CommsChannel; label: string }> = [
@@ -28,14 +28,13 @@ export function CommsTopRailSurface({ channel, onChannelChange, activeOperator, 
         <div className="comms-top-rail-right">
           <div className="comms-top-rail-tabs">
             {CHANNELS.map((item) => (
-              <button
+              <TextButton
                 key={item.id}
-                type="button"
-                className={`comms-top-rail-tab ${channel === item.id ? 'is-active' : ''}`}
+                label={item.label}
+                variant={channel === item.id ? 'primary' : 'ghost'}
+                size="sm"
                 onClick={() => onChannelChange(item.id)}
-              >
-                {item.label}
-              </button>
+              />
             ))}
           </div>
           <TopRailSelectorCard

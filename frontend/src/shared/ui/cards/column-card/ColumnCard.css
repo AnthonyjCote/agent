@@ -1,0 +1,65 @@
+/*
+ * Purpose: Style reusable column-stacked card surfaces.
+ * Responsibilities:
+ * - Define neutral elevated container treatment.
+ * - Provide title/description/body spacing for consistent vertical stacks.
+ */
+/* @tags: shared-ui,surface,card,styles */
+/* @status: active */
+/* @owner: founder */
+/* @domain: shared */
+/* @adr: none */
+
+.column-card {
+  width: 100%;
+  text-align: left;
+  border: 1px solid rgba(60, 76, 108, 0.46);
+  border-radius: 10px;
+  background: rgba(17, 23, 35, 0.9);
+  box-shadow: inset 0 0 0 1px rgba(26, 36, 54, 0.42);
+  padding: 7px 9px;
+}
+
+.column-card.is-interactive {
+  appearance: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  transition: border-color 140ms ease, background-color 140ms ease;
+}
+
+.column-card.is-interactive:hover {
+  border-color: rgba(94, 118, 163, 0.62);
+  background: rgba(22, 30, 45, 0.92);
+}
+
+.column-card.is-active {
+  border-color: rgba(110, 144, 204, 0.86);
+  background: rgba(26, 35, 54, 0.94);
+}
+
+.column-card-title {
+  margin: 0;
+  color: var(--text-primary, #e7ecf9);
+  font-size: 13px;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.column-card-description {
+  margin: 1px 0 0;
+  color: var(--text-muted, #8f99af);
+  font-size: 11px;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.column-card-body {
+  margin-top: 8px;
+  display: grid;
+  gap: 8px;
+}

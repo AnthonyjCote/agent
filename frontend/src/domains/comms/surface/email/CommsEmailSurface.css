@@ -45,7 +45,14 @@
   align-content: start;
 }
 
-.comms-email-folder,
+.comms-email-folder {
+  min-height: 36px;
+}
+
+.comms-email-folder .column-card-title {
+  text-transform: capitalize;
+}
+
 .comms-email-folder-add {
   width: 100%;
   min-height: 36px;
@@ -53,23 +60,10 @@
   border: 1px solid color-mix(in srgb, var(--border-subtle) 86%, transparent);
   background: linear-gradient(180deg, #151d2c 0%, #101824 100%);
   color: var(--text-muted);
-  text-align: left;
-  font-size: 12px;
-  padding: 8px 10px;
-  text-transform: capitalize;
-  cursor: pointer;
-}
-
-.comms-email-folder.is-active {
-  color: var(--text-primary);
-  border-color: color-mix(in srgb, #7294e6 54%, var(--border-strong));
-  background: linear-gradient(180deg, #21304a 0%, #17253d 100%);
-}
-
-.comms-email-folder-add {
   text-align: center;
   font-size: 18px;
   line-height: 1;
+  cursor: pointer;
 }
 
 .comms-email-main {

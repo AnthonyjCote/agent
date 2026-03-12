@@ -41,19 +41,11 @@
 }
 
 .comms-sms-thread-item {
-  border: 1px solid color-mix(in srgb, #33415a 70%, transparent);
-  border-radius: 12px;
-  background: linear-gradient(180deg, #161f31 0%, #121a29 100%);
-  padding: 6px 6px 6px 10px;
+  padding: 6px 6px 6px 8px;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 6px;
   align-items: center;
-}
-
-.comms-sms-thread-item.is-active {
-  border-color: color-mix(in srgb, #70c0ff 56%, transparent);
-  background: linear-gradient(180deg, #1f3b57 0%, #183048 100%);
 }
 
 .comms-sms-thread-main {

@@ -1,0 +1,41 @@
+/*
+ * Purpose: Style spacious main-content cards for settings/detail panes.
+ * Responsibilities:
+ * - Provide elevated container style aligned with column-card visual language.
+ * - Add roomier spacing for forms and dense content.
+ */
+/* @tags: shared-ui,surface,card,styles */
+/* @status: active */
+/* @owner: founder */
+/* @domain: shared */
+/* @adr: none */
+
+.content-card {
+  width: 100%;
+  border: 1px solid rgba(60, 76, 108, 0.52);
+  border-radius: 12px;
+  background: rgba(16, 22, 34, 0.92);
+  box-shadow: inset 0 0 0 1px rgba(27, 37, 55, 0.44);
+  padding: 16px 18px;
+}
+
+.content-card-title {
+  margin: 0;
+  color: var(--text-primary, #e7ecf9);
+  font-size: 15px;
+  line-height: 1.25;
+  font-weight: 600;
+}
+
+.content-card-description {
+  margin: 5px 0 0;
+  color: var(--text-muted, #8f99af);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.content-card-body {
+  margin-top: 14px;
+  display: grid;
+  gap: 10px;
+}

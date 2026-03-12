@@ -82,19 +82,11 @@
 }
 
 .comms-chat-thread-item {
-  border: 1px solid color-mix(in srgb, #2f3b52 70%, transparent);
-  background: linear-gradient(180deg, #161e2d 0%, #121b29 100%);
-  border-radius: 10px;
-  padding: 6px 6px 6px 10px;
+  padding: 6px 6px 6px 8px;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 6px;
   align-items: center;
-}
-
-.comms-chat-thread-item.is-active {
-  border-color: color-mix(in srgb, #6f97ff 65%, var(--border-strong));
-  background: linear-gradient(180deg, #22324e 0%, #1a2942 100%);
 }
 
 .comms-chat-thread-main {

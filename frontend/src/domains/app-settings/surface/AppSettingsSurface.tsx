@@ -11,16 +11,16 @@
 // @adr: none
 
 import { useState } from 'react';
-import { LeftColumnShell, ColumnCard } from '@/shared/ui';
+import { LeftColumnShell, ColumnCard, ContentCard } from '@/shared/ui';
 import { SETTINGS_CATEGORIES, type SettingsCategoryId } from '@/domains/app-settings/lib/settings-categories';
 import { ProvidersSettingsPanel } from '@/domains/app-settings/modules/providers';
 import './AppSettingsSurface.css';
 
 function PlaceholderCategoryPanel({ title }: { title: string }) {
   return (
-    <ColumnCard title={title} description="Scaffolded category panel.">
+    <ContentCard title={title} description="Scaffolded category panel.">
       <p className="app-settings-placeholder">Settings controls for this category will be added next.</p>
-    </ColumnCard>
+    </ContentCard>
   );
 }
 
@@ -35,15 +35,15 @@ export function AppSettingsSurface() {
             {SETTINGS_CATEGORIES.map((category) => {
               const active = activeCategory === category.id;
               return (
-                <button
+                <ColumnCard
                   key={category.id}
-                  type="button"
-                  className={`app-settings-category-item${active ? ' active' : ''}`}
+                  as="button"
+                  className="app-settings-category-item"
+                  active={active}
+                  title={category.label}
                   onClick={() => setActiveCategory(category.id)}
-                  aria-current={active ? 'page' : undefined}
-                >
-                  {category.label}
-                </button>
+                  ariaCurrent={active ? 'page' : undefined}
+                />
               );
             })}
           </nav>

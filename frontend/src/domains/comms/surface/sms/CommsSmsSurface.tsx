@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { AgentAvatar, ConfirmDialogModal, LeftColumnShell, LeftColumnTopBar, TextButton, TextField } from '@/shared/ui';
+import { AgentAvatar, ColumnCard, ConfirmDialogModal, LeftColumnShell, LeftColumnTopBar, TextButton, TextField } from '@/shared/ui';
 import { useRuntimeClient } from '@/app/runtime/RuntimeProvider';
 import { formatCommsTime, useCommsChannelState } from '@/domains/comms/model';
 import { ComposeSmsModal, type ComposeSmsContact } from './compose-modal';
@@ -209,7 +209,11 @@ export function CommsSmsSurface({
               {state.loading ? <div className="comms-sms-empty">Loading threads...</div> : null}
               {!state.loading && state.threads.length === 0 ? <div className="comms-sms-empty">No threads yet.</div> : null}
               {state.threads.map((thread) => (
-                <div key={thread.threadId} className={`comms-sms-thread-item ${state.activeThreadId === thread.threadId ? 'is-active' : ''}`}>
+                <ColumnCard
+                  key={thread.threadId}
+                  className="comms-sms-thread-item"
+                  active={state.activeThreadId === thread.threadId}
+                >
                   <button
                     type="button"
                     className="comms-sms-thread-main"
@@ -231,7 +235,7 @@ export function CommsSmsSurface({
                       <path d="M5.8 6.2h8.4m-7.1 0v8m2.9-8v8m2.9-8v8M7.7 4.5h4.6l.5 1.2h2v1.5H5.2V5.7h2zM6.7 7.2h6.6v8.1a1 1 0 0 1-1 1H7.7a1 1 0 0 1-1-1z" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
                   </button>
-                </div>
+                </ColumnCard>
               ))}
             </div>
           </aside>
