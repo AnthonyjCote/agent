@@ -1,0 +1,122 @@
+.debug-cards-panel {
+  min-width: 0;
+}
+
+.debug-cards-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-bottom: 14px;
+  align-items: center;
+}
+
+.debug-cards-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.debug-cards-list {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 12px;
+}
+
+.debug-card {
+  border: 1px solid color-mix(in srgb, var(--border-strong) 90%, #2f3f58);
+  border-radius: 12px;
+  background: linear-gradient(180deg, #1b2636 0%, #151e2d 100%);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  padding: 10px 12px;
+  min-width: 0;
+}
+
+.debug-card.tone-success {
+  border-color: color-mix(in srgb, #48d597 45%, var(--border-strong));
+}
+
+.debug-card.tone-warning {
+  border-color: color-mix(in srgb, #f2b366 45%, var(--border-strong));
+}
+
+.debug-card.tone-danger {
+  border-color: color-mix(in srgb, var(--accent-danger) 55%, var(--border-strong));
+}
+
+.debug-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.debug-card-head h4 {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.debug-card-head p {
+  margin: 2px 0 0;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.debug-card-copy {
+  border: 1px solid color-mix(in srgb, var(--border-strong) 72%, transparent);
+  background: transparent;
+  color: var(--text-muted);
+  border-radius: 8px;
+  font-size: 11px;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
+.debug-card-copy:hover {
+  color: var(--text-primary);
+  border-color: color-mix(in srgb, var(--text-primary) 35%, transparent);
+}
+
+.debug-card-summary {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: color-mix(in srgb, var(--text-primary) 90%, #fff);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.debug-card-raw-details {
+  margin-top: 8px;
+}
+
+.debug-card-raw-details summary {
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.debug-card-output {
+  margin: 0;
+  max-height: min(56vh, 460px);
+  overflow: auto;
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--border-strong) 78%, transparent);
+  background: linear-gradient(180deg, #161d28 0%, #121924 100%);
+  color: color-mix(in srgb, var(--text-primary) 92%, #fff);
+  font-size: 12px;
+  line-height: 1.35;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.debug-card-divider {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}

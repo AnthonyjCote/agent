@@ -7,6 +7,8 @@ import type {
   CommsMessageRecord,
   CommsThreadRecord,
   CreateCommsThreadInput,
+  DebugToolExecuteInput,
+  DebugToolExecuteResult,
   DispatchWorkUnitInput,
   DispatchWorkUnitResult,
   ChatThreadMessageRecord,
@@ -159,6 +161,11 @@ export class TauriTransport implements AgentRuntimeClient {
   async cancelRun(runId: string): Promise<boolean> {
     const invoke = await this.getInvoke();
     return invoke<boolean>('cancel_run', { runId });
+  }
+
+  async executeDebugTool(input: DebugToolExecuteInput): Promise<DebugToolExecuteResult> {
+    const invoke = await this.getInvoke();
+    return invoke<DebugToolExecuteResult>('execute_debug_tool', { input });
   }
 
   async listRunEvents(runId: string): Promise<RuntimeRunEvent[]> {

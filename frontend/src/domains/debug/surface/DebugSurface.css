@@ -1,0 +1,222 @@
+.debug-surface {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-height: 100%;
+  --working-area-padding-top: 0px;
+  --working-area-padding-x: 0px;
+}
+
+.debug-surface > .top-rail-shell {
+  margin: 0;
+  min-height: 56px;
+  padding: 10px 18px;
+}
+
+.debug-top-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.debug-top-left h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.debug-top-tabs {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.debug-tab {
+  min-width: 88px;
+}
+
+.debug-tab.is-active {
+  cursor: default;
+}
+
+.debug-top-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.debug-content {
+  min-height: 0;
+  padding: 12px;
+}
+
+.debug-run-lab {
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  gap: 12px;
+  min-height: calc(100vh - 170px);
+}
+
+.debug-runs-list {
+  min-width: 0;
+  overflow: auto;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--border-strong) 78%, transparent);
+  background: linear-gradient(180deg, #141b26 0%, #111723 100%);
+  padding: 6px;
+  display: grid;
+  align-content: start;
+  gap: 6px;
+}
+
+.debug-run-item {
+  border: 1px solid color-mix(in srgb, var(--border-strong) 74%, transparent);
+  background: color-mix(in srgb, #172031 86%, transparent);
+  border-radius: 10px;
+  padding: 8px;
+  text-align: left;
+  cursor: pointer;
+  color: var(--text-primary);
+  display: grid;
+  gap: 4px;
+}
+
+.debug-run-item.is-active {
+  border-color: color-mix(in srgb, #4b6fa6 70%, transparent);
+  background: color-mix(in srgb, #23334f 92%, transparent);
+}
+
+.debug-run-id {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.debug-run-status {
+  width: fit-content;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 11px;
+  text-transform: capitalize;
+  background: color-mix(in srgb, #2d3648 80%, transparent);
+  color: var(--text-secondary);
+}
+
+.debug-run-status.status-running {
+  background: color-mix(in srgb, #33425b 88%, transparent);
+  color: #cdd8ec;
+}
+
+.debug-run-status.status-completed {
+  background: color-mix(in srgb, #223f35 88%, transparent);
+  color: #b5dccf;
+}
+
+.debug-run-status.status-failed {
+  background: color-mix(in srgb, #4a252b 88%, transparent);
+  color: #edc3ca;
+}
+
+.debug-run-status.status-cancelled {
+  background: color-mix(in srgb, #45413a 88%, transparent);
+  color: #d7cfc3;
+}
+
+.debug-run-prompt {
+  font-size: 12px;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.debug-run-detail {
+  min-width: 0;
+}
+
+.debug-run-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 10px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.debug-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+}
+
+.debug-empty {
+  padding: 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.debug-tool-console,
+.debug-state-inspector {
+  border: 1px solid color-mix(in srgb, var(--border-strong) 78%, transparent);
+  border-radius: 12px;
+  background: linear-gradient(180deg, #141b26 0%, #111723 100%);
+  padding: 12px;
+}
+
+.debug-tool-console header h3,
+.debug-state-inspector header h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.debug-tool-console header p,
+.debug-state-inspector header p {
+  margin: 6px 0 12px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.debug-tool-controls {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.debug-label {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.debug-json-input,
+.debug-json-output {
+  width: 100%;
+  min-height: 180px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--border-strong) 72%, transparent);
+  background: color-mix(in srgb, #0f1622 92%, transparent);
+  color: var(--text-primary);
+  padding: 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  overflow: auto;
+}
+
+.debug-json-input {
+  resize: vertical;
+}
+
+.debug-error {
+  margin: 8px 0;
+  color: var(--accent-danger);
+  font-size: 12px;
+}

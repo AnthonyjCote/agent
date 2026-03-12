@@ -7,6 +7,8 @@ import type {
   CommsMessageRecord,
   CommsThreadRecord,
   CreateCommsThreadInput,
+  DebugToolExecuteInput,
+  DebugToolExecuteResult,
   DispatchWorkUnitInput,
   DispatchWorkUnitResult,
   ChatThreadMessageRecord,
@@ -318,6 +320,18 @@ export class HttpTransport implements AgentRuntimeClient {
     }
     const payload = (await response.json()) as { cancelled?: boolean };
     return Boolean(payload.cancelled);
+  }
+
+  async executeDebugTool(input: DebugToolExecuteInput): Promise<DebugToolExecuteResult> {
+    const response = await fetch(`${this.baseUrl}/debug/tools/execute`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(input)
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to execute debug tool: ${response.status}`);
+    }
+    return (await response.json()) as DebugToolExecuteResult;
   }
 
   async listRunEvents(runId: string): Promise<RuntimeRunEvent[]> {

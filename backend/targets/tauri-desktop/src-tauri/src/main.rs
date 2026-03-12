@@ -778,6 +778,31 @@ struct StartRunResponse {
     run_id: String,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DebugToolExecuteInput {
+    tool_id: String,
+    #[serde(default)]
+    args: serde_json::Value,
+    #[serde(default)]
+    operator_id: Option<String>,
+    #[serde(default)]
+    operator_name: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DebugToolExecuteResponse {
+    ok: bool,
+    tool_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    normalized_args: Option<serde_json::Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    output: Option<serde_json::Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    error: Option<serde_json::Value>,
+}
+
 #[tauri::command]
 fn start_run(runtime: State<'_, Arc<RuntimeService>>, payload: StartRunPayload) -> StartRunResponse {
     let run_id = payload.run_id.clone();
@@ -809,6 +834,38 @@ fn start_run(runtime: State<'_, Arc<RuntimeService>>, payload: StartRunPayload) 
 #[tauri::command]
 fn list_run_events(runtime: State<'_, Arc<RuntimeService>>, run_id: String) -> Vec<serde_json::Value> {
     runtime.list_run_events_json(&run_id)
+}
+
+#[tauri::command]
+fn execute_debug_tool(
+    runtime: State<'_, Arc<RuntimeService>>,
+    input: DebugToolExecuteInput,
+) -> DebugToolExecuteResponse {
+    match runtime.execute_debug_tool(
+        &input.tool_id,
+        input.args,
+        input.operator_id.as_deref(),
+        input.operator_name.as_deref(),
+    ) {
+        Ok((normalized_args, output)) => DebugToolExecuteResponse {
+            ok: true,
+            tool_id: input.tool_id,
+            normalized_args: Some(normalized_args),
+            output: Some(output),
+            error: None,
+        },
+        Err(message) => DebugToolExecuteResponse {
+            ok: false,
+            tool_id: input.tool_id,
+            normalized_args: None,
+            output: None,
+            error: Some(serde_json::json!({
+                "code": "debug_tool_execution_failed",
+                "message": message,
+                "retryable": false
+            })),
+        },
+    }
 }
 
 #[tauri::command]
@@ -880,6 +937,7 @@ fn main() {
             list_work_units,
             dispatch_work_unit,
             start_run,
+            execute_debug_tool,
             cancel_run,
             list_run_events,
             list_thread_run_ids,

@@ -9,6 +9,8 @@ export type {
   CommsChannel,
   CommsMessageRecord,
   CommsThreadRecord,
+  DebugToolExecuteInput,
+  DebugToolExecuteResult,
   CreateThreadInput,
   CreateCommsThreadInput,
   AppendCommsMessageInput,

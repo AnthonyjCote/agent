@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { CommsChannel } from '@agent-deck/runtime-client';
 import { CommsChatSurface, CommsEmailSurface, CommsSmsSurface, CommsTopRailSurface } from './surface';
-import { CommsAccountSelectorModal } from './surface/top-rail/account-selector-modal';
 import { useAgentManifestStore, useOrgChartStore } from '../../shared/config';
+import { OperatorSelectorModal } from '../../shared/ui';
 import './view.css';
 
 const COMMS_ACTIVE_OPERATOR_STORAGE_KEY = 'agent-deck.comms.active-operator-id';
@@ -208,15 +208,18 @@ export function CommsView() {
           />
         ) : null}
       </div>
-      <CommsAccountSelectorModal
+      <OperatorSelectorModal
         open={selectorOpen}
-        operators={displayOperators.map((operator) => ({
+        options={displayOperators.map((operator) => ({
           id: operator.id,
           name: operator.name,
           title: operator.title,
           avatarDataUrl: operator.avatarDataUrl
         }))}
-        selectedOperatorId={activeOperatorId}
+        selectedId={activeOperatorId}
+        title="Select Active Account"
+        description="Choose which operator account is active across Email, Chat, and SMS."
+        ariaLabel="Select active comms account"
         onClose={() => setSelectorOpen(false)}
         onSelect={setActiveOperatorId}
       />

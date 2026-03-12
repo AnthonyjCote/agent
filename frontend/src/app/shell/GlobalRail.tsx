@@ -66,6 +66,21 @@ function RailIcon({ mode }: { mode: ViewMode }) {
           <path d="M9 6.5h6M12 9v6" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
         </svg>
       );
+    case 'debug':
+      return (
+        <svg {...common}>
+          <path
+            d="M8.5 3.5h7l1 2.5H21v2h-1.4l-1.2 9.2A2 2 0 0 1 16.4 19H7.6a2 2 0 0 1-2-1.8L4.4 8H3V6h4.5l1-2.5Z"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="1.4"
+            strokeLinejoin="round"
+          />
+          <circle cx="9" cy="11" r="1.1" fill="currentColor" />
+          <circle cx="15" cy="11" r="1.1" fill="currentColor" />
+          <path d="M9 14.5h6" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+        </svg>
+      );
     case 'app-settings':
       return (
         <svg {...common}>

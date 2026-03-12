@@ -14,7 +14,7 @@
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { type AgentManifest, useAgentManifestStore } from '../../../shared/config/agents';
 import { useOrgChartStore } from '../../../shared/config/org-chart';
-import { AgentManifestModal } from '../../../shared/modules';
+import { AgentManifestModal, DebugCardsPanel, buildClientDebugCards, buildRuntimeDebugCards } from '../../../shared/modules';
 import {
   AgentAvatar,
   AgentGrid,
@@ -45,300 +45,6 @@ type MarkdownTable = {
   header: string[];
   rows: string[][];
 };
-
-type DebugCard = {
-  key: string;
-  eventType: string;
-  title: string;
-  subtitle?: string;
-  summary: string;
-  raw: string;
-  tone?: 'default' | 'success' | 'warning' | 'danger';
-};
-
-function stringifyDebugRaw(value: unknown): string {
-  try {
-    return JSON.stringify(value, null, 2);
-  } catch {
-    return String(value ?? '');
-  }
-}
-
-function compactDebugText(value: string, max = 260): string {
-  const compact = value.split(/\s+/).join(' ').trim();
-  if (!compact) {
-    return '(empty)';
-  }
-  if (compact.length <= max) {
-    return compact;
-  }
-  return `${compact.slice(0, max)}...`;
-}
-
-function normalizeDebugCompare(value: string): string {
-  return value.split(/\s+/).join(' ').trim();
-}
-
-function parseDebugStreamJson(line: string): Record<string, unknown> | null {
-  const trimmed = line.trim();
-  if (!trimmed.startsWith('{') || !trimmed.endsWith('}')) {
-    return null;
-  }
-  try {
-    return JSON.parse(trimmed) as Record<string, unknown>;
-  } catch {
-    return null;
-  }
-}
-
-function buildRuntimeDebugCards(events: Array<Record<string, unknown>>, hideProviderEcho: boolean): DebugCard[] {
-  const cards: DebugCard[] = [];
-  const requestByPhase = new Map<string, string>();
-  const providerAssistantMergeByPhase = new Map<string, string>();
-  const flushAssistantMerge = (phaseKey?: string) => {
-    const keysToFlush =
-      typeof phaseKey === 'string'
-        ? [phaseKey]
-        : Array.from(providerAssistantMergeByPhase.keys());
-    keysToFlush.forEach((key) => {
-      const merged = providerAssistantMergeByPhase.get(key);
-      if (!merged || !merged.trim()) {
-        providerAssistantMergeByPhase.delete(key);
-        return;
-      }
-      const subtitle = key ? `phase: ${key}` : undefined;
-      const raw = stringifyDebugRaw({
-        event: 'debug_model_stream_merge',
-        phase: key,
-        role: 'assistant',
-        merged
-      });
-      cards.push({
-        key: `runtime-merge-${cards.length}-${key || 'default'}`,
-        eventType: 'debug_model_stream_merge',
-        title: 'Provider Stream Merge (assistant)',
-        subtitle,
-        summary: compactDebugText(merged),
-        raw
-      });
-      providerAssistantMergeByPhase.delete(key);
-    });
-  };
-
-  events.forEach((event, index) => {
-    const eventType = String(event.event ?? '');
-    const phase = typeof event.phase === 'string' ? event.phase : '';
-    const subtitle = phase ? `phase: ${phase}` : undefined;
-    const phaseKey = phase || 'default';
-
-    if (eventType === 'debug_model_request') {
-      flushAssistantMerge(phaseKey);
-      const payload = typeof event.payload === 'string' ? event.payload : stringifyDebugRaw(event.payload);
-      requestByPhase.set(phase || 'default', normalizeDebugCompare(payload));
-      cards.push({
-        key: `runtime-${index}`,
-        eventType: eventType,
-        title: 'Model Request',
-        subtitle,
-        summary: compactDebugText(payload),
-        raw: stringifyDebugRaw(event)
-      });
-      return;
-    }
-
-    if (eventType === 'debug_model_response') {
-      flushAssistantMerge(phaseKey);
-      const payload = typeof event.payload === 'string' ? event.payload : stringifyDebugRaw(event.payload);
-      cards.push({
-        key: `runtime-${index}`,
-        eventType: eventType,
-        title: 'Model Response',
-        subtitle,
-        summary: compactDebugText(payload),
-        raw: stringifyDebugRaw(event)
-      });
-      return;
-    }
-
-    if (eventType === 'debug_model_stream_line') {
-      const line = typeof event.line === 'string' ? event.line : '';
-      const parsed = parseDebugStreamJson(line);
-      if (parsed) {
-        const type = typeof parsed.type === 'string' ? parsed.type : '';
-        if (hideProviderEcho && type === 'message' && parsed.role === 'user') {
-          const content = typeof parsed.content === 'string' ? parsed.content : '';
-          const request = requestByPhase.get(phase || 'default') ?? '';
-          if (request && normalizeDebugCompare(content) === request) {
-            return;
-          }
-        }
-        if (type === 'tool_use') {
-          const toolName = typeof parsed.tool_name === 'string' ? parsed.tool_name : 'tool';
-          const params = stringifyDebugRaw(parsed.parameters ?? {});
-          cards.push({
-            key: `runtime-${index}`,
-            eventType: eventType,
-            title: 'Provider Tool Use',
-            subtitle,
-            summary: `${toolName}: ${compactDebugText(params, 140)}`,
-            raw: stringifyDebugRaw(event),
-            tone: 'warning'
-          });
-          return;
-        }
-        if (type === 'tool_result') {
-          const toolId = typeof parsed.tool_id === 'string' ? parsed.tool_id : 'tool';
-          const status = typeof parsed.status === 'string' ? parsed.status : 'success';
-          cards.push({
-            key: `runtime-${index}`,
-            eventType: eventType,
-            title: 'Provider Tool Result',
-            subtitle,
-            summary: `${toolId} (${status})`,
-            raw: stringifyDebugRaw(event),
-            tone: status === 'error' ? 'danger' : 'success'
-          });
-          return;
-        }
-        if (type === 'message') {
-          const role = typeof parsed.role === 'string' ? parsed.role : 'assistant';
-          const content = typeof parsed.content === 'string' ? parsed.content : '';
-          if (role === 'assistant' && content) {
-            providerAssistantMergeByPhase.set(
-              phaseKey,
-              `${providerAssistantMergeByPhase.get(phaseKey) ?? ''}${content}`
-            );
-          } else {
-            flushAssistantMerge(phaseKey);
-          }
-          cards.push({
-            key: `runtime-${index}`,
-            eventType: eventType,
-            title: `Provider Stream (${role})`,
-            subtitle,
-            summary: compactDebugText(content),
-            raw: stringifyDebugRaw(event)
-          });
-          return;
-        }
-        if (type === 'result') {
-          flushAssistantMerge(phaseKey);
-          cards.push({
-            key: `runtime-${index}`,
-            eventType: eventType,
-            title: 'Provider Result',
-            subtitle,
-            summary: compactDebugText(stringifyDebugRaw(parsed.stats ?? parsed)),
-            raw: stringifyDebugRaw(event),
-            tone: 'success'
-          });
-          return;
-        }
-        // Any structured non-message line is a seam for assistant stream chunks.
-        flushAssistantMerge(phaseKey);
-      }
-
-      flushAssistantMerge(phaseKey);
-      cards.push({
-        key: `runtime-${index}`,
-        eventType: eventType,
-        title: 'Provider Stream Line',
-        subtitle,
-        summary: compactDebugText(line),
-        raw: stringifyDebugRaw(event)
-      });
-      return;
-    }
-
-    if (eventType === 'model_delta') {
-      flushAssistantMerge(phaseKey);
-      const text = typeof event.text === 'string' ? event.text : '';
-      cards.push({
-        key: `runtime-${index}`,
-        eventType: eventType,
-        title: 'Model Delta',
-        subtitle,
-        summary: compactDebugText(text),
-        raw: stringifyDebugRaw(event)
-      });
-      return;
-    }
-
-    if (eventType === 'tool_use' || eventType === 'tool_result' || eventType === 'debug_tool_result') {
-      flushAssistantMerge(phaseKey);
-      const lifecycle = typeof event.lifecycle === 'string' ? event.lifecycle : '';
-      const toolName = typeof event.tool_name === 'string' ? event.tool_name : 'tool';
-      let summary = `${toolName}${lifecycle ? ` (${lifecycle})` : ''}`;
-      if (eventType === 'debug_tool_result' && event.output) {
-        const output = event.output as Record<string, unknown>;
-        if (output.error && typeof output.error === 'object') {
-          summary = `${toolName} error: ${compactDebugText(stringifyDebugRaw(output.error), 170)}`;
-        } else if (typeof output.summary === 'string') {
-          summary = `${toolName}: ${compactDebugText(output.summary)}`;
-        }
-      }
-      const lifecycleTitle =
-        lifecycle
-          ? `Tool Event - ${lifecycle.charAt(0).toUpperCase()}${lifecycle.slice(1)}`
-          : eventType === 'debug_tool_result'
-            ? 'Tool Event - Payload'
-            : 'Tool Event';
-      cards.push({
-        key: `runtime-${index}`,
-        eventType: eventType,
-        title: lifecycleTitle,
-        subtitle,
-        summary,
-        raw: stringifyDebugRaw(event),
-        tone: lifecycle === 'failed' ? 'danger' : lifecycle === 'completed' ? 'success' : 'warning'
-      });
-      return;
-    }
-
-    if (eventType.startsWith('run_')) {
-      flushAssistantMerge(phaseKey);
-      cards.push({
-        key: `runtime-${index}`,
-        eventType: eventType,
-        title: eventType,
-        subtitle,
-        summary: compactDebugText(stringifyDebugRaw(event)),
-        raw: stringifyDebugRaw(event),
-        tone:
-          eventType === 'run_failed' ? 'danger' : eventType === 'run_completed' ? 'success' : 'default'
-      });
-      return;
-    }
-
-    flushAssistantMerge(phaseKey);
-    cards.push({
-      key: `runtime-${index}`,
-      eventType: eventType || 'event',
-      title: eventType || 'Event',
-      subtitle,
-      summary: compactDebugText(stringifyDebugRaw(event)),
-      raw: stringifyDebugRaw(event)
-    });
-  });
-
-  flushAssistantMerge();
-
-  return cards;
-}
-
-function buildClientDebugCards(events: Array<Record<string, unknown>>): DebugCard[] {
-  return events.map((event, index) => {
-    const eventType = String(event.event ?? 'client_event');
-    return {
-      key: `client-${index}`,
-      eventType,
-      title: eventType,
-      summary: compactDebugText(stringifyDebugRaw(event)),
-      raw: stringifyDebugRaw(event),
-      tone: eventType.includes('error') ? 'danger' : 'default'
-    };
-  });
-}
 
 function parseAssistantContentWithSources(content: string): {
   body: string;
@@ -863,21 +569,6 @@ export function ChatGuiSurface() {
     const clientEvents = (selectedDebugRun?.clientDebugEvents || []) as Array<Record<string, unknown>>;
     return buildClientDebugCards(clientEvents);
   }, [selectedDebugRun]);
-  const debugEventTypeOptions = useMemo(() => {
-    const values = new Set<string>();
-    runtimeDebugCards.forEach((card) => {
-      if (card.eventType) {
-        values.add(card.eventType);
-      }
-    });
-    clientDebugCards.forEach((card) => {
-      if (card.eventType) {
-        values.add(card.eventType);
-      }
-    });
-    const sorted = Array.from(values).sort((a, b) => a.localeCompare(b));
-    return [{ value: 'all', label: 'All event types' }, ...sorted.map((value) => ({ value, label: value }))];
-  }, [clientDebugCards, runtimeDebugCards]);
   const copyDebugRaw = useCallback(async (raw: string) => {
     try {
       await navigator.clipboard.writeText(raw);
@@ -885,28 +576,6 @@ export function ChatGuiSurface() {
       // no-op fallback
     }
   }, []);
-  const filteredRuntimeDebugCards = useMemo(() => {
-    return runtimeDebugCards.filter((card) => {
-      if (debugErrorsOnly && card.tone !== 'danger') {
-        return false;
-      }
-      if (debugEventFilter === 'all') {
-        return true;
-      }
-      return card.eventType === debugEventFilter;
-    });
-  }, [debugErrorsOnly, debugEventFilter, runtimeDebugCards]);
-  const filteredClientDebugCards = useMemo(() => {
-    return clientDebugCards.filter((card) => {
-      if (debugErrorsOnly && card.tone !== 'danger') {
-        return false;
-      }
-      if (debugEventFilter === 'all') {
-        return true;
-      }
-      return card.eventType === debugEventFilter;
-    });
-  }, [clientDebugCards, debugErrorsOnly, debugEventFilter]);
   const openExternalUrl = useCallback(
     async (url: string) => {
       try {
@@ -1280,13 +949,6 @@ export function ChatGuiSurface() {
             <span>Client debug events: {selectedDebugRun?.clientDebugEvents.length || 0}</span>
           </div>
           <div className="chat-gui-debug-controls">
-            <DropdownSelector
-              value={debugEventFilter}
-              options={debugEventTypeOptions}
-              onValueChange={setDebugEventFilter}
-              ariaLabel="Filter by event type"
-              size="compact"
-            />
             <label className="chat-gui-debug-toggle">
               <input
                 type="checkbox"
@@ -1303,55 +965,16 @@ export function ChatGuiSurface() {
               />
               <span>Show raw JSON panel</span>
             </label>
-            <label className="chat-gui-debug-toggle">
-              <input
-                type="checkbox"
-                checked={debugErrorsOnly}
-                onChange={(event) => setDebugErrorsOnly(event.currentTarget.checked)}
-              />
-              <span>Show errors only</span>
-            </label>
           </div>
-          <div className="chat-gui-debug-cards">
-            {filteredRuntimeDebugCards.map((card) => (
-              <article key={card.key} className={`chat-gui-debug-card tone-${card.tone || 'default'}`}>
-                <header className="chat-gui-debug-card-head">
-                  <div>
-                    <h4>{card.title}</h4>
-                    {card.subtitle ? <p>{card.subtitle}</p> : null}
-                  </div>
-                  <button type="button" className="chat-gui-debug-copy" onClick={() => void copyDebugRaw(card.raw)}>
-                    Copy raw
-                  </button>
-                </header>
-                <p className="chat-gui-debug-card-summary">{card.summary}</p>
-                <details className="chat-gui-debug-raw-details">
-                  <summary>Raw payload</summary>
-                  <pre className="chat-gui-debug-output">{card.raw}</pre>
-                </details>
-              </article>
-            ))}
-            {filteredClientDebugCards.length > 0 ? (
-              <div className="chat-gui-debug-divider">Client events</div>
-            ) : null}
-            {filteredClientDebugCards.map((card) => (
-              <article key={card.key} className={`chat-gui-debug-card tone-${card.tone || 'default'}`}>
-                <header className="chat-gui-debug-card-head">
-                  <div>
-                    <h4>{card.title}</h4>
-                  </div>
-                  <button type="button" className="chat-gui-debug-copy" onClick={() => void copyDebugRaw(card.raw)}>
-                    Copy raw
-                  </button>
-                </header>
-                <p className="chat-gui-debug-card-summary">{card.summary}</p>
-                <details className="chat-gui-debug-raw-details">
-                  <summary>Raw payload</summary>
-                  <pre className="chat-gui-debug-output">{card.raw}</pre>
-                </details>
-              </article>
-            ))}
-          </div>
+          <DebugCardsPanel
+            runtimeCards={runtimeDebugCards}
+            clientCards={clientDebugCards}
+            eventFilter={debugEventFilter}
+            onEventFilterChange={setDebugEventFilter}
+            errorsOnly={debugErrorsOnly}
+            onErrorsOnlyChange={setDebugErrorsOnly}
+            onCopyRaw={copyDebugRaw}
+          />
           {debugShowRaw ? <pre className="chat-gui-debug-output">{debugJson || '[]'}</pre> : null}
         </section>
       </div>

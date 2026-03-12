@@ -1,0 +1,41 @@
+.top-rail-selector-card {
+  border: 1px solid color-mix(in srgb, var(--border-strong) 78%, transparent);
+  background: linear-gradient(180deg, #182031 0%, #121a28 100%);
+  border-radius: 12px;
+  min-height: 40px;
+  padding: 5px 9px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 9px;
+  align-items: center;
+  color: var(--text-primary);
+  cursor: pointer;
+  min-width: 250px;
+  max-width: 320px;
+}
+
+.top-rail-selector-card:hover {
+  border-color: color-mix(in srgb, #88a8ee 56%, var(--border-strong));
+}
+
+.top-rail-selector-copy {
+  min-width: 0;
+  display: grid;
+  gap: 1px;
+  text-align: left;
+}
+
+.top-rail-selector-copy strong {
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.top-rail-selector-copy span {
+  font-size: 10px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

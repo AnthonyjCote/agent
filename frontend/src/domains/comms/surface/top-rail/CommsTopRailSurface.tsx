@@ -1,5 +1,5 @@
 import type { CommsChannel } from '@agent-deck/runtime-client';
-import { AgentAvatar, TopRailShell } from '../../../../shared/ui';
+import { TopRailSelectorCard, TopRailShell } from '../../../../shared/ui';
 import './CommsTopRailSurface.css';
 
 const CHANNELS: Array<{ id: CommsChannel; label: string }> = [
@@ -12,6 +12,7 @@ type CommsTopRailSurfaceProps = {
   channel: CommsChannel;
   onChannelChange: (channel: CommsChannel) => void;
   activeOperator: {
+    id: string;
     name: string;
     title: string;
     avatarDataUrl?: string;
@@ -37,18 +38,14 @@ export function CommsTopRailSurface({ channel, onChannelChange, activeOperator, 
               </button>
             ))}
           </div>
-          <button type="button" className="comms-top-rail-account-card" onClick={onOpenAccountSelector}>
-            <AgentAvatar
-              name={activeOperator?.name || 'Select Account'}
-              src={activeOperator?.avatarDataUrl}
-              size="sm"
-              shape="circle"
-            />
-            <div className="comms-top-rail-account-copy">
-              <strong>{activeOperator?.name || 'Select account'}</strong>
-              <span>{activeOperator?.title || 'No active operator'}</span>
-            </div>
-          </button>
+          <TopRailSelectorCard
+            operatorId={activeOperator?.id}
+            name={activeOperator?.name || 'Select account'}
+            subtitle={activeOperator?.title || 'No active operator'}
+            avatarSrc={activeOperator?.avatarDataUrl}
+            onClick={onOpenAccountSelector}
+            ariaLabel="Select active comms operator"
+          />
         </div>
       }
     />

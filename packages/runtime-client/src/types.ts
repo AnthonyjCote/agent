@@ -21,6 +21,25 @@ export interface StartRunResponse {
   runId: string;
 }
 
+export interface DebugToolExecuteInput {
+  toolId: string;
+  args: Record<string, unknown>;
+  operatorId?: string;
+  operatorName?: string;
+}
+
+export interface DebugToolExecuteResult {
+  ok: boolean;
+  toolId: string;
+  normalizedArgs?: Record<string, unknown>;
+  output?: unknown;
+  error?: {
+    code: string;
+    message: string;
+    retryable?: boolean;
+  };
+}
+
 export interface RuntimeRunEvent {
   event: string;
   [key: string]: unknown;
@@ -291,6 +310,7 @@ export interface AgentRuntimeClient {
   listWorkUnits(status?: string, limit?: number, offset?: number): Promise<WorkUnitRecord[]>;
   startRun(input: StartRunInput): Promise<StartRunResponse>;
   cancelRun(runId: string): Promise<boolean>;
+  executeDebugTool(input: DebugToolExecuteInput): Promise<DebugToolExecuteResult>;
   listRunEvents(runId: string): Promise<RuntimeRunEvent[]>;
   listThreadRunIds(threadId: string, limit?: number): Promise<string[]>;
 }

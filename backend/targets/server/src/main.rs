@@ -110,6 +110,31 @@ struct StartRunResponse {
     run_id: String,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DebugToolExecuteInput {
+    tool_id: String,
+    #[serde(default)]
+    args: serde_json::Value,
+    #[serde(default)]
+    operator_id: Option<String>,
+    #[serde(default)]
+    operator_name: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DebugToolExecuteResponse {
+    ok: bool,
+    tool_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    normalized_args: Option<serde_json::Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    output: Option<serde_json::Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    error: Option<serde_json::Value>,
+}
+
 async fn start_run(
     State(state): State<AppState>,
     Json(payload): Json<StartRunPayload>,
@@ -169,6 +194,37 @@ async fn run_events(
     Path(run_id): Path<String>,
 ) -> Json<Vec<agent_core::models::run::RunEvent>> {
     Json(state.runtime.list_run_events(&run_id))
+}
+
+async fn execute_debug_tool(
+    State(state): State<AppState>,
+    Json(input): Json<DebugToolExecuteInput>,
+) -> Json<DebugToolExecuteResponse> {
+    match state.runtime.execute_debug_tool(
+        &input.tool_id,
+        input.args,
+        input.operator_id.as_deref(),
+        input.operator_name.as_deref(),
+    ) {
+        Ok((normalized_args, output)) => Json(DebugToolExecuteResponse {
+            ok: true,
+            tool_id: input.tool_id,
+            normalized_args: Some(normalized_args),
+            output: Some(output),
+            error: None,
+        }),
+        Err(message) => Json(DebugToolExecuteResponse {
+            ok: false,
+            tool_id: input.tool_id,
+            normalized_args: None,
+            output: None,
+            error: Some(serde_json::json!({
+                "code": "debug_tool_execution_failed",
+                "message": message,
+                "retryable": false
+            })),
+        }),
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -961,6 +1017,7 @@ async fn main() {
         .route("/runs", post(start_run))
         .route("/runs/{run_id}/events", get(run_events))
         .route("/runs/{run_id}/cancel", post(cancel_run))
+        .route("/debug/tools/execute", post(execute_debug_tool))
         .route("/work-units", get(list_work_units))
         .route("/work-units/dispatch", post(dispatch_work_unit))
         .with_state(app_state)

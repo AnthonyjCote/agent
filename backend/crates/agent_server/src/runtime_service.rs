@@ -238,6 +238,42 @@ impl RuntimeService {
         killed
     }
 
+    pub fn execute_debug_tool(
+        &self,
+        tool_name: &str,
+        args: serde_json::Value,
+        operator_id: Option<&str>,
+        operator_name: Option<&str>,
+    ) -> Result<(serde_json::Value, serde_json::Value), String> {
+        let mut normalized_args = args;
+        if tool_name.trim() == "comms_tool" {
+            let op_id = operator_id
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .ok_or_else(|| {
+                    "comms_tool debug execution requires operator_id for sender/mailbox scope."
+                        .to_string()
+                })?;
+            let op_name = operator_name
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .unwrap_or("Operator");
+            normalized_args = enforce_comms_sender_scope(
+                &self.state_store,
+                &self.workspace_id,
+                op_id,
+                op_name,
+                &normalized_args,
+            )
+            .map_err(|error| format!("{}: {}", error.code, error.message))?;
+        }
+        let backend = PersistentAppToolBackend::new(self.state_store.clone(), self.workspace_id.clone());
+        let output = execute_app_tool_by_id(&backend, tool_name, &normalized_args)
+            .map_err(|error| format!("{}: {}", error.code, error.message))?;
+        let serialized = serde_json::to_value(output).map_err(|error| error.to_string())?;
+        Ok((normalized_args, serialized))
+    }
+
     fn render_history_excerpt(&self, thread_id: &str) -> String {
         let Some(history) = self
             .history_by_thread
