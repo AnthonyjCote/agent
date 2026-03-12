@@ -510,7 +510,6 @@
   padding: 14px 0 18px;
   position: relative;
   z-index: 2;
-  background: linear-gradient(180deg, transparent 0%, rgba(12, 13, 16, 0.92) 22%, rgba(12, 13, 16, 1) 100%);
 }
 
 .chat-gui-debug-meta {

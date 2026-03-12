@@ -23,10 +23,7 @@
   height: 100%;
   overflow: hidden;
   min-width: 0;
-  background:
-    radial-gradient(circle at 12% -10%, rgba(255, 255, 255, 0.06) 0%, transparent 42%),
-    radial-gradient(circle at 120% 110%, rgba(255, 255, 255, 0.04) 0%, transparent 35%),
-    linear-gradient(180deg, #12151b 0%, #0c0d10 100%);
+  background: var(--bg-base);
 }
 
 .view-region {
