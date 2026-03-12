@@ -26,7 +26,7 @@
 .left-column-shell-left {
   border-right: 1px solid var(--border-strong);
   box-shadow: inset -1px 0 0 color-mix(in srgb, #a9bad7 14%, transparent);
-  background: linear-gradient(180deg, #11141b 0%, #0e1118 100%);
+  background: var(--bg-elev-1);
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;

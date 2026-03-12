@@ -15,6 +15,7 @@ type UseCommsChannelStateInput = {
   createRequestNonce: number;
   newThreadTitle: string;
   newThreadSubject?: string;
+  autoSelectFirstThread?: boolean;
 };
 
 export function useCommsChannelState(input: UseCommsChannelStateInput) {
@@ -26,7 +27,8 @@ export function useCommsChannelState(input: UseCommsChannelStateInput) {
     activeOperatorEmailAddress,
     createRequestNonce,
     newThreadTitle,
-    newThreadSubject
+    newThreadSubject,
+    autoSelectFirstThread = true
   } = input;
   const runtimeClient = useRuntimeClient();
   const [accounts, setAccounts] = useState<CommsAccountRecord[]>([]);
@@ -108,11 +110,16 @@ export function useCommsChannelState(input: UseCommsChannelStateInput) {
         limit: 200
       });
       setThreads(next);
-      if (!activeThreadId || !next.some((thread) => thread.threadId === activeThreadId)) {
-        setActiveThreadId(next[0]?.threadId ?? null);
+      const hasActiveThread = !!activeThreadId && next.some((thread) => thread.threadId === activeThreadId);
+      if (!hasActiveThread) {
+        if (autoSelectFirstThread && !activeThreadId) {
+          setActiveThreadId(next[0]?.threadId ?? null);
+        } else if (activeThreadId) {
+          setActiveThreadId(null);
+        }
       }
     },
-    [activeAccount?.accountId, activeThreadId, channel, folder, runtimeClient]
+    [activeAccount?.accountId, activeThreadId, autoSelectFirstThread, channel, folder, runtimeClient]
   );
 
   const refreshMessages = useCallback(async () => {

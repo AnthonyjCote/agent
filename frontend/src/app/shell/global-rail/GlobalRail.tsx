@@ -12,7 +12,7 @@
 
 import type { ViewMode } from '@/app/shell/model/ui-contract';
 import { VIEW_DEFINITIONS, VIEW_ORDER } from '@/app/shell/view-registry/view-registry';
-import { NavTooltipPopover } from '@/shared/ui';
+import { IconButton, NavTooltipPopover } from '@/shared/ui';
 import './GlobalRail.css';
 
 type GlobalRailProps = {
@@ -115,31 +115,33 @@ export function GlobalRail({ viewMode, setViewMode }: GlobalRailProps) {
           const def = VIEW_DEFINITIONS[mode];
           const active = viewMode === mode;
           return (
-            <button
+            <IconButton
               key={mode}
-              type="button"
-              className={`rail-item nav-tooltip-host${active ? ' active' : ''}`}
-              aria-label={def.label}
-              aria-current={active ? 'page' : undefined}
+              variant="chip"
+              className="nav-tooltip-host"
+              ariaLabel={def.label}
+              ariaCurrent={active ? 'page' : undefined}
               onClick={() => setViewMode(mode)}
+              active={active}
+              icon={<RailIcon mode={mode} />}
             >
-              <RailIcon mode={mode} />
               <NavTooltipPopover label={def.label} orientation="vertical" side="right" align="center" />
-            </button>
+            </IconButton>
           );
         })}
       </div>
       <div className="global-rail-group bottom">
-        <button
-          type="button"
-          className={`rail-item nav-tooltip-host${viewMode === settingsMode ? ' active' : ''}`}
-          aria-label={VIEW_DEFINITIONS[settingsMode].label}
-          aria-current={viewMode === settingsMode ? 'page' : undefined}
+        <IconButton
+          variant="chip"
+          className="nav-tooltip-host"
+          ariaLabel={VIEW_DEFINITIONS[settingsMode].label}
+          ariaCurrent={viewMode === settingsMode ? 'page' : undefined}
           onClick={() => setViewMode(settingsMode)}
+          active={viewMode === settingsMode}
+          icon={<RailIcon mode={settingsMode} />}
         >
-          <RailIcon mode={settingsMode} />
           <NavTooltipPopover label={VIEW_DEFINITIONS[settingsMode].label} orientation="vertical" side="right" align="center" />
-        </button>
+        </IconButton>
       </div>
     </nav>
   );

@@ -3,12 +3,15 @@ import {
   AgentAvatar,
   ColumnCard,
   ConfirmDialogModal,
+  IconButton,
   LeftColumnShell,
   LeftColumnTopBar,
   ModalShell,
   ModalTopRail,
+  NavTooltipPopover,
   TextButton,
-  TextField
+  TextField,
+  WorkspaceSurface
 } from '@/shared/ui';
 import { useRuntimeClient } from '@/app/runtime/RuntimeProvider';
 import { formatCommsTime, useCommsChannelState } from '@/domains/comms/model';
@@ -259,18 +262,39 @@ export function CommsChatSurface({
               left={<span className="comms-chat-sidebar-title">Chats</span>}
               right={
                 <div className="comms-chat-sidebar-actions">
-                  <button type="button" className="comms-chat-sidebar-icon" aria-label="New DM" onClick={() => setNewDmOpen(true)}>
-                    <svg viewBox="0 0 20 20" aria-hidden="true">
-                      <path d="M10 4.2v11.6M4.2 10h11.6" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                    </svg>
-                    <span>DM</span>
-                  </button>
-                  <button type="button" className="comms-chat-sidebar-icon" aria-label="New Group" onClick={() => setNewGroupOpen(true)}>
-                    <svg viewBox="0 0 20 20" aria-hidden="true">
-                      <path d="M10 4.2v11.6M4.2 10h11.6" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                    </svg>
-                    <span>Group</span>
-                  </button>
+                  <IconButton
+                    variant="compact-action"
+                    className="comms-chat-sidebar-icon nav-tooltip-host"
+                    ariaLabel="New DM"
+                    onClick={() => setNewDmOpen(true)}
+                    icon={(
+                      <svg viewBox="0 0 20 20" aria-hidden="true">
+                        <circle cx="7.2" cy="7.1" r="2.2" fill="none" stroke="currentColor" strokeWidth="1.4" />
+                        <path d="M3.9 14.2c.5-1.7 1.8-2.7 3.3-2.7s2.8 1 3.3 2.7" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+                        <path d="M13.2 6.2v2.3M12.05 7.35h2.3" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+                      </svg>
+                    )}
+                  >
+                    <NavTooltipPopover label="New DM" orientation="horizontal" side="bottom" align="end" />
+                  </IconButton>
+                  <IconButton
+                    variant="compact-action"
+                    className="comms-chat-sidebar-icon nav-tooltip-host"
+                    ariaLabel="New Group"
+                    onClick={() => setNewGroupOpen(true)}
+                    icon={(
+                      <svg viewBox="0 0 20 20" aria-hidden="true">
+                        <circle cx="6.1" cy="7.4" r="1.7" fill="none" stroke="currentColor" strokeWidth="1.3" />
+                        <circle cx="10.4" cy="6.7" r="1.9" fill="none" stroke="currentColor" strokeWidth="1.3" />
+                        <circle cx="14.1" cy="8.2" r="1.6" fill="none" stroke="currentColor" strokeWidth="1.3" />
+                        <path d="M3.8 13.9c.4-1.4 1.5-2.2 2.7-2.2M7.7 13.9c.6-1.9 1.9-3 3.5-3s2.9 1.1 3.5 3" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+                        <path d="M15.8 13.9c-.3-1-1-1.7-1.9-2" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+                        <path d="M15.4 5.6v2.1M14.35 6.65h2.1" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+                      </svg>
+                    )}
+                  >
+                    <NavTooltipPopover label="New Group" orientation="horizontal" side="bottom" align="end" />
+                  </IconButton>
                 </div>
               }
             />
@@ -294,19 +318,19 @@ export function CommsChatSurface({
                       <strong>{thread.title}</strong>
                       <span>{thread.messageCount} msgs · {formatCommsTime(thread.lastMessageAtMs || thread.updatedAtMs)}</span>
                     </button>
-                    <button
-                      type="button"
-                      className="comms-chat-thread-delete"
-                      aria-label={`Delete chat ${thread.title}`}
+                    <IconButton
+                      variant="compact-action"
+                      ariaLabel={`Delete chat ${thread.title}`}
+                      icon={(
+                        <svg viewBox="0 0 20 20" aria-hidden="true">
+                          <path d="M5.8 6.2h8.4m-7.1 0v8m2.9-8v8m2.9-8v8M7.7 4.5h4.6l.5 1.2h2v1.5H5.2V5.7h2zM6.7 7.2h6.6v8.1a1 1 0 0 1-1 1H7.7a1 1 0 0 1-1-1z" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      )}
                       onClick={(event) => {
                         event.stopPropagation();
                         setPendingDeleteThreadId(thread.threadId);
                       }}
-                    >
-                      <svg viewBox="0 0 20 20" aria-hidden="true">
-                        <path d="M5.8 6.2h8.4m-7.1 0v8m2.9-8v8m2.9-8v8M7.7 4.5h4.6l.5 1.2h2v1.5H5.2V5.7h2zM6.7 7.2h6.6v8.1a1 1 0 0 1-1 1H7.7a1 1 0 0 1-1-1z" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    </button>
+                    />
                   </ColumnCard>
                 ))}
               </section>
@@ -327,19 +351,19 @@ export function CommsChatSurface({
                       <strong># {thread.title}</strong>
                       <span>{thread.messageCount} msgs · {formatCommsTime(thread.lastMessageAtMs || thread.updatedAtMs)}</span>
                     </button>
-                    <button
-                      type="button"
-                      className="comms-chat-thread-delete"
-                      aria-label={`Delete chat ${thread.title}`}
+                    <IconButton
+                      variant="compact-action"
+                      ariaLabel={`Delete chat ${thread.title}`}
+                      icon={(
+                        <svg viewBox="0 0 20 20" aria-hidden="true">
+                          <path d="M5.8 6.2h8.4m-7.1 0v8m2.9-8v8m2.9-8v8M7.7 4.5h4.6l.5 1.2h2v1.5H5.2V5.7h2zM6.7 7.2h6.6v8.1a1 1 0 0 1-1 1H7.7a1 1 0 0 1-1-1z" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      )}
                       onClick={(event) => {
                         event.stopPropagation();
                         setPendingDeleteThreadId(thread.threadId);
                       }}
-                    >
-                      <svg viewBox="0 0 20 20" aria-hidden="true">
-                        <path d="M5.8 6.2h8.4m-7.1 0v8m2.9-8v8m2.9-8v8M7.7 4.5h4.6l.5 1.2h2v1.5H5.2V5.7h2zM6.7 7.2h6.6v8.1a1 1 0 0 1-1 1H7.7a1 1 0 0 1-1-1z" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    </button>
+                    />
                   </ColumnCard>
                 ))}
               </section>
@@ -347,7 +371,7 @@ export function CommsChatSurface({
           </aside>
         }
         right={
-          <section className="comms-chat-main">
+          <WorkspaceSurface className="comms-chat-main">
             <header className="comms-chat-main-header">
               <div className="comms-chat-main-title">
                 <h2>{state.activeThread?.title || 'Select a chat'}</h2>
@@ -402,7 +426,7 @@ export function CommsChatSurface({
               />
               <TextButton label="Send" variant="primary" onClick={() => void handleSend()} />
             </footer>
-          </section>
+          </WorkspaceSurface>
         }
       />
 

@@ -1,0 +1,99 @@
+/*
+ * Purpose: Style reusable icon-only action buttons.
+ * Responsibilities:
+ * - Match compact navigation/icon control treatment.
+ * - Keep hover/active states consistent for shared usage.
+ */
+/* @tags: shared-ui,controls,icon-button,styles */
+/* @status: active */
+/* @owner: founder */
+/* @domain: shared */
+/* @adr: none */
+
+.icon-button {
+  --icon-button-size: 40px;
+  --icon-button-radius: 10px;
+  --icon-button-border: transparent;
+  --icon-button-bg: transparent;
+  --icon-button-color: inherit;
+  --icon-button-border-hover: var(--border-subtle);
+  --icon-button-bg-hover: var(--bg-elev-2);
+  --icon-button-color-hover: inherit;
+  --icon-button-border-active: var(--accent);
+  --icon-button-bg-active: #252a33;
+  --icon-button-color-active: inherit;
+  --icon-button-shadow-active: inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+  --icon-button-icon-size: 18px;
+
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: var(--icon-button-size);
+  height: var(--icon-button-size);
+  border: 1px solid var(--icon-button-border);
+  border-radius: var(--icon-button-radius);
+  color: var(--icon-button-color);
+  background: var(--icon-button-bg);
+  cursor: pointer;
+  transition:
+    background 0.16s ease,
+    border-color 0.16s ease,
+    color 0.16s ease;
+}
+
+.icon-button svg {
+  width: var(--icon-button-icon-size);
+  height: var(--icon-button-icon-size);
+  opacity: 0.92;
+}
+
+.icon-button:hover:not(:disabled):not(.active) {
+  background: var(--icon-button-bg-hover);
+  border-color: var(--icon-button-border-hover);
+  color: var(--icon-button-color-hover);
+}
+
+.icon-button.active {
+  background: var(--icon-button-bg-active);
+  border-color: var(--icon-button-border-active);
+  color: var(--icon-button-color-active);
+  box-shadow: var(--icon-button-shadow-active);
+}
+
+.icon-button-chip {
+  --icon-button-size: 40px;
+  --icon-button-radius: 10px;
+  --icon-button-border: transparent;
+  --icon-button-bg: transparent;
+  --icon-button-color: inherit;
+  --icon-button-border-hover: var(--border-subtle);
+  --icon-button-bg-hover: var(--bg-elev-2);
+  --icon-button-color-hover: inherit;
+  --icon-button-border-active: var(--accent);
+  --icon-button-bg-active: #252a33;
+  --icon-button-color-active: inherit;
+  --icon-button-shadow-active: inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+  --icon-button-icon-size: 18px;
+}
+
+.icon-button-compact-action {
+  --icon-button-size: 32px;
+  --icon-button-radius: 10px;
+  --icon-button-border: color-mix(in srgb, var(--border-subtle) 88%, transparent);
+  --icon-button-bg: color-mix(in srgb, var(--bg-elev-2) 86%, transparent);
+  --icon-button-color: var(--text-muted);
+  --icon-button-border-hover: color-mix(in srgb, #4e6ed7 44%, var(--border-strong));
+  --icon-button-bg-hover: color-mix(in srgb, #2a3242 70%, transparent);
+  --icon-button-color-hover: #ffffff;
+  --icon-button-border-active: color-mix(in srgb, #4e6ed7 48%, #2a3145);
+  --icon-button-bg-active: color-mix(in srgb, #243356 72%, transparent);
+  --icon-button-color-active: #ffffff;
+  --icon-button-shadow-active: none;
+  --icon-button-icon-size: 15px;
+}
+
+.icon-button:disabled {
+  opacity: 0.5;
+  cursor: default;
+  transform: none;
+}

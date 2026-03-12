@@ -27,7 +27,7 @@
   border-radius: 12px;
   overflow: hidden;
   border: 1px solid color-mix(in srgb, var(--border-strong) 82%, transparent);
-  background: linear-gradient(180deg, #171d27 0%, #121822 100%);
+  background: var(--bg-elev-1);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.05),
     0 24px 48px rgba(0, 0, 0, 0.45);

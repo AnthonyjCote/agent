@@ -348,6 +348,14 @@ impl EmailTransportAdapter for SandboxEmailAdapter {
             );
         }
 
+        let body_text_with_context = build_email_reply_body_with_context(
+            store,
+            workspace_id,
+            &sender_thread,
+            &input.body_text,
+            input.reply_to_message_id.as_deref(),
+        )?;
+
         let sender_message = store.append_comms_message(
             workspace_id,
             &input.thread_id,
@@ -357,7 +365,7 @@ impl EmailTransportAdapter for SandboxEmailAdapter {
             input.cc_participants.as_ref(),
             input.bcc_participants.as_ref(),
             input.subject.as_deref(),
-            &input.body_text,
+            &body_text_with_context,
             input.reply_to_message_id.as_deref(),
         )?;
 
@@ -448,7 +456,7 @@ impl EmailTransportAdapter for SandboxEmailAdapter {
                 input.cc_participants.as_ref(),
                 input.bcc_participants.as_ref(),
                 input.subject.as_deref(),
-                &input.body_text,
+                &body_text_with_context,
                 input.reply_to_message_id.as_deref(),
             )?;
 
@@ -464,6 +472,57 @@ impl EmailTransportAdapter for SandboxEmailAdapter {
 
         Ok(sender_message)
     }
+}
+
+fn build_email_reply_body_with_context(
+    store: &PersistenceStateStore,
+    workspace_id: &str,
+    thread: &crate::CommsThreadRecord,
+    body_text: &str,
+    reply_to_message_id: Option<&str>,
+) -> Result<String, PersistenceError> {
+    let base = body_text.trim();
+    if base.is_empty() {
+        return Ok(String::new());
+    }
+    if base.contains("\n> ") || base.contains("\nOn ") {
+        return Ok(base.to_string());
+    }
+    if thread.message_count <= 0 {
+        return Ok(base.to_string());
+    }
+
+    let reference = if let Some(message_id) = reply_to_message_id
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    {
+        store.get_comms_message(workspace_id, &thread.thread_id, message_id)?
+    } else {
+        let latest_offset = (thread.message_count - 1).max(0);
+        store
+            .list_comms_messages(workspace_id, &thread.thread_id, 1, latest_offset)?
+            .into_iter()
+            .next()
+    };
+
+    let Some(reference) = reference else {
+        return Ok(base.to_string());
+    };
+
+    let quoted = reference
+        .body_text
+        .lines()
+        .map(|line| format!("> {}", line))
+        .collect::<Vec<_>>()
+        .join("\n");
+    if quoted.trim().is_empty() {
+        return Ok(base.to_string());
+    }
+    let from = reference.from_account_ref.trim();
+    let from = if from.is_empty() { "sender" } else { from };
+    let stamp = reference.created_at_ms;
+
+    Ok(format!("{base}\n\nOn {stamp}, {from} wrote:\n{quoted}"))
 }
 
 impl SandboxSmsAdapter {

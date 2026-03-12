@@ -29,7 +29,7 @@
 }
 
 .modal-top-rail-raised {
-  background: linear-gradient(180deg, #151f2e 0%, #111a27 100%);
+  background: var(--bg-elev-2);
   border-bottom: 1px solid var(--border-strong);
   box-shadow: inset 0 -1px 0 color-mix(in srgb, #a9bad7 14%, transparent);
 }

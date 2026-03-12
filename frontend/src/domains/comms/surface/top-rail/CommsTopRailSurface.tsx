@@ -23,20 +23,21 @@ type CommsTopRailSurfaceProps = {
 export function CommsTopRailSurface({ channel, onChannelChange, activeOperator, onOpenAccountSelector }: CommsTopRailSurfaceProps) {
   return (
     <TopRailShell
-      left={<div />}
+      left={
+        <div className="comms-top-rail-tabs">
+          {CHANNELS.map((item) => (
+            <TextButton
+              key={item.id}
+              label={item.label}
+              variant={channel === item.id ? 'primary' : 'ghost'}
+              size="sm"
+              onClick={() => onChannelChange(item.id)}
+            />
+          ))}
+        </div>
+      }
       right={
         <div className="comms-top-rail-right">
-          <div className="comms-top-rail-tabs">
-            {CHANNELS.map((item) => (
-              <TextButton
-                key={item.id}
-                label={item.label}
-                variant={channel === item.id ? 'primary' : 'ghost'}
-                size="sm"
-                onClick={() => onChannelChange(item.id)}
-              />
-            ))}
-          </div>
           <TopRailSelectorCard
             operatorId={activeOperator?.id}
             name={activeOperator?.name || 'Select account'}

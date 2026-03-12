@@ -7,3 +7,4 @@ Includes:
 - `LeftColumnTopBar`: full-bleed control bar for left column actions.
 - `ModalTopRail`: full-bleed control bar for modal content panes.
 - `TopRailShell`: full-bleed control bar for working-area content panes.
+- `WorkspaceSurface`: framed main workspace shell for right-pane content areas.

@@ -13,16 +13,59 @@
 
 :root {
   font-family: "Manrope", "IBM Plex Sans", "Avenir Next", "Segoe UI", sans-serif;
-  --bg-base: #151515;
+
+/* Core Background */
+  --bg-base: #171616;
   --bg-shell: #101216;
-  --bg-elev-1: #14171d;
-  --bg-elev-2: #1a1e25;
+
+  /* Elevation */
+  --bg-elev-1: #121316;
+  --bg-elev-2: #18191c;
   --bg-elev-3: #20252d;
+
+  /* State Colors */
+  --accent: #8f98a8;
+  --danger-base: #5a1f29;
+  --danger-highlight: #d24a5d;
+  --warning-base: #7f541f;
+  --warning-highlight: #e1a23a;
+
+  /* Borders */
   --border-subtle: #2b313b;
   --border-strong: #3a424f;
+
+  /* Radius */
+  --r-default: 8px;
+  --r-round: 999px;
+
+  /* Text Color*/
   --text-primary: #e7e9ee;
-  --text-muted: #98a1b0;
-  --accent: #8f98a8;
+  --text-muted: #758092;
+ 
+  /* Text Size*/
+  --default-text: 12px;
+  --compact-text: 9px;
+  --micro-text: 5px;
+  --heading-large: 18px;
+  --heading-compact: 14px;
+
+  /* buttons */
+  --button-primary: #253c50;
+  --button-seccondary: #35373a;
+  --button-hover: #365c72;
+
+  /* Fields */
+  --field-background: #1b2330;
+  --field-highlight: #1e2736;
+
+  /* Cards */
+  --card-primary:
+  --card-seccondary:
+  
+  /* chat */
+  --sent-bubble:#2d7cff;
+  --recieved-bubble:#28344b;
+
 }
 
 * {

@@ -34,28 +34,8 @@
 }
 
 .comms-chat-sidebar-icon {
-  border: 1px solid color-mix(in srgb, #334562 74%, transparent);
-  background: linear-gradient(180deg, #1a2538 0%, #141d2f 100%);
-  color: var(--text-muted);
-  border-radius: 8px;
-  padding: 4px 6px;
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  cursor: pointer;
-  font-size: 10px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.comms-chat-sidebar-icon svg {
-  width: 11px;
-  height: 11px;
-}
-
-.comms-chat-sidebar-icon:hover {
-  color: var(--text-primary);
-  border-color: color-mix(in srgb, #7ea1f8 52%, var(--border-strong));
+  width: 28px;
+  height: 28px;
 }
 
 .comms-chat-thread-list {
@@ -109,37 +89,12 @@
   color: var(--text-muted);
 }
 
-.comms-chat-thread-delete {
-  width: 24px;
-  height: 24px;
-  border: 1px solid color-mix(in srgb, var(--border-subtle) 78%, transparent);
-  border-radius: 8px;
-  background: color-mix(in srgb, #121a29 80%, #000);
-  color: var(--text-muted);
-  display: inline-grid;
-  place-items: center;
-  cursor: pointer;
-}
-
-.comms-chat-thread-delete svg {
-  width: 13px;
-  height: 13px;
-}
-
-.comms-chat-thread-delete:hover {
-  color: color-mix(in srgb, var(--danger-text) 88%, #fff);
-  border-color: color-mix(in srgb, var(--danger-text) 52%, transparent);
-  background: color-mix(in srgb, var(--danger-bg) 44%, #121a29);
-}
-
 .comms-chat-main {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
   min-height: 0;
   height: 100%;
-  background:
-    radial-gradient(circle at 10% 0%, rgba(86, 149, 255, 0.14), transparent 35%),
-    linear-gradient(180deg, #101824 0%, #0c131f 100%);
+  background: transparent;
 }
 
 .comms-chat-main-header {
@@ -243,14 +198,14 @@
   min-width: 220px;
   border: 1px solid color-mix(in srgb, #334560 68%, transparent);
   border-radius: 12px;
-  background: linear-gradient(180deg, #1a2638 0%, #142031 100%);
+  background: var(--recieved-bubble);
   padding: 8px 10px 10px;
 }
 
 .comms-chat-message.outbound {
   justify-self: end;
   border-color: color-mix(in srgb, #6795ff 56%, transparent);
-  background: linear-gradient(180deg, #24406d 0%, #1b3457 100%);
+  background: var(--sent-bubble);
 }
 
 .comms-chat-message.inbound.has-tail::before {
@@ -263,7 +218,7 @@
   transform: translateY(-50%) rotate(45deg);
   border-left: 1px solid color-mix(in srgb, #334560 68%, transparent);
   border-bottom: 1px solid color-mix(in srgb, #334560 68%, transparent);
-  background: linear-gradient(180deg, #1a2638 0%, #142031 100%);
+  background: var(--recieved-bubble);
 }
 
 .comms-chat-message p {

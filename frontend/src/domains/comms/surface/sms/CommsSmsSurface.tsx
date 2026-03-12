@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { AgentAvatar, ColumnCard, ConfirmDialogModal, LeftColumnShell, LeftColumnTopBar, TextButton, TextField } from '@/shared/ui';
+import { AgentAvatar, ColumnCard, ConfirmDialogModal, IconButton, LeftColumnShell, LeftColumnTopBar, TextButton, TextField, WorkspaceSurface } from '@/shared/ui';
 import { useRuntimeClient } from '@/app/runtime/RuntimeProvider';
 import { formatCommsTime, useCommsChannelState } from '@/domains/comms/model';
 import { ComposeSmsModal, type ComposeSmsContact } from './compose-modal';
@@ -222,26 +222,26 @@ export function CommsSmsSurface({
                     <strong>{thread.title}</strong>
                     <span>{formatCommsTime(thread.lastMessageAtMs || thread.updatedAtMs)}</span>
                   </button>
-                  <button
-                    type="button"
-                    className="comms-sms-thread-delete"
-                    aria-label={`Delete SMS thread ${thread.title}`}
+                  <IconButton
+                    variant="compact-action"
+                    ariaLabel={`Delete SMS thread ${thread.title}`}
+                    icon={(
+                      <svg viewBox="0 0 20 20" aria-hidden="true">
+                        <path d="M5.8 6.2h8.4m-7.1 0v8m2.9-8v8m2.9-8v8M7.7 4.5h4.6l.5 1.2h2v1.5H5.2V5.7h2zM6.7 7.2h6.6v8.1a1 1 0 0 1-1 1H7.7a1 1 0 0 1-1-1z" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    )}
                     onClick={(event) => {
                       event.stopPropagation();
                       setPendingDeleteThreadId(thread.threadId);
                     }}
-                  >
-                    <svg viewBox="0 0 20 20" aria-hidden="true">
-                      <path d="M5.8 6.2h8.4m-7.1 0v8m2.9-8v8m2.9-8v8M7.7 4.5h4.6l.5 1.2h2v1.5H5.2V5.7h2zM6.7 7.2h6.6v8.1a1 1 0 0 1-1 1H7.7a1 1 0 0 1-1-1z" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  </button>
+                  />
                 </ColumnCard>
               ))}
             </div>
           </aside>
         }
         right={
-          <section className="comms-sms-main">
+          <WorkspaceSurface className="comms-sms-main">
             <div className="comms-sms-stage">
               <div className="comms-sms-phone">
                 <div className="comms-sms-notch" />
@@ -299,7 +299,7 @@ export function CommsSmsSurface({
               </div>
             </div>
             <CommsComposeFab ariaLabel="Compose SMS" onClick={() => setComposeOpen(true)} />
-          </section>
+          </WorkspaceSurface>
         }
       />
       <ComposeSmsModal
