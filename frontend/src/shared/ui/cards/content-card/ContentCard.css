@@ -12,11 +12,30 @@
 
 .content-card {
   width: 100%;
+  text-align: left;
   border: 1px solid rgba(60, 76, 108, 0.52);
   border-radius: 12px;
   background: rgba(16, 22, 34, 0.92);
   box-shadow: inset 0 0 0 1px rgba(27, 37, 55, 0.44);
   padding: 16px 18px;
+}
+
+.content-card.is-interactive {
+  appearance: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  transition: border-color 140ms ease, background-color 140ms ease;
+}
+
+.content-card.is-interactive:hover {
+  border-color: rgba(94, 118, 163, 0.62);
+  background: rgba(22, 30, 45, 0.94);
+}
+
+.content-card.is-active {
+  border-color: rgba(110, 144, 204, 0.86);
+  background: rgba(26, 35, 54, 0.96);
 }
 
 .content-card-title {

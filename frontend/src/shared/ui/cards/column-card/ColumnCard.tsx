@@ -52,7 +52,7 @@ export function ColumnCard({
     <section className={classes}>
       {title ? <h3 className="column-card-title">{title}</h3> : null}
       {description ? <p className="column-card-description">{description}</p> : null}
-      {children ? <div className="column-card-body">{children}</div> : null}
+      {children ? (title || description ? <div className="column-card-body">{children}</div> : children) : null}
     </section>
   );
 }

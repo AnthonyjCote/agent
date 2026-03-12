@@ -111,28 +111,12 @@
 }
 
 .comms-email-mail-row {
-  border: 1px solid color-mix(in srgb, #364154 74%, transparent);
-  background: linear-gradient(180deg, #161f2f 0%, #111927 100%);
-  border-radius: 12px;
   padding: 10px 12px;
   display: grid;
   gap: 4px;
-  text-align: left;
-  cursor: pointer;
-  color: var(--text-primary);
-}
-
-.comms-email-mail-row:hover {
-  border-color: color-mix(in srgb, #7597eb 42%, var(--border-strong));
-}
-
-.comms-email-mail-row.is-active {
-  border-color: color-mix(in srgb, #7ba0fa 64%, var(--border-strong));
-  background: linear-gradient(180deg, #23344f 0%, #1b2b45 100%);
 }
 
 .comms-email-mail-row.is-unread {
-  border-color: color-mix(in srgb, #7ea8ff 52%, var(--border-strong));
   box-shadow: inset 0 0 0 1px color-mix(in srgb, #7ea8ff 22%, transparent);
 }
 

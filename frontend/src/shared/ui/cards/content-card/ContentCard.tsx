@@ -18,16 +18,41 @@ type ContentCardProps = {
   description?: string;
   children?: ReactNode;
   className?: string;
+  as?: 'section' | 'button';
+  active?: boolean;
+  onClick?: () => void;
+  ariaCurrent?: 'page';
 };
 
-export function ContentCard({ title, description, children, className }: ContentCardProps) {
-  const classes = ['content-card', className].filter(Boolean).join(' ');
+export function ContentCard({
+  title,
+  description,
+  children,
+  className,
+  as = 'section',
+  active = false,
+  onClick,
+  ariaCurrent
+}: ContentCardProps) {
+  const classes = ['content-card', as === 'button' ? 'is-interactive' : '', active ? 'is-active' : '', className]
+    .filter(Boolean)
+    .join(' ');
+
+  if (as === 'button') {
+    return (
+      <button type="button" className={classes} onClick={onClick} aria-current={ariaCurrent}>
+        {title ? <h3 className="content-card-title">{title}</h3> : null}
+        {description ? <p className="content-card-description">{description}</p> : null}
+        {children ? (title || description ? <div className="content-card-body">{children}</div> : children) : null}
+      </button>
+    );
+  }
 
   return (
     <section className={classes}>
       {title ? <h3 className="content-card-title">{title}</h3> : null}
       {description ? <p className="content-card-description">{description}</p> : null}
-      {children ? <div className="content-card-body">{children}</div> : null}
+      {children ? (title || description ? <div className="content-card-body">{children}</div> : children) : null}
     </section>
   );
 }

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ColumnCard, LeftColumnShell, LeftColumnTopBar, TextButton } from '@/shared/ui';
+import { ColumnCard, ContentCard, LeftColumnShell, LeftColumnTopBar, TextButton } from '@/shared/ui';
 import { formatCommsTime, useCommsChannelState } from '@/domains/comms/model';
 import { CommsComposeFab } from '@/domains/comms/surface/shared';
 import { ComposeEmailModal, type ComposeEmailContact } from './compose-modal';
@@ -261,10 +261,11 @@ export function CommsEmailSurface({
                 {state.loading ? <div className="comms-email-empty">Loading threads...</div> : null}
                 {!state.loading && state.threads.length === 0 ? <div className="comms-email-empty">No threads yet.</div> : null}
                 {state.threads.map((thread) => (
-                  <button
+                  <ContentCard
                     key={thread.threadId}
-                    type="button"
-                    className={`comms-email-mail-row ${state.activeThreadId === thread.threadId ? 'is-active' : ''} ${(thread.state || '').toLowerCase() === 'unread' ? 'is-unread' : ''}`}
+                    as="button"
+                    className={`comms-email-mail-row ${(thread.state || '').toLowerCase() === 'unread' ? 'is-unread' : ''}`}
+                    active={state.activeThreadId === thread.threadId}
                     onClick={() => {
                       state.setActiveThreadId(thread.threadId);
                       setReadOpen(true);
@@ -279,7 +280,7 @@ export function CommsEmailSurface({
                       {thread.messageCount} message(s)
                       {(thread.state || '').toLowerCase() === 'unread' ? ' · unread' : ''}
                     </p>
-                  </button>
+                  </ContentCard>
                 ))}
             </div>
             <CommsComposeFab ariaLabel="Compose email" onClick={() => setComposeOpen(true)} />

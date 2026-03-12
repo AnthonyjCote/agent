@@ -1,5 +1,6 @@
 import { buildOperatorTree, type OperatorTreeNode, type OrgUnitTreeNode } from '@/domains/agent-chart/model';
 import type { Operator, OrgUnit } from '@/shared/config';
+import { ColumnCard } from '@/shared/ui';
 import type { BusinessUnitTreeNode, SelectedNode } from '@/domains/agent-chart/surface/types';
 import { NodeMedia, NodeMediaIcon } from './NodeMedia';
 import { CollapseToggleIcon } from './CollapseToggleIcon';
@@ -101,7 +102,7 @@ export function OrgHierarchyTree(props: OrgHierarchyTreeProps) {
           onPointerDown={(event) => dnd.beginRowDragCandidate(event, { kind: 'operator', id: operator.id })}
         >
           {renderTreeGuides(depth)}
-          <span className="agent-chart-row-card">
+          <ColumnCard className="agent-chart-row-card" active={selected || (dragState.isTarget && dragState.placement === 'inside')}>
             <NodeMedia image={operator.avatarDataUrl} fallback={<NodeMediaIcon kind="operator" actorKind={operator.kind} />} />
             <span className="agent-chart-node-content">
               <span className="agent-chart-node-title">{operator.name}</span>
@@ -127,7 +128,7 @@ export function OrgHierarchyTree(props: OrgHierarchyTreeProps) {
                 </span>
               ) : null}
             </span>
-          </span>
+          </ColumnCard>
         </button>
         {!collapsed ? node.children.map((child) => renderActorNode(child, depth + 1)) : null}
       </div>
@@ -164,7 +165,7 @@ export function OrgHierarchyTree(props: OrgHierarchyTreeProps) {
           onPointerDown={(event) => dnd.beginRowDragCandidate(event, { kind: 'org_unit', id: node.unit.id })}
         >
           {renderTreeGuides(depth)}
-          <span className="agent-chart-row-card">
+          <ColumnCard className="agent-chart-row-card" active={selected || (dragState.isTarget && dragState.placement === 'inside')}>
             <NodeMedia image={node.unit.iconDataUrl} fallback={<NodeMediaIcon kind="org_unit" />} />
             <span className="agent-chart-node-content">
               <span className="agent-chart-node-title">{node.unit.name}</span>
@@ -187,7 +188,7 @@ export function OrgHierarchyTree(props: OrgHierarchyTreeProps) {
                 </span>
               ) : null}
             </span>
-          </span>
+          </ColumnCard>
         </button>
         {!collapsed ? actorTree.map((actorNode) => renderActorNode(actorNode, depth + 1)) : null}
         {!collapsed ? node.children.map((child) => renderOrgNode(child, depth + 1)) : null}
@@ -222,7 +223,7 @@ export function OrgHierarchyTree(props: OrgHierarchyTreeProps) {
           }
           ref={(nodeRef) => dnd.setRowRef('business_unit', node.id, nodeRef)}
         >
-          <span className="agent-chart-row-card">
+          <ColumnCard className="agent-chart-row-card" active={selected || (dragState.isTarget && dragState.placement === 'inside')}>
             <NodeMedia image={logoDataUrl} className="business-unit" fallback={<NodeMediaIcon kind="business_unit" />} />
             <span className="agent-chart-node-content">
               <span className="agent-chart-node-title">{node.name}</span>
@@ -245,7 +246,7 @@ export function OrgHierarchyTree(props: OrgHierarchyTreeProps) {
                 </span>
               ) : null}
             </span>
-          </span>
+          </ColumnCard>
         </button>
         {!collapsed ? attachedOrgRoots.map((rootNode) => renderOrgNode(rootNode, depth + 1)) : null}
         {!collapsed ? node.children.map((child) => renderBusinessUnitNode(child, depth + 1)) : null}
@@ -277,7 +278,7 @@ export function OrgHierarchyTree(props: OrgHierarchyTreeProps) {
           }
           ref={(nodeRef) => dnd.setRowRef('scope_bucket', scope, nodeRef)}
         >
-          <span className="agent-chart-row-card">
+          <ColumnCard className="agent-chart-row-card" active={selected || (dragState.isTarget && dragState.placement === 'inside')}>
             <NodeMedia
               image={undefined}
               className="business-unit scope-bucket"
@@ -304,7 +305,7 @@ export function OrgHierarchyTree(props: OrgHierarchyTreeProps) {
                 </span>
               ) : null}
             </span>
-          </span>
+          </ColumnCard>
         </button>
         {!collapsed ? roots.map((rootNode) => renderOrgNode(rootNode, 1)) : null}
       </div>
