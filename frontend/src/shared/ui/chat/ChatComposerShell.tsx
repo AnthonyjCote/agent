@@ -17,6 +17,8 @@ type ChatComposerShellProps = {
   value: string;
   onValueChange: (next: string) => void;
   onSubmit: () => void;
+  onStop?: () => void;
+  isRunning?: boolean;
   placeholder: string;
 };
 
@@ -24,12 +26,18 @@ export function ChatComposerShell({
   value,
   onValueChange,
   onSubmit,
+  onStop,
+  isRunning = false,
   placeholder
 }: ChatComposerShellProps) {
   const trimmed = value.trim();
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (isRunning) {
+      onStop?.();
+      return;
+    }
     if (!trimmed) {
       return;
     }
@@ -39,6 +47,10 @@ export function ChatComposerShell({
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
+      if (isRunning) {
+        onStop?.();
+        return;
+      }
       if (!trimmed) {
         return;
       }
@@ -56,8 +68,12 @@ export function ChatComposerShell({
         onKeyDown={handleKeyDown}
         rows={1}
       />
-      <button className="chat-composer-send" type="submit" disabled={!trimmed}>
-        Send
+      <button
+        className={`chat-composer-send${isRunning ? ' is-stop' : ''}`}
+        type="submit"
+        disabled={isRunning ? false : !trimmed}
+      >
+        {isRunning ? 'Stop' : 'Send'}
       </button>
     </form>
   );

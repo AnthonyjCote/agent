@@ -73,6 +73,7 @@ pub struct CommsPrefetchResult {
     pub recipient_ref: String,
     pub candidates: Vec<ResolvedRecipient>,
     pub clarification_question: Option<String>,
+    pub operator_directory_raw: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Clone)]
@@ -324,6 +325,69 @@ pub fn resolve_message_send_prefetch_from_tools(
     recipient_ref: &str,
     executor: &mut dyn FnMut(&str, &serde_json::Value) -> Result<Option<ToolOutputEnvelope>, RunError>,
 ) -> CommsPrefetchResult {
+    fn normalize_for_match(value: &str) -> String {
+        value
+            .trim()
+            .to_ascii_lowercase()
+            .chars()
+            .filter(|ch| ch.is_ascii_alphanumeric() || ch.is_ascii_whitespace() || *ch == '.' || *ch == '_' || *ch == '-')
+            .collect::<String>()
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ")
+    }
+
+    fn destination_local_part(destination: &str) -> String {
+        destination
+            .split('@')
+            .next()
+            .unwrap_or(destination)
+            .trim()
+            .to_ascii_lowercase()
+    }
+
+    fn score_recipient_match(recipient_ref: &str, candidate: &ResolvedRecipient) -> i32 {
+        let ref_norm = normalize_for_match(recipient_ref);
+        if ref_norm.is_empty() {
+            return 0;
+        }
+
+        let name_norm = normalize_for_match(&candidate.name);
+        let title_norm = normalize_for_match(&candidate.title);
+        let local_part = destination_local_part(&candidate.destination);
+
+        if name_norm == ref_norm {
+            return 220;
+        }
+
+        // Strong name token match: "bob" -> "Bob Robertson"
+        if name_norm
+            .split_whitespace()
+            .any(|token| token == ref_norm || token.starts_with(&ref_norm))
+        {
+            return 180;
+        }
+
+        if name_norm.contains(&ref_norm) {
+            return 140;
+        }
+
+        if local_part == ref_norm
+            || local_part.starts_with(&format!("{ref_norm}."))
+            || local_part.contains(&format!(".{ref_norm}"))
+            || local_part.starts_with(&ref_norm)
+        {
+            return 125;
+        }
+
+        // Title fallback ("chief of staff"), lower confidence than name.
+        if title_norm.contains(&ref_norm) {
+            return 85;
+        }
+
+        0
+    }
+
     let recipient_query = recipient_ref.trim();
     let comms_directory_args = serde_json::json!({
         "ops": [
@@ -332,26 +396,67 @@ pub fn resolve_message_send_prefetch_from_tools(
                 "target": "operator_directory",
                 "selector": {
                     "channel": method.as_str(),
+                    // Query-first lookup keeps short refs (e.g. "bob") flexible across
+                    // name/title/address, while still allowing deterministic resolution.
                     "query": if recipient_query.is_empty() { serde_json::Value::Null } else { serde_json::Value::String(recipient_query.to_string()) },
-                    "name": if recipient_query.is_empty() { serde_json::Value::Null } else { serde_json::Value::String(recipient_query.to_string()) },
-                    "title": if recipient_query.is_empty() { serde_json::Value::Null } else { serde_json::Value::String(recipient_query.to_string()) },
+                    "name": serde_json::Value::Null,
+                    "title": serde_json::Value::Null,
                     "limit": 8
                 }
             }
         ]
     });
 
-    let candidates = run_tool_call_for_prefetch("comms_tool", &comms_directory_args, executor)
+    let (candidates, operator_directory_raw) = run_tool_call_for_prefetch("comms_tool", &comms_directory_args, executor)
         .ok()
         .and_then(|value| value)
-        .map(|value| parse_operator_directory_from_comms_output(&value))
-        .unwrap_or_default();
+        .map(|value| {
+            let parsed = parse_operator_directory_from_comms_output(&value);
+            let raw = serde_json::json!({
+                "summary": value.summary,
+                "structuredData": value.structured_data,
+                "errors": value.errors,
+                "artifacts": value.artifacts
+            });
+            (parsed, Some(raw))
+        })
+        .unwrap_or_else(|| (Vec::new(), None));
+
+    let mut ranked = candidates
+        .into_iter()
+        .filter_map(|candidate| {
+            let score = score_recipient_match(recipient_query, &candidate);
+            if score <= 0 {
+                return None;
+            }
+            Some((score, candidate))
+        })
+        .collect::<Vec<_>>();
+    ranked.sort_by(|a, b| b.0.cmp(&a.0).then_with(|| a.1.name.cmp(&b.1.name)));
+
+    let mut deduped = Vec::new();
+    let mut seen = std::collections::HashSet::<String>::new();
+    for (_, candidate) in ranked {
+        let key = format!(
+            "{}|{}",
+            candidate.name.trim().to_ascii_lowercase(),
+            candidate.destination.trim().to_ascii_lowercase()
+        );
+        if !seen.insert(key) {
+            continue;
+        }
+        deduped.push(candidate);
+        if deduped.len() >= 5 {
+            break;
+        }
+    }
 
     CommsPrefetchResult {
         method,
         recipient_ref: recipient_ref.trim().to_string(),
-        candidates: candidates.into_iter().take(5).collect(),
+        candidates: deduped,
         clarification_question: None,
+        operator_directory_raw,
     }
 }
 
@@ -509,5 +614,6 @@ pub fn resolve_message_send_prefetch(
         recipient_ref: recipient_ref.trim().to_string(),
         candidates,
         clarification_question: None,
+        operator_directory_raw: None,
     }
 }

@@ -102,6 +102,10 @@ pub fn resolve_prefetch(
                     "action":"read",
                     "items":[{"target":"snapshot"}]
                 })),
+                "org_mutate_plan" => Some(serde_json::json!({
+                    "action":"read",
+                    "items":[{"target":"snapshot"}]
+                })),
                 "org_read_unit" => {
                     let unit_ref = spec
                         .args
@@ -405,15 +409,21 @@ pub fn resolve_prefetch(
         } else {
             "resolved"
         };
+        let mut resolved_data = serde_json::json!({
+            "method": resolved.method.as_str(),
+            "recipientRef": resolved.recipient_ref,
+            "matches": candidate_data
+        });
+        if let Some(raw) = resolved.operator_directory_raw.clone() {
+            if let Some(object) = resolved_data.as_object_mut() {
+                object.insert("operatorDirectoryRaw".to_string(), raw);
+            }
+        }
         resolution.packets.push(PrefetchPacket {
             tool: "comms_tool".to_string(),
             intent: "message_send".to_string(),
             status: status.to_string(),
-            resolved_data: Some(serde_json::json!({
-                "method": resolved.method.as_str(),
-                "recipientRef": resolved.recipient_ref,
-                "matches": candidate_data
-            })),
+            resolved_data: Some(resolved_data),
             clarification_prompt: None,
         });
         resolution.detail_blocks.push(format!(

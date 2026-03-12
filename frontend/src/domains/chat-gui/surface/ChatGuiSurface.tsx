@@ -95,13 +95,44 @@ function buildRuntimeDebugCards(events: Array<Record<string, unknown>>, hideProv
   const cards: DebugCard[] = [];
   const requestByPhase = new Map<string, string>();
   const providerAssistantMergeByPhase = new Map<string, string>();
+  const flushAssistantMerge = (phaseKey?: string) => {
+    const keysToFlush =
+      typeof phaseKey === 'string'
+        ? [phaseKey]
+        : Array.from(providerAssistantMergeByPhase.keys());
+    keysToFlush.forEach((key) => {
+      const merged = providerAssistantMergeByPhase.get(key);
+      if (!merged || !merged.trim()) {
+        providerAssistantMergeByPhase.delete(key);
+        return;
+      }
+      const subtitle = key ? `phase: ${key}` : undefined;
+      const raw = stringifyDebugRaw({
+        event: 'debug_model_stream_merge',
+        phase: key,
+        role: 'assistant',
+        merged
+      });
+      cards.push({
+        key: `runtime-merge-${cards.length}-${key || 'default'}`,
+        eventType: 'debug_model_stream_merge',
+        title: 'Provider Stream Merge (assistant)',
+        subtitle,
+        summary: compactDebugText(merged),
+        raw
+      });
+      providerAssistantMergeByPhase.delete(key);
+    });
+  };
 
   events.forEach((event, index) => {
     const eventType = String(event.event ?? '');
     const phase = typeof event.phase === 'string' ? event.phase : '';
     const subtitle = phase ? `phase: ${phase}` : undefined;
+    const phaseKey = phase || 'default';
 
     if (eventType === 'debug_model_request') {
+      flushAssistantMerge(phaseKey);
       const payload = typeof event.payload === 'string' ? event.payload : stringifyDebugRaw(event.payload);
       requestByPhase.set(phase || 'default', normalizeDebugCompare(payload));
       cards.push({
@@ -116,6 +147,7 @@ function buildRuntimeDebugCards(events: Array<Record<string, unknown>>, hideProv
     }
 
     if (eventType === 'debug_model_response') {
+      flushAssistantMerge(phaseKey);
       const payload = typeof event.payload === 'string' ? event.payload : stringifyDebugRaw(event.payload);
       cards.push({
         key: `runtime-${index}`,
@@ -172,11 +204,12 @@ function buildRuntimeDebugCards(events: Array<Record<string, unknown>>, hideProv
           const role = typeof parsed.role === 'string' ? parsed.role : 'assistant';
           const content = typeof parsed.content === 'string' ? parsed.content : '';
           if (role === 'assistant' && content) {
-            const phaseKey = phase || 'default';
             providerAssistantMergeByPhase.set(
               phaseKey,
               `${providerAssistantMergeByPhase.get(phaseKey) ?? ''}${content}`
             );
+          } else {
+            flushAssistantMerge(phaseKey);
           }
           cards.push({
             key: `runtime-${index}`,
@@ -189,6 +222,7 @@ function buildRuntimeDebugCards(events: Array<Record<string, unknown>>, hideProv
           return;
         }
         if (type === 'result') {
+          flushAssistantMerge(phaseKey);
           cards.push({
             key: `runtime-${index}`,
             eventType: eventType,
@@ -200,8 +234,11 @@ function buildRuntimeDebugCards(events: Array<Record<string, unknown>>, hideProv
           });
           return;
         }
+        // Any structured non-message line is a seam for assistant stream chunks.
+        flushAssistantMerge(phaseKey);
       }
 
+      flushAssistantMerge(phaseKey);
       cards.push({
         key: `runtime-${index}`,
         eventType: eventType,
@@ -214,6 +251,7 @@ function buildRuntimeDebugCards(events: Array<Record<string, unknown>>, hideProv
     }
 
     if (eventType === 'model_delta') {
+      flushAssistantMerge(phaseKey);
       const text = typeof event.text === 'string' ? event.text : '';
       cards.push({
         key: `runtime-${index}`,
@@ -227,6 +265,7 @@ function buildRuntimeDebugCards(events: Array<Record<string, unknown>>, hideProv
     }
 
     if (eventType === 'tool_use' || eventType === 'tool_result' || eventType === 'debug_tool_result') {
+      flushAssistantMerge(phaseKey);
       const lifecycle = typeof event.lifecycle === 'string' ? event.lifecycle : '';
       const toolName = typeof event.tool_name === 'string' ? event.tool_name : 'tool';
       let summary = `${toolName}${lifecycle ? ` (${lifecycle})` : ''}`;
@@ -257,6 +296,7 @@ function buildRuntimeDebugCards(events: Array<Record<string, unknown>>, hideProv
     }
 
     if (eventType.startsWith('run_')) {
+      flushAssistantMerge(phaseKey);
       cards.push({
         key: `runtime-${index}`,
         eventType: eventType,
@@ -270,6 +310,7 @@ function buildRuntimeDebugCards(events: Array<Record<string, unknown>>, hideProv
       return;
     }
 
+    flushAssistantMerge(phaseKey);
     cards.push({
       key: `runtime-${index}`,
       eventType: eventType || 'event',
@@ -280,25 +321,7 @@ function buildRuntimeDebugCards(events: Array<Record<string, unknown>>, hideProv
     });
   });
 
-  if (providerAssistantMergeByPhase.size > 0) {
-    for (const [phase, merged] of providerAssistantMergeByPhase.entries()) {
-      const subtitle = phase ? `phase: ${phase}` : undefined;
-      const raw = stringifyDebugRaw({
-        event: 'debug_model_stream_merge',
-        phase,
-        role: 'assistant',
-        merged
-      });
-      cards.push({
-        key: `runtime-merge-${phase}`,
-        eventType: 'debug_model_stream_merge',
-        title: 'Provider Stream Merge (assistant)',
-        subtitle,
-        summary: compactDebugText(merged),
-        raw
-      });
-    }
-  }
+  flushAssistantMerge();
 
   return cards;
 }
@@ -792,6 +815,7 @@ export function ChatGuiSurface() {
     setSelectedDebugRunId,
     setDraft,
     submitDraft,
+    stopActiveRun,
     activateAgent,
     openThread,
     deleteThread
@@ -1457,6 +1481,8 @@ export function ChatGuiSurface() {
                 value={draft}
                 onValueChange={setDraft}
                 onSubmit={submitActiveDraft}
+                onStop={() => void stopActiveRun()}
+                isRunning={isRunning}
                 placeholder={composerPlaceholder}
               />
             }
@@ -1541,6 +1567,8 @@ export function ChatGuiSurface() {
             value={draft}
             onValueChange={setDraft}
             onSubmit={submitActiveDraft}
+            onStop={() => void stopActiveRun()}
+            isRunning={isRunning}
             placeholder={composerPlaceholder}
           />
         </div>

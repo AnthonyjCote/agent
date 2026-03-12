@@ -812,6 +812,20 @@ fn list_run_events(runtime: State<'_, Arc<RuntimeService>>, run_id: String) -> V
 }
 
 #[tauri::command]
+fn cancel_run(runtime: State<'_, Arc<RuntimeService>>, run_id: String) -> bool {
+    runtime.cancel_run(&run_id)
+}
+
+#[tauri::command]
+fn list_thread_run_ids(
+    runtime: State<'_, Arc<RuntimeService>>,
+    thread_id: String,
+    limit: Option<i64>,
+) -> Vec<String> {
+    runtime.list_thread_run_ids(&thread_id, limit.unwrap_or(50))
+}
+
+#[tauri::command]
 fn open_external_url(url: String) -> Result<(), String> {
     if !url.starts_with("http://") && !url.starts_with("https://") {
         return Err("Only http(s) URLs are allowed.".to_string());
@@ -866,7 +880,9 @@ fn main() {
             list_work_units,
             dispatch_work_unit,
             start_run,
+            cancel_run,
             list_run_events,
+            list_thread_run_ids,
             open_external_url
         ])
         .run(tauri::generate_context!())

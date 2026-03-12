@@ -290,5 +290,7 @@ export interface AgentRuntimeClient {
   dispatchWorkUnit(input: DispatchWorkUnitInput): Promise<DispatchWorkUnitResult>;
   listWorkUnits(status?: string, limit?: number, offset?: number): Promise<WorkUnitRecord[]>;
   startRun(input: StartRunInput): Promise<StartRunResponse>;
+  cancelRun(runId: string): Promise<boolean>;
   listRunEvents(runId: string): Promise<RuntimeRunEvent[]>;
+  listThreadRunIds(threadId: string, limit?: number): Promise<string[]>;
 }

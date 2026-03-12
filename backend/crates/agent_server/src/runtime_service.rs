@@ -3,7 +3,10 @@ use std::{
     sync::Mutex,
 };
 
-use adapter::{app_tool_backend::PersistentAppToolBackend, gemini::model_inference::GeminiCliModelInference};
+use adapter::{
+    app_tool_backend::PersistentAppToolBackend,
+    gemini::model_inference::{cancel_active_gemini_run, GeminiCliModelInference},
+};
 use app_persistence::CommsThreadRecord;
 use app_persistence::PersistenceStateStore;
 use agent_core::{
@@ -148,6 +151,13 @@ impl RuntimeService {
                 *entry = events.clone();
             }
         }
+        let persisted_events: Vec<serde_json::Value> = events
+            .iter()
+            .filter_map(|event| serde_json::to_value(event).ok())
+            .collect();
+        let _ = self
+            .state_store
+            .replace_run_events(&self.workspace_id, &run_id, &persisted_events);
         self.append_thread_turn(&thread_id, &user_message, assistant_text.as_deref());
 
         run_id
@@ -165,14 +175,67 @@ impl RuntimeService {
                 }]
             });
         }
+        let reserved = vec![serde_json::json!({
+            "event": "run_started",
+            "workspace_id": workspace_id,
+            "run_id": run_id,
+            "thread_id": thread_id,
+            "policy_snapshot_version": "v1",
+            "context_hash": "reserved"
+        })];
+        let _ = self
+            .state_store
+            .replace_run_events(&self.workspace_id, run_id, &reserved);
     }
 
     pub fn list_run_events(&self, run_id: &str) -> Vec<RunEvent> {
-        self.events_by_run
+        let in_memory = self
+            .events_by_run
             .lock()
             .ok()
             .and_then(|guard| guard.get(run_id).cloned())
+            .unwrap_or_default();
+        if !in_memory.is_empty() {
+            return in_memory;
+        }
+        self.state_store
+            .list_run_events(&self.workspace_id, run_id)
             .unwrap_or_default()
+            .into_iter()
+            .filter_map(|value| serde_json::from_value::<RunEvent>(value).ok())
+            .collect()
+    }
+
+    pub fn list_thread_run_ids(&self, thread_id: &str, limit: i64) -> Vec<String> {
+        self.state_store
+            .list_thread_run_ids(&self.workspace_id, thread_id, limit)
+            .unwrap_or_default()
+    }
+
+    pub fn cancel_run(&self, run_id: &str) -> bool {
+        let killed = cancel_active_gemini_run(run_id);
+        if killed {
+            if let Ok(mut guard) = self.events_by_run.lock() {
+                guard
+                    .entry(run_id.to_string())
+                    .or_default()
+                    .push(RunEvent::RunCancelled {
+                        run_id: run_id.to_string(),
+                    });
+            }
+            let mut events = self
+                .state_store
+                .list_run_events(&self.workspace_id, run_id)
+                .unwrap_or_default();
+            events.push(serde_json::json!({
+                "event": "run_cancelled",
+                "run_id": run_id
+            }));
+            let _ = self
+                .state_store
+                .replace_run_events(&self.workspace_id, run_id, &events);
+        }
+        killed
     }
 
     fn render_history_excerpt(&self, thread_id: &str) -> String {

@@ -309,6 +309,17 @@ export class HttpTransport implements AgentRuntimeClient {
     return (await response.json()) as StartRunResponse;
   }
 
+  async cancelRun(runId: string): Promise<boolean> {
+    const response = await fetch(`${this.baseUrl}/runs/${encodeURIComponent(runId)}/cancel`, {
+      method: 'POST'
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to cancel run: ${response.status}`);
+    }
+    const payload = (await response.json()) as { cancelled?: boolean };
+    return Boolean(payload.cancelled);
+  }
+
   async listRunEvents(runId: string): Promise<RuntimeRunEvent[]> {
     const response = await fetch(`${this.baseUrl}/runs/${encodeURIComponent(runId)}/events`);
     if (!response.ok) {
@@ -316,5 +327,20 @@ export class HttpTransport implements AgentRuntimeClient {
     }
 
     return (await response.json()) as RuntimeRunEvent[];
+  }
+
+  async listThreadRunIds(threadId: string, limit?: number): Promise<string[]> {
+    const params = new URLSearchParams();
+    if (typeof limit === 'number') {
+      params.set('limit', String(limit));
+    }
+    const suffix = params.toString() ? `?${params.toString()}` : '';
+    const response = await fetch(
+      `${this.baseUrl}/threads/${encodeURIComponent(threadId)}/run-ids${suffix}`
+    );
+    if (!response.ok) {
+      throw new Error(`Failed to fetch thread run ids: ${response.status}`);
+    }
+    return (await response.json()) as string[];
   }
 }

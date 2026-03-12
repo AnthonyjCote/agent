@@ -171,6 +171,28 @@ async fn run_events(
     Json(state.runtime.list_run_events(&run_id))
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CancelRunResponse {
+    cancelled: bool,
+}
+
+async fn cancel_run(
+    State(state): State<AppState>,
+    Path(run_id): Path<String>,
+) -> Json<CancelRunResponse> {
+    Json(CancelRunResponse {
+        cancelled: state.runtime.cancel_run(&run_id),
+    })
+}
+
+async fn thread_run_ids(
+    State(state): State<AppState>,
+    Path(thread_id): Path<String>,
+) -> Json<Vec<String>> {
+    Json(state.runtime.list_thread_run_ids(&thread_id, 50))
+}
+
 async fn list_agent_manifests(
     State(state): State<AppState>,
 ) -> Result<Json<Vec<serde_json::Value>>, (axum::http::StatusCode, String)> {
@@ -925,6 +947,7 @@ async fn main() {
             "/threads/{thread_id}/messages",
             get(list_thread_messages).post(append_thread_message),
         )
+        .route("/threads/{thread_id}/run-ids", get(thread_run_ids))
         .route("/comms/accounts", get(list_comms_accounts).post(upsert_comms_account))
         .route("/comms/threads", get(list_comms_threads).post(create_comms_thread))
         .route(
@@ -937,6 +960,7 @@ async fn main() {
         )
         .route("/runs", post(start_run))
         .route("/runs/{run_id}/events", get(run_events))
+        .route("/runs/{run_id}/cancel", post(cancel_run))
         .route("/work-units", get(list_work_units))
         .route("/work-units/dispatch", post(dispatch_work_unit))
         .with_state(app_state)

@@ -11,6 +11,7 @@ use agent_core::{
 use super::{
     invoke_stream::{build_headless_command, GeminiInvokeRequest},
     parse_events::extract_text_chunks,
+    run_process_registry::{cancel_run_process, clear_run_process, register_run_process, was_cancel_requested},
     types::GeminiOutputFormat,
     workspace::{
         ensure_workspace_context, AGENT_DECK_GEMINI_ACK_ALIAS,
@@ -20,6 +21,10 @@ use super::{
 
 #[derive(Debug, Default)]
 pub struct GeminiCliModelInference;
+
+pub fn cancel_active_gemini_run(run_id: &str) -> bool {
+    cancel_run_process(run_id)
+}
 
 fn default_model_name(profile: Option<&str>) -> Option<String> {
     match profile.unwrap_or("deep_default") {
@@ -123,6 +128,7 @@ impl ModelInferencePort for GeminiCliModelInference {
                 message: format!("Failed to spawn Gemini CLI: {error}"),
                 retryable: true,
             })?;
+        register_run_process(&request.run_id, child.id());
 
         let stdout = child.stdout.take().ok_or_else(|| RunError {
             code: "gemini_stream_stdout_missing".to_string(),
@@ -136,11 +142,13 @@ impl ModelInferencePort for GeminiCliModelInference {
 
         loop {
             line.clear();
-            let read = reader.read_line(&mut line).map_err(|error| RunError {
+            let read = reader.read_line(&mut line).map_err(|error| {
+                clear_run_process(&request.run_id);
+                RunError {
                 code: "gemini_stream_read_failed".to_string(),
                 message: format!("Failed reading Gemini stream: {error}"),
                 retryable: true,
-            })?;
+            }})?;
             if read == 0 {
                 break;
             }
@@ -156,11 +164,23 @@ impl ModelInferencePort for GeminiCliModelInference {
             }
         }
 
-        let output = child.wait_with_output().map_err(|error| RunError {
+        let output = child.wait_with_output().map_err(|error| {
+            clear_run_process(&request.run_id);
+            RunError {
             code: "gemini_stream_wait_failed".to_string(),
             message: format!("Failed waiting on Gemini CLI: {error}"),
             retryable: true,
-        })?;
+        }})?;
+        let cancelled = was_cancel_requested(&request.run_id);
+        clear_run_process(&request.run_id);
+
+        if cancelled {
+            return Err(RunError {
+                code: "run_cancelled".to_string(),
+                message: "Run cancelled by user.".to_string(),
+                retryable: false,
+            });
+        }
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();

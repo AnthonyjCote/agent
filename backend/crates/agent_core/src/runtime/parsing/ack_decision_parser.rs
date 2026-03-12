@@ -1,15 +1,6 @@
 use serde::Deserialize;
 
-use crate::{
-    models::run::RunError,
-    runtime::logging::work_log::compact_for_log,
-    tools::{
-        toolbox::sanitize_requested_tool_ids,
-        toolbox_prefetch::{PrefetchSpec, PrefetchSpecRaw},
-    },
-};
-
-const ACK_PREFETCH_MAX: usize = 5;
+use crate::models::run::RunError;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum AckDecision {
@@ -29,72 +20,38 @@ impl AckDecision {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "snake_case")]
 struct AckEnvelopeRaw {
     decision: Option<String>,
     ack_text: Option<String>,
-    prefetch_tools: Option<Vec<AckPrefetchEntryRaw>>,
-    requires_web_search: Option<bool>,
-    expansions: Option<AckExpansionsRaw>,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(untagged)]
-enum AckPrefetchEntryRaw {
-    ToolId(String),
-    ToolSpec(PrefetchSpecRaw),
-}
-
-#[derive(Debug, Deserialize)]
-struct AckExpansionsRaw {
     #[serde(default)]
-    comms: Option<AckCommsExpansionRaw>,
+    target_domains: Vec<String>,
+    primary_intent: Option<String>,
     #[serde(default)]
-    org: Option<AckOrgExpansionRaw>,
-}
-
-#[derive(Debug, Deserialize)]
-struct AckCommsExpansionRaw {
+    named_entities: Vec<String>,
     #[serde(default)]
-    enabled: Option<bool>,
+    filter_keywords: Vec<String>,
     #[serde(default)]
-    intent: Option<String>,
-    #[serde(default)]
-    method: Option<String>,
-    #[serde(default)]
-    recipient_ref: Option<String>,
-    #[serde(default)]
-    folder: Option<String>,
-    #[serde(default)]
-    query: Option<String>,
-    #[serde(default)]
-    from_participant: Option<String>,
-    #[serde(default)]
-    to_participant: Option<String>,
-    #[serde(default)]
-    subject_contains: Option<String>,
-    #[serde(default)]
-    state: Option<String>,
-}
-
-#[derive(Debug, Deserialize)]
-struct AckOrgExpansionRaw {
-    #[serde(default)]
-    enabled: Option<bool>,
-    #[serde(default)]
-    intent: Option<String>,
-    #[serde(default)]
-    name_ref: Option<String>,
-    #[serde(default)]
-    unit_ref: Option<String>,
+    relative_dates: Vec<String>,
 }
 
 #[derive(Debug, Clone)]
 pub(crate) struct AckEnvelope {
     pub decision: AckDecision,
     pub ack_text: String,
-    pub prefetch_tools: Vec<String>,
-    pub prefetch_specs: Vec<PrefetchSpec>,
-    pub requires_web_search: bool,
+    pub target_domains: Vec<String>,
+    pub primary_intent: String,
+    pub named_entities: Vec<String>,
+    pub filter_keywords: Vec<String>,
+    pub relative_dates: Vec<String>,
+}
+
+impl AckEnvelope {
+    pub fn has_target_domain(&self, value: &str) -> bool {
+        self.target_domains
+            .iter()
+            .any(|entry| entry.eq_ignore_ascii_case(value))
+    }
 }
 
 fn decision_from_text(value: &str) -> Option<AckDecision> {
@@ -106,156 +63,108 @@ fn decision_from_text(value: &str) -> Option<AckDecision> {
     }
 }
 
-fn parse_ack_envelope(raw: &str, allowed_tool_ids: &[String]) -> Option<AckEnvelope> {
-    fn clean_optional(value: Option<String>) -> Option<String> {
-        value.map(|item| item.trim().to_string()).filter(|item| !item.is_empty())
+fn normalize_json_candidate(candidate: &str) -> Option<String> {
+    let trimmed = candidate.trim();
+    if trimmed.is_empty() {
+        return None;
     }
-
-    fn normalize_json_candidate(candidate: &str) -> Option<String> {
-        let trimmed = candidate.trim();
-        if trimmed.is_empty() {
-            return None;
+    let unfenced = if trimmed.starts_with("```") {
+        let mut lines = trimmed.lines();
+        let _ = lines.next();
+        let mut body = lines.collect::<Vec<_>>();
+        if body
+            .last()
+            .map(|line| line.trim_start().starts_with("```"))
+            == Some(true)
+        {
+            body.pop();
         }
-        let unfenced = if trimmed.starts_with("```") {
-            let mut lines = trimmed.lines();
-            let _ = lines.next();
-            let mut body = lines.collect::<Vec<_>>();
-            if body
-                .last()
-                .map(|line| line.trim_start().starts_with("```"))
-                == Some(true)
-            {
-                body.pop();
-            }
-            body.join("\n")
-        } else {
-            trimmed.to_string()
-        };
-        let start = unfenced.find('{')?;
-        let end = unfenced.rfind('}')?;
-        if end <= start {
-            return None;
-        }
-        Some(unfenced[start..=end].to_string())
+        body.join("\n")
+    } else {
+        trimmed.to_string()
+    };
+    let start = unfenced.find('{')?;
+    let end = unfenced.rfind('}')?;
+    if end <= start {
+        return None;
     }
+    Some(unfenced[start..=end].to_string())
+}
 
-    fn parse_candidate(candidate: &str, allowed_tool_ids: &[String]) -> Option<AckEnvelope> {
-        let normalized = normalize_json_candidate(candidate)?;
-        let parsed: AckEnvelopeRaw = serde_json::from_str(&normalized).ok()?;
-        let decision = decision_from_text(parsed.decision.as_deref().unwrap_or(""))?;
-        let ack_text = parsed.ack_text.unwrap_or_default().trim().to_string();
-        if ack_text.is_empty() {
-            return None;
+fn normalize_csv(values: Vec<String>) -> Vec<String> {
+    values
+        .into_iter()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .collect()
+}
+
+fn normalize_target_domains(values: Vec<String>) -> Vec<String> {
+    const ALLOWED: &[&str] = &["comms", "org", "calendar", "tasks", "websearch"];
+    let mut out = Vec::new();
+    for value in values {
+        let normalized = value.trim().to_ascii_lowercase();
+        if normalized.is_empty() {
+            continue;
         }
-        let mut requested_tool_ids = Vec::new();
-        let mut requested_specs = Vec::new();
-        for entry in parsed.prefetch_tools.unwrap_or_default() {
-            match entry {
-                AckPrefetchEntryRaw::ToolId(tool_id) => {
-                    requested_tool_ids.push(tool_id);
-                }
-                AckPrefetchEntryRaw::ToolSpec(spec) => {
-                    requested_tool_ids.push(spec.tool.clone());
-                    requested_specs.push(PrefetchSpec {
-                        tool: spec.tool,
-                        intent: spec.intent.map(|value| value.trim().to_string()).filter(|value| !value.is_empty()),
-                        args: spec.args.unwrap_or(serde_json::Value::Object(serde_json::Map::new())),
-                    });
-                }
-            }
+        if ALLOWED.contains(&normalized.as_str()) && !out.iter().any(|entry| entry == &normalized) {
+            out.push(normalized);
         }
-        if let Some(expansions) = parsed.expansions {
-            if let Some(comms) = expansions.comms {
-                if comms.enabled.unwrap_or(false) {
-                    let intent = clean_optional(comms.intent).unwrap_or_else(|| "message_send".to_string());
-                    let args = serde_json::json!({
-                        "method": clean_optional(comms.method).unwrap_or_else(|| "unknown".to_string()),
-                        "recipient_ref": clean_optional(comms.recipient_ref).unwrap_or_default(),
-                        "folder": clean_optional(comms.folder).unwrap_or_else(|| "inbox".to_string()),
-                        "query": clean_optional(comms.query).unwrap_or_default(),
-                        "from_participant": clean_optional(comms.from_participant).unwrap_or_default(),
-                        "to_participant": clean_optional(comms.to_participant).unwrap_or_default(),
-                        "subject_contains": clean_optional(comms.subject_contains).unwrap_or_default(),
-                        "state": clean_optional(comms.state).unwrap_or_default(),
-                    });
-                    requested_tool_ids.push("comms_tool".to_string());
-                    requested_specs.push(PrefetchSpec {
-                        tool: "comms_tool".to_string(),
-                        intent: Some(intent),
-                        args,
-                    });
-                }
-            }
-            if let Some(org) = expansions.org {
-                if org.enabled.unwrap_or(false) {
-                    let intent = clean_optional(org.intent).unwrap_or_else(|| "org_read_snapshot".to_string());
-                    let args = serde_json::json!({
-                        "name_ref": clean_optional(org.name_ref).unwrap_or_default(),
-                        "unit_ref": clean_optional(org.unit_ref).unwrap_or_default(),
-                    });
-                    requested_tool_ids.push("org_manage_entities_v2".to_string());
-                    requested_specs.push(PrefetchSpec {
-                        tool: "org_manage_entities_v2".to_string(),
-                        intent: Some(intent),
-                        args,
-                    });
-                }
-            }
-        }
-        let mut prefetch = sanitize_requested_tool_ids(&requested_tool_ids, allowed_tool_ids);
-        if prefetch.len() > ACK_PREFETCH_MAX {
-            prefetch.truncate(ACK_PREFETCH_MAX);
-        }
-        let prefetch_set = prefetch.iter().map(String::as_str).collect::<std::collections::HashSet<_>>();
-        let mut dedupe_spec_keys = std::collections::HashSet::new();
-        let mut prefetch_specs = requested_specs
-            .into_iter()
-            .filter(|spec| prefetch_set.contains(spec.tool.as_str()))
-            .filter(|spec| {
-                let key = format!(
-                    "{}|{}|{}",
-                    spec.tool,
-                    spec.intent.clone().unwrap_or_default(),
-                    compact_for_log(&spec.args.to_string(), 320)
-                );
-                dedupe_spec_keys.insert(key)
-            })
-            .collect::<Vec<_>>();
-        if prefetch_specs.len() > ACK_PREFETCH_MAX {
-            prefetch_specs.truncate(ACK_PREFETCH_MAX);
-        }
-        let requires_web_search = parsed.requires_web_search.unwrap_or(false);
-        Some(AckEnvelope {
-            decision,
-            ack_text,
-            prefetch_tools: prefetch,
-            prefetch_specs,
-            requires_web_search,
-        })
     }
+    out
+}
 
+fn normalize_primary_intent(value: Option<String>) -> String {
+    let raw = value
+        .map(|item| item.trim().to_ascii_lowercase())
+        .filter(|item| !item.is_empty())
+        .unwrap_or_else(|| "unknown".to_string());
+    match raw.as_str() {
+        "read" | "write" | "edit" | "analyze" | "mixed" | "unknown" => raw,
+        _ => "unknown".to_string(),
+    }
+}
+
+fn parse_candidate(candidate: &str) -> Option<AckEnvelope> {
+    let normalized = normalize_json_candidate(candidate)?;
+    let parsed: AckEnvelopeRaw = serde_json::from_str(&normalized).ok()?;
+    let decision = decision_from_text(parsed.decision.as_deref().unwrap_or(""))?;
+    let ack_text = parsed.ack_text.unwrap_or_default().trim().to_string();
+    if ack_text.is_empty() {
+        return None;
+    }
+    Some(AckEnvelope {
+        decision,
+        ack_text,
+        target_domains: normalize_target_domains(parsed.target_domains),
+        primary_intent: normalize_primary_intent(parsed.primary_intent),
+        named_entities: normalize_csv(parsed.named_entities),
+        filter_keywords: normalize_csv(parsed.filter_keywords),
+        relative_dates: normalize_csv(parsed.relative_dates),
+    })
+}
+
+fn parse_ack_envelope(raw: &str) -> Option<AckEnvelope> {
     let trimmed = raw.trim();
-    if let Some(envelope) = parse_candidate(trimmed, allowed_tool_ids) {
+    if let Some(envelope) = parse_candidate(trimmed) {
         return Some(envelope);
     }
-
     for (index, ch) in trimmed.char_indices().rev() {
         if ch != '{' {
             continue;
         }
-        if let Some(envelope) = parse_candidate(&trimmed[index..], allowed_tool_ids) {
+        if let Some(envelope) = parse_candidate(&trimmed[index..]) {
             return Some(envelope);
         }
     }
-
     None
 }
 
 pub(crate) fn resolve_ack_envelope(
     raw_ack_output: &str,
-    allowed_tool_ids: &[String],
+    _allowed_tool_ids: &[String],
 ) -> Result<AckEnvelope, RunError> {
-    if let Some(envelope) = parse_ack_envelope(raw_ack_output, allowed_tool_ids) {
+    if let Some(envelope) = parse_ack_envelope(raw_ack_output) {
         return Ok(envelope);
     }
 

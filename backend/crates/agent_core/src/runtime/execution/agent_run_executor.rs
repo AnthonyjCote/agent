@@ -59,6 +59,16 @@ pub fn execute_run_once_with_tools<M: ModelInferencePort>(
     let ack_envelope = match run_ack_stage(&context, inference, on_event, &trace_store) {
         Ok(value) => value,
         Err(error) => {
+            if error.code == "run_cancelled" {
+                append_event(
+                    &trace_store,
+                    on_event,
+                    RunEvent::RunCancelled {
+                        run_id: context.run_id.clone(),
+                    },
+                );
+                return trace_store.snapshot();
+            }
             append_event(
                 &trace_store,
                 on_event,
@@ -86,6 +96,7 @@ pub fn execute_run_once_with_tools<M: ModelInferencePort>(
         .deep_phase()
         .unwrap_or("deep_default")
         .to_string();
+    let requires_web_search = ack_envelope.has_target_domain("websearch");
     let PrefetchGateOutput {
         prefetched_tool_details,
         prefetch_resolution,
@@ -122,12 +133,22 @@ pub fn execute_run_once_with_tools<M: ModelInferencePort>(
             &prefetch_resolution.packets,
             &tool_results_log,
             &work_log,
-            ack_envelope.requires_web_search,
+            requires_web_search,
             on_event,
             &trace_store,
         ) {
             Ok(value) => value,
             Err(error) => {
+                if error.code == "run_cancelled" {
+                    append_event(
+                        &trace_store,
+                        on_event,
+                        RunEvent::RunCancelled {
+                            run_id: context.run_id.clone(),
+                        },
+                    );
+                    return trace_store.snapshot();
+                }
                 append_event(
                     &trace_store,
                     on_event,

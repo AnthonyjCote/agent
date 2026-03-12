@@ -14,9 +14,23 @@ use crate::{
 fn looks_like_ack_tool_use(lines: &[String]) -> bool {
     lines.iter().any(|line| {
         let compact = line.trim();
-        compact.contains("\"type\":\"tool_use\"")
-            || compact.contains("\"tool_calls\"")
-            || compact.contains("\"type\":\"tool_result\"")
+        if compact.is_empty() {
+            return false;
+        }
+        if !(compact.starts_with('{') && compact.ends_with('}')) {
+            return false;
+        }
+        let parsed = serde_json::from_str::<serde_json::Value>(compact).ok();
+        let Some(value) = parsed else {
+            return false;
+        };
+        let event_type = value
+            .get("type")
+            .and_then(|raw| raw.as_str())
+            .unwrap_or("")
+            .trim()
+            .to_ascii_lowercase();
+        event_type == "tool_use" || event_type == "tool_result"
     })
 }
 
@@ -133,14 +147,14 @@ pub(crate) fn run_ack_stage<M: ModelInferencePort>(
             run_id: context.run_id.clone(),
             phase: "ack_stage".to_string(),
             line: format!(
-                "{{\"type\":\"ack_decision_parsed\",\"decision\":\"{}\",\"prefetch_count\":{},\"requires_web_search\":{}}}",
+                "{{\"type\":\"ack_decision_parsed\",\"decision\":\"{}\",\"target_domains\":{},\"primary_intent\":\"{}\"}}",
                 match envelope.decision {
                     crate::runtime::parsing::ack_decision_parser::AckDecision::AckOnly => "ack_only",
                     crate::runtime::parsing::ack_decision_parser::AckDecision::HandoffDeepDefault => "handoff_deep_default",
                     crate::runtime::parsing::ack_decision_parser::AckDecision::HandoffDeepEscalate => "handoff_deep_escalate",
                 },
-                envelope.prefetch_specs.len(),
-                envelope.requires_web_search
+                serde_json::to_string(&envelope.target_domains).unwrap_or_else(|_| "[]".to_string()),
+                envelope.primary_intent
             ),
         },
     );

@@ -156,9 +156,19 @@ export class TauriTransport implements AgentRuntimeClient {
     return invoke<StartRunResponse>('start_run', { payload: input });
   }
 
+  async cancelRun(runId: string): Promise<boolean> {
+    const invoke = await this.getInvoke();
+    return invoke<boolean>('cancel_run', { runId });
+  }
+
   async listRunEvents(runId: string): Promise<RuntimeRunEvent[]> {
     const invoke = await this.getInvoke();
     return invoke<RuntimeRunEvent[]>('list_run_events', { runId });
+  }
+
+  async listThreadRunIds(threadId: string, limit?: number): Promise<string[]> {
+    const invoke = await this.getInvoke();
+    return invoke<string[]>('list_thread_run_ids', { threadId, limit });
   }
 
   private async getInvoke(): Promise<TauriInvoke> {

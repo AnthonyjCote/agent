@@ -51,6 +51,24 @@ function resolveRunStatus(events: RuntimeRunEvent[], fallback: RunDebugStatus = 
   return fallback;
 }
 
+function extractPromptFromRunEvents(events: RuntimeRunEvent[]): string {
+  const request = events.find(
+    (event) => event.event === 'debug_model_request' && typeof event.payload === 'string'
+  );
+  if (!request || typeof request.payload !== 'string') {
+    return '';
+  }
+  const payload = request.payload;
+  const marker = 'User prompt:';
+  const index = payload.indexOf(marker);
+  if (index < 0) {
+    return '';
+  }
+  const tail = payload.slice(index + marker.length).trimStart();
+  const firstLine = tail.split('\n')[0]?.trim() ?? '';
+  return firstLine;
+}
+
 function buildAssistantContent(events: RuntimeRunEvent[]): string {
   const lines: string[] = [];
 
@@ -417,6 +435,7 @@ export function useChatGuiState(runtimeClient: AgentRuntimeClient) {
   const [clientDebugEvents, setClientDebugEvents] = useState<RuntimeRunEvent[]>([]);
   const [debugRuns, setDebugRuns] = useState<RunDebugRecord[]>([]);
   const [selectedDebugRunId, setSelectedDebugRunId] = useState<string | null>(null);
+  const cancelledRunsRef = useRef<Set<string>>(new Set());
 
   const wait = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms));
   const toChatMessage = (
@@ -454,6 +473,43 @@ export function useChatGuiState(runtimeClient: AgentRuntimeClient) {
     setMessages(rows.map((row) => toChatMessage(row, activeAgent)));
   };
 
+  const hydrateDebugRunsForThread = async (threadId: string, activeAgent: ActiveAgent) => {
+    const runIds = await runtimeClient.listThreadRunIds(threadId, 80);
+    if (runIds.length === 0) {
+      setDebugRuns((current) => current.filter((record) => record.threadId !== threadId));
+      return;
+    }
+
+    const hydrated = await Promise.all(
+      runIds.map(async (runId, index) => {
+        const runtimeEvents = await runtimeClient.listRunEvents(runId);
+        return {
+          runId,
+          threadId,
+          startedAt: Date.now() - index,
+          prompt: extractPromptFromRunEvents(runtimeEvents),
+          agentId: activeAgent.id,
+          agentName: activeAgent.name,
+          agentRole: activeAgent.role || 'General Assistant',
+          status: resolveRunStatus(runtimeEvents, 'completed'),
+          clientDebugEvents: [] as RuntimeRunEvent[],
+          runtimeEvents
+        } as RunDebugRecord;
+      })
+    );
+
+    setDebugRuns((current) => {
+      const otherThreads = current.filter((record) => record.threadId !== threadId);
+      const runningUnpersisted = current.filter(
+        (record) =>
+          record.threadId === threadId &&
+          record.status === 'running' &&
+          !runIds.includes(record.runId)
+      );
+      return [...runningUnpersisted, ...hydrated, ...otherThreads];
+    });
+  };
+
   const activateAgent = async (activeAgent: ActiveAgent) => {
     const listed = await refreshThreads();
     const agentThreads = listed.filter((thread) => thread.operatorId === activeAgent.id);
@@ -464,16 +520,19 @@ export function useChatGuiState(runtimeClient: AgentRuntimeClient) {
     setActiveThreadId(threadId);
     if (!threadId) {
       setMessages([]);
+      setDebugRuns((current) => current.filter((record) => record.agentId !== activeAgent.id));
       return;
     }
     selectedThreadByOperatorRef.current[activeAgent.id] = threadId;
     await loadThreadMessages(threadId, activeAgent);
+    await hydrateDebugRunsForThread(threadId, activeAgent);
   };
 
   const openThread = async (threadId: string, activeAgent: ActiveAgent) => {
     selectedThreadByOperatorRef.current[activeAgent.id] = threadId;
     setActiveThreadId(threadId);
     await loadThreadMessages(threadId, activeAgent);
+    await hydrateDebugRunsForThread(threadId, activeAgent);
   };
 
   const createThread = async (activeAgent: ActiveAgent, title?: string) => {
@@ -545,6 +604,24 @@ export function useChatGuiState(runtimeClient: AgentRuntimeClient) {
 
     for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
       const events = await runtimeClient.listRunEvents(runId);
+      if (cancelledRunsRef.current.has(runId)) {
+        const cancelledEvent: RuntimeRunEvent = {
+          event: 'run_cancelled',
+          runId,
+          message: 'Run cancelled by user.'
+        };
+        const merged = events.some((event) => event.event === 'run_cancelled')
+          ? events
+          : [...events, cancelledEvent];
+        setRunEvents(merged);
+        upsertDebugRun(runId, (record) => ({
+          ...record,
+          runtimeEvents: merged,
+          clientDebugEvents: [...record.clientDebugEvents, cancelledEvent],
+          status: 'cancelled'
+        }));
+        return merged;
+      }
       setRunEvents(events);
       const pendingState = resolvePendingAssistantState(events);
       updatePendingAssistantMessage(runId, pendingState.responseDraft, true, pendingState.reasoning, undefined, pendingState.status);
@@ -601,6 +678,39 @@ export function useChatGuiState(runtimeClient: AgentRuntimeClient) {
     }));
 
     return resolved;
+  };
+
+  const stopActiveRun = async () => {
+    const runId = activeRunId;
+    if (!runId) {
+      return;
+    }
+    cancelledRunsRef.current.add(runId);
+    const cancelledEvent: RuntimeRunEvent = {
+      event: 'run_cancelled',
+      runId,
+      message: 'Run cancelled by user.'
+    };
+    setRunEvents((current) =>
+      current.some((event) => event.event === 'run_cancelled') ? current : [...current, cancelledEvent]
+    );
+    setClientDebugEvents((current) => [...current, cancelledEvent]);
+    updatePendingAssistantMessage(runId, 'Run stopped by user.', false, '', undefined, '');
+    upsertDebugRun(runId, (record) => ({
+      ...record,
+      runtimeEvents: record.runtimeEvents.some((event) => event.event === 'run_cancelled')
+        ? record.runtimeEvents
+        : [...record.runtimeEvents, cancelledEvent],
+      clientDebugEvents: [...record.clientDebugEvents, cancelledEvent],
+      status: 'cancelled'
+    }));
+    setIsRunning(false);
+    setActiveRunId(null);
+    try {
+      await runtimeClient.cancelRun(runId);
+    } catch {
+      // UI state is already stopped; backend may finish naturally if cancel is unavailable.
+    }
   };
 
   const submitDraft = async (activeAgent: ActiveAgent) => {
@@ -676,6 +786,7 @@ export function useChatGuiState(runtimeClient: AgentRuntimeClient) {
       },
       ...current.filter((record) => record.runId !== runId)
     ]);
+    cancelledRunsRef.current.delete(runId);
 
     try {
       await runtimeClient.appendThreadMessage({
@@ -717,12 +828,15 @@ export function useChatGuiState(runtimeClient: AgentRuntimeClient) {
       }));
 
       const finalContent = buildAssistantContent(events);
-      await runtimeClient.appendThreadMessage({
-        threadId,
-        role: 'assistant',
-        content: finalContent
-      });
-      updatePendingAssistantMessage(runId, finalContent, false, '', buildSearchQueryLinks(events), '');
+      const wasCancelled = cancelledRunsRef.current.has(runId) || events.some((event) => event.event === 'run_cancelled');
+      if (!wasCancelled) {
+        await runtimeClient.appendThreadMessage({
+          threadId,
+          role: 'assistant',
+          content: finalContent
+        });
+        updatePendingAssistantMessage(runId, finalContent, false, '', buildSearchQueryLinks(events), '');
+      }
       void refreshThreads();
     } catch (error) {
       const runtimeErrorEvent: RuntimeRunEvent = {
@@ -755,6 +869,8 @@ export function useChatGuiState(runtimeClient: AgentRuntimeClient) {
       );
     } finally {
       setIsRunning(false);
+      setActiveRunId(null);
+      cancelledRunsRef.current.delete(runId);
     }
   };
 
@@ -773,6 +889,7 @@ export function useChatGuiState(runtimeClient: AgentRuntimeClient) {
     setSelectedDebugRunId,
     setDraft,
     submitDraft,
+    stopActiveRun,
     activateAgent,
     openThread,
     createThread,

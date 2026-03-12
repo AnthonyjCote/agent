@@ -605,6 +605,108 @@ impl PersistenceStateStore {
         })
     }
 
+    pub fn replace_run_events(
+        &self,
+        workspace_id: &str,
+        run_id: &str,
+        events_json: &[Value],
+    ) -> Result<(), PersistenceError> {
+        let mut connection = self.open_runtime_db()?;
+        let transaction = connection
+            .transaction()
+            .map_err(|error| self.runtime_sql_error("Failed to begin replace_run_events transaction", error))?;
+        transaction
+            .execute(
+                "DELETE FROM run_events WHERE workspace_id = ?1 AND run_id = ?2",
+                params![workspace_id, run_id],
+            )
+            .map_err(|error| self.runtime_sql_error("Failed to clear run events", error))?;
+        let now = now_ms();
+        for (index, event) in events_json.iter().enumerate() {
+            let serialized = serde_json::to_string(event).map_err(|error| PersistenceError::JsonSerialize {
+                context: "Failed to serialize run event",
+                source: error,
+            })?;
+            transaction
+                .execute(
+                    "
+                    INSERT INTO run_events (workspace_id, run_id, event_index, event_json, created_at_ms)
+                    VALUES (?1, ?2, ?3, ?4, ?5)
+                    ",
+                    params![workspace_id, run_id, index as i64, serialized, now],
+                )
+                .map_err(|error| self.runtime_sql_error("Failed to insert run event", error))?;
+        }
+        transaction
+            .commit()
+            .map_err(|error| self.runtime_sql_error("Failed to commit replace_run_events transaction", error))?;
+        Ok(())
+    }
+
+    pub fn list_run_events(
+        &self,
+        workspace_id: &str,
+        run_id: &str,
+    ) -> Result<Vec<Value>, PersistenceError> {
+        let connection = self.open_runtime_db()?;
+        let mut statement = connection
+            .prepare(
+                "
+                SELECT event_json
+                FROM run_events
+                WHERE workspace_id = ?1 AND run_id = ?2
+                ORDER BY event_index ASC
+                ",
+            )
+            .map_err(|error| self.runtime_sql_error("Failed to prepare list_run_events query", error))?;
+        let rows = statement
+            .query_map(params![workspace_id, run_id], |row| row.get::<_, String>(0))
+            .map_err(|error| self.runtime_sql_error("Failed to query run events", error))?;
+
+        let mut result = Vec::new();
+        for row in rows {
+            let value = row.map_err(|error| self.runtime_sql_error("Failed to read run event row", error))?;
+            if let Ok(parsed) = serde_json::from_str::<Value>(&value) {
+                result.push(parsed);
+            }
+        }
+        Ok(result)
+    }
+
+    pub fn list_thread_run_ids(
+        &self,
+        workspace_id: &str,
+        thread_id: &str,
+        limit: i64,
+    ) -> Result<Vec<String>, PersistenceError> {
+        let connection = self.open_runtime_db()?;
+        let mut statement = connection
+            .prepare(
+                "
+                SELECT run_id
+                FROM run_events
+                WHERE workspace_id = ?1
+                  AND json_extract(event_json, '$.event') = 'run_started'
+                  AND json_extract(event_json, '$.thread_id') = ?2
+                GROUP BY run_id
+                ORDER BY MAX(created_at_ms) DESC
+                LIMIT ?3
+                ",
+            )
+            .map_err(|error| self.runtime_sql_error("Failed to prepare list_thread_run_ids query", error))?;
+        let rows = statement
+            .query_map(params![workspace_id, thread_id, limit.max(1).min(200)], |row| row.get::<_, String>(0))
+            .map_err(|error| self.runtime_sql_error("Failed to query thread run ids", error))?;
+
+        let mut result = Vec::new();
+        for row in rows {
+            result.push(
+                row.map_err(|error| self.runtime_sql_error("Failed to read thread run id row", error))?,
+            );
+        }
+        Ok(result)
+    }
+
     pub fn list_comms_accounts(
         &self,
         workspace_id: &str,
