@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { Operator, BusinessUnit, OrgCommand, OrgUnit } from '@/shared/config';
-import { TopRailShell } from '@/shared/ui';
+import { LeftColumnTopBar } from '@/shared/ui';
 import { canEditOrgNode } from '@/domains/agent-chart/lib/permissions';
 import type { PendingDelete } from '@/domains/agent-chart/surface/types';
 import type { OrgChartSelectionState } from '@/domains/agent-chart/surface/hooks';
@@ -94,7 +94,7 @@ export function OrgChartRightPane(props: OrgChartRightPaneProps) {
 
   return (
     <section className="agent-chart-right-pane" aria-label="Org item details">
-      <TopRailShell
+      <LeftColumnTopBar
         tone="raised"
         left={
           <div className="agent-chart-workspace-meta">

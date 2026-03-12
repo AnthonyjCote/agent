@@ -35,37 +35,79 @@
   min-height: 0;
   overflow: auto;
   padding: 10px;
-  display: grid;
-  align-content: start;
-  gap: 7px;
 }
 
-.comms-sms-thread-item {
-  padding: 6px 6px 6px 8px;
+.comms-sms-thread-list .data-list-table-row {
+  grid-template-columns: minmax(0, 1.6fr) auto auto;
+  min-height: 56px;
+}
+
+.comms-sms-thread-list .data-list-table-cell {
+  padding-left: 8px;
+  padding-right: 8px;
+}
+
+.comms-sms-thread-contact-cell {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 6px;
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
+  gap: 10px;
 }
 
-.comms-sms-thread-main {
-  border: 0;
-  background: transparent;
-  padding: 3px 0;
+.comms-sms-thread-contact-copy {
+  min-width: 0;
   display: grid;
-  gap: 4px;
-  text-align: left;
-  color: var(--text-primary);
-  cursor: pointer;
+  gap: 2px;
 }
 
-.comms-sms-thread-item strong {
+.comms-sms-thread-contact-copy strong {
   font-size: 12px;
+  line-height: 1.2;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.comms-sms-thread-item span {
+.comms-sms-thread-contact-copy span {
+  font-size: 10px;
+  line-height: 1.2;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.comms-sms-thread-state {
+  text-align: right;
+}
+
+.comms-sms-thread-state-cell {
+  display: grid;
+  gap: 3px;
+  justify-items: end;
+}
+
+.comms-sms-thread-state-cell em {
+  font-style: normal;
+  font-size: 10px;
+  text-transform: capitalize;
+  color: var(--text-primary);
+}
+
+.comms-sms-thread-state-cell span {
   font-size: 10px;
   color: var(--text-muted);
+}
+
+.comms-sms-thread-row-unread .comms-sms-thread-contact-copy strong,
+.comms-sms-thread-row-unread .comms-sms-thread-state-cell em {
+  font-weight: 700;
+}
+
+.comms-sms-thread-actions {
+  display: flex;
+  justify-content: flex-end;
 }
 
 .comms-sms-main {

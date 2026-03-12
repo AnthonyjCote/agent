@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { CommsMessageRecord, CommsThreadRecord } from '@agent-deck/runtime-client';
-import { AgentAvatar, ColumnCard, DataListTable, LeftColumnShell, LeftColumnTopBar, TextButton, WorkspaceSurface } from '@/shared/ui';
+import { AgentAvatar, DataListTable, IconButton, LeftColumnShell, LeftColumnTopBar, TextButton, WorkspaceSurface } from '@/shared/ui';
 import { formatCommsTime, useCommsChannelState } from '@/domains/comms/model';
 import { inferHeuristicEmailTags } from '@/domains/comms/lib/emailHeuristicTags';
 import { useRuntimeClient } from '@/app/runtime/RuntimeProvider';
@@ -17,6 +17,13 @@ type CommsEmailSurfaceProps = {
   activeOperatorName: string;
   activeOperatorEmailAddress: string;
   contacts: ComposeEmailContact[];
+};
+
+type FolderSummary = {
+  id: string;
+  label: string;
+  count: number;
+  unreadCount: number;
 };
 
 type ThreadPreview = {
@@ -98,6 +105,14 @@ function visibleTagSummary(tags: string[], maxVisible = 2): { visible: string[];
   return { visible, overflow: Math.max(0, tags.length - visible.length) };
 }
 
+function AddIcon() {
+  return (
+    <svg viewBox="0 0 20 20" aria-hidden="true">
+      <path d="M10 4.25a.75.75 0 0 1 .75.75v4.25H15a.75.75 0 0 1 0 1.5h-4.25V15a.75.75 0 0 1-1.5 0v-4.25H5a.75.75 0 0 1 0-1.5h4.25V5a.75.75 0 0 1 .75-.75Z" fill="currentColor" />
+    </svg>
+  );
+}
+
 export function CommsEmailSurface({
   createRequestNonce,
   activeOperatorId,
@@ -117,6 +132,7 @@ export function CommsEmailSurface({
   const [sendingCompose, setSendingCompose] = useState(false);
   const [readOpen, setReadOpen] = useState(false);
   const [threadPreviewMap, setThreadPreviewMap] = useState<Record<string, ThreadPreview>>({});
+  const [folderSummaryMap, setFolderSummaryMap] = useState<Record<string, { count: number; unreadCount: number }>>({});
   const state = useCommsChannelState({
     channel: 'email',
     folder,
@@ -138,6 +154,56 @@ export function CommsEmailSurface({
   );
   const selectedThreadIsRead = (selectedThread?.state || '').toLowerCase() === 'read';
   const latestSelectedMessage = state.messages[state.messages.length - 1] ?? null;
+  const folderRows = useMemo<FolderSummary[]>(
+    () =>
+      emailFolders.map((item) => ({
+        id: item,
+        label: item,
+        count: folderSummaryMap[item]?.count ?? 0,
+        unreadCount: folderSummaryMap[item]?.unreadCount ?? 0
+      })),
+    [emailFolders, folderSummaryMap]
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    const accountId = state.activeAccount?.accountId;
+    if (!accountId) {
+      setFolderSummaryMap({});
+      return;
+    }
+    void (async () => {
+      try {
+        const allThreads = await runtimeClient.listCommsThreads({
+          channel: 'email',
+          accountId,
+          limit: 1000,
+          offset: 0
+        });
+        if (cancelled) {
+          return;
+        }
+        const next: Record<string, { count: number; unreadCount: number }> = {};
+        for (const thread of allThreads) {
+          const key = (thread.folder || 'inbox').toLowerCase();
+          const current = next[key] || { count: 0, unreadCount: 0 };
+          current.count += 1;
+          if ((thread.state || '').toLowerCase() === 'unread') {
+            current.unreadCount += 1;
+          }
+          next[key] = current;
+        }
+        setFolderSummaryMap(next);
+      } catch {
+        if (!cancelled) {
+          setFolderSummaryMap({});
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [runtimeClient, state.activeAccount?.accountId, state.threads]);
   useEffect(() => {
     let cancelled = false;
     const contactByAddress = new Map(contacts.map((contact) => [contact.address.toLowerCase(), contact]));
@@ -435,24 +501,56 @@ export function CommsEmailSurface({
           <aside className="comms-email-sidebar">
             <LeftColumnTopBar
               tone="raised"
-              left={<span className="comms-email-sidebar-title">Email Folders</span>}
+              left={
+                <div className="comms-email-sidebar-title-wrap">
+                  <span className="comms-email-sidebar-title">Email Folders</span>
+                  <IconButton
+                    variant="compact-action"
+                    icon={<AddIcon />}
+                    ariaLabel="Add email folder"
+                    onClick={handleAddFolder}
+                  />
+                </div>
+              }
               right={<span className="comms-email-sidebar-count">{state.threads.length} thread(s)</span>}
             />
             <div className="comms-email-sidebar-body">
-              <div className="comms-email-folders">
-                {emailFolders.map((item) => (
-                  <ColumnCard
-                    key={item}
-                    as="button"
-                    className="comms-email-folder"
-                    active={folder === item}
-                    title={item}
-                    onClick={() => setFolder(item)}
-                  />
-                ))}
-                <button type="button" className="comms-email-folder-add" onClick={handleAddFolder} aria-label="Add email folder">
-                  +
-                </button>
+              <div className="comms-email-folder-table">
+                <DataListTable
+                  variant="full-bleed"
+                  showHeader={false}
+                  columns={[
+                    {
+                      key: 'name',
+                      header: 'Folder',
+                      className: 'comms-email-folder-name',
+                      render: (row: FolderSummary) => (
+                        <div className="comms-email-folder-name-cell">
+                          <strong>{row.label}</strong>
+                        </div>
+                      )
+                    },
+                    {
+                      key: 'count',
+                      header: 'Count',
+                      className: 'comms-email-folder-count',
+                      render: (row: FolderSummary) => <span>{row.count}</span>
+                    },
+                    {
+                      key: 'unread',
+                      header: 'Unread',
+                      className: 'comms-email-folder-unread',
+                      render: (row: FolderSummary) =>
+                        row.unreadCount > 0 ? <span className="comms-email-folder-unread-pill">{row.unreadCount}</span> : <span />
+                    }
+                  ]}
+                  rows={folderRows}
+                  getRowKey={(row) => row.id}
+                  activeRowKey={folder}
+                  rowClassName={(row) => (row.unreadCount > 0 ? 'comms-email-folder-row-unread' : undefined)}
+                  onRowClick={(row) => setFolder(row.id)}
+                  emptyState={null}
+                />
               </div>
             </div>
           </aside>

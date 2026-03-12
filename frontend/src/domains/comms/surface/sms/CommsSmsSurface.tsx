@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { AgentAvatar, ColumnCard, ConfirmDialogModal, IconButton, LeftColumnShell, LeftColumnTopBar, TextButton, TextField, WorkspaceSurface } from '@/shared/ui';
+import { AgentAvatar, ConfirmDialogModal, DataListTable, IconButton, LeftColumnShell, LeftColumnTopBar, TextButton, TextField, WorkspaceSurface } from '@/shared/ui';
 import { useRuntimeClient } from '@/app/runtime/RuntimeProvider';
 import { formatCommsTime, useCommsChannelState } from '@/domains/comms/model';
 import { ComposeSmsModal, type ComposeSmsContact } from './compose-modal';
@@ -26,6 +26,15 @@ type CommsSmsSurfaceProps = {
     title: string;
     avatarDataUrl?: string;
   }>;
+};
+
+type SmsThreadRow = {
+  threadId: string;
+  displayName: string;
+  number: string;
+  avatarDataUrl?: string;
+  state: string;
+  updatedLabel: string;
 };
 
 export function CommsSmsSurface({
@@ -128,6 +137,27 @@ export function CommsSmsSurface({
     () => contactNumbers.find((contact) => contact.address === activeThreadPeerNumber) ?? null,
     [activeThreadPeerNumber, contactNumbers]
   );
+  const contactByNumber = useMemo(
+    () => new Map(contactNumbers.map((contact) => [contact.address, contact])),
+    [contactNumbers]
+  );
+  const smsThreadRows = useMemo<SmsThreadRow[]>(
+    () =>
+      state.threads.map((thread) => {
+        const participants = thread.participants as Record<string, unknown> | null;
+        const peerNumber = participants && typeof participants.peerNumber === 'string' ? participants.peerNumber : '';
+        const contact = contactByNumber.get(peerNumber);
+        return {
+          threadId: thread.threadId,
+          displayName: contact?.name || thread.title || peerNumber || 'Unknown contact',
+          number: contact?.address || peerNumber || thread.title || '(unknown number)',
+          avatarDataUrl: contact?.avatarDataUrl,
+          state: (thread.state || 'active').toString(),
+          updatedLabel: formatCommsTime(thread.lastMessageAtMs || thread.updatedAtMs)
+        };
+      }),
+    [contactByNumber, state.threads]
+  );
 
   const handleSendCompose = async () => {
     if (sendingCompose) {
@@ -207,36 +237,65 @@ export function CommsSmsSurface({
             />
             <div className="comms-sms-thread-list">
               {state.loading ? <div className="comms-sms-empty">Loading threads...</div> : null}
-              {!state.loading && state.threads.length === 0 ? <div className="comms-sms-empty">No threads yet.</div> : null}
-              {state.threads.map((thread) => (
-                <ColumnCard
-                  key={thread.threadId}
-                  className="comms-sms-thread-item"
-                  active={state.activeThreadId === thread.threadId}
-                >
-                  <button
-                    type="button"
-                    className="comms-sms-thread-main"
-                    onClick={() => state.setActiveThreadId(thread.threadId)}
-                  >
-                    <strong>{thread.title}</strong>
-                    <span>{formatCommsTime(thread.lastMessageAtMs || thread.updatedAtMs)}</span>
-                  </button>
-                  <IconButton
-                    variant="compact-action"
-                    ariaLabel={`Delete SMS thread ${thread.title}`}
-                    icon={(
-                      <svg viewBox="0 0 20 20" aria-hidden="true">
-                        <path d="M5.8 6.2h8.4m-7.1 0v8m2.9-8v8m2.9-8v8M7.7 4.5h4.6l.5 1.2h2v1.5H5.2V5.7h2zM6.7 7.2h6.6v8.1a1 1 0 0 1-1 1H7.7a1 1 0 0 1-1-1z" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    )}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      setPendingDeleteThreadId(thread.threadId);
-                    }}
-                  />
-                </ColumnCard>
-              ))}
+              {!state.loading ? (
+                <DataListTable
+                  variant="full-bleed"
+                  showHeader={false}
+                  columns={[
+                    {
+                      key: 'contact',
+                      header: 'Contact',
+                      className: 'comms-sms-thread-contact',
+                      render: (row: SmsThreadRow) => (
+                        <div className="comms-sms-thread-contact-cell">
+                          <AgentAvatar name={row.displayName} src={row.avatarDataUrl} size="sm" />
+                          <div className="comms-sms-thread-contact-copy">
+                            <strong>{row.displayName}</strong>
+                            <span>{row.number}</span>
+                          </div>
+                        </div>
+                      )
+                    },
+                    {
+                      key: 'state',
+                      header: 'State',
+                      className: 'comms-sms-thread-state',
+                      render: (row: SmsThreadRow) => (
+                        <div className="comms-sms-thread-state-cell">
+                          <em>{row.state}</em>
+                          <span>{row.updatedLabel}</span>
+                        </div>
+                      )
+                    },
+                    {
+                      key: 'actions',
+                      header: 'Actions',
+                      className: 'comms-sms-thread-actions',
+                      render: (row: SmsThreadRow) => (
+                        <IconButton
+                          variant="compact-action"
+                          ariaLabel={`Delete SMS thread ${row.displayName}`}
+                          icon={(
+                            <svg viewBox="0 0 20 20" aria-hidden="true">
+                              <path d="M5.8 6.2h8.4m-7.1 0v8m2.9-8v8m2.9-8v8M7.7 4.5h4.6l.5 1.2h2v1.5H5.2V5.7h2zM6.7 7.2h6.6v8.1a1 1 0 0 1-1 1H7.7a1 1 0 0 1-1-1z" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                          )}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setPendingDeleteThreadId(row.threadId);
+                          }}
+                        />
+                      )
+                    }
+                  ]}
+                  rows={smsThreadRows}
+                  getRowKey={(row) => row.threadId}
+                  activeRowKey={state.activeThreadId}
+                  rowClassName={(row) => (row.state.toLowerCase() === 'unread' ? 'comms-sms-thread-row-unread' : undefined)}
+                  onRowClick={(row) => state.setActiveThreadId(row.threadId)}
+                  emptyState={<div className="comms-sms-empty">No threads yet.</div>}
+                />
+              ) : null}
             </div>
           </aside>
         }

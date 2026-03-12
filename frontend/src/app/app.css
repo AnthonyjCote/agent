@@ -59,8 +59,8 @@
   --field-highlight: #1e2736;
 
   /* Cards */
-  --card-primary:
-  --card-seccondary:
+  --card-primary:#1b2330;
+  --card-seccondary:#1e2736;
   
   /* chat */
   --sent-bubble:#2d7cff;
@@ -83,4 +83,18 @@ body,
   background: var(--bg-base);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+}
+
+:where(
+  button,
+  a[href],
+  input,
+  select,
+  textarea,
+  [role="button"],
+  [tabindex]
+):focus-visible {
+  outline: 1px solid var(--border-strong);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 20%, transparent);
 }

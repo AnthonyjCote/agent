@@ -10,6 +10,7 @@
 // @domain: shared
 // @adr: none
 
+import { useEffect, useRef } from 'react';
 import type { PropsWithChildren, ReactNode } from 'react';
 import './ModalShell.css';
 
@@ -25,6 +26,15 @@ type ModalShellProps = PropsWithChildren<{
 }>;
 
 export function ModalShell({ open, title, size = 'medium', onClose, footer, children, ariaLabel }: ModalShellProps) {
+  const frameRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+    frameRef.current?.focus({ preventScroll: true });
+  }, [open]);
+
   if (!open) {
     return null;
   }
@@ -32,10 +42,12 @@ export function ModalShell({ open, title, size = 'medium', onClose, footer, chil
   return (
     <div className="modal-shell-overlay" role="presentation" onClick={onClose}>
       <section
+        ref={frameRef}
         className={`modal-shell-frame size-${size}`}
         role="dialog"
         aria-modal="true"
         aria-label={ariaLabel || title || 'Modal'}
+        tabIndex={-1}
         onClick={(event) => event.stopPropagation()}
       >
         {title ? (

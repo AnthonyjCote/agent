@@ -16,7 +16,7 @@
   min-width: 0;
   min-height: 0;
   overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--border-strong) 82%, transparent);
+  border: none;
   background: var(--bg-base);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, #31425c 26%, transparent);
+  box-shadow: none;
 }
